@@ -1,8 +1,10 @@
 const { load } = require('./load');
-const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'data/rosters2025.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js']);
+const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', 'data/history/seasons/' + (process.argv[3] || '2025') + '.js']);
+// Preload following seasons so real-history careers can continue (node has no script tags).
+for (let s = +(process.argv[3] || 2025) + 1; s <= +(process.argv[3] || 2025) + (+process.argv[2] || 1); s++) { try { load(['data/history/seasons/' + s + '.js']); } catch (e) {} }
 const seasons = +process.argv[2] || 1;
 const t0 = Date.now();
-const L = HL.League.create({ seed: 777 });
+const L = HL.League.createFromSeason({ seasonKey: process.argv[3] || '2025', seed: 777 });
 const missing = Object.values(L.players).filter(p => !p.nbaId).map(p => p.name);
 console.log('players', Object.keys(L.players).length, 'missing nbaId:', missing.length, missing.slice(0, 20).join(', '));
 for (let s = 0; s < seasons; s++) {

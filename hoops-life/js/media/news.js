@@ -246,12 +246,18 @@ HL.News = (function () {
   }
 
   function seriesEnd(L, s, roundNo) {
-    if (roundNo === 4) return;
+    if (s.conf === 'Finals') return;
+    // Name the round by how far it is from the conference final.
+    const fmt = L.playoffs && L.playoffs.format;
+    const confRounds = fmt ? Math.ceil(Math.log2(Math.max(2, fmt.perConf))) : 3;
+    const fromEnd = confRounds - roundNo;
+    const confWord = L.season < 1970 ? 'Division' : 'Conference';
+    roundNo = fromEnd <= 0 ? 3 : fromEnd === 1 ? 2 : 1;
     const W = T(L, s.winner), Lo = T(L, s.winner === s.hi ? s.lo : s.hi);
     const score = s.wins.slice().sort((a, b) => b - a).join('-');
-    const roundName = ['First Round', 'Conference Semifinals', 'Conference Finals'][roundNo - 1];
+    const roundName = ['First Round', `${confWord} Semifinals`, `${confWord} Finals`][roundNo - 1];
     const upset = s.winner === s.lo && s.hiSeed && s.loSeed - s.hiSeed >= 3;
-    const c = { winner: W.name, loser: Lo.name, lposs: poss(Lo.name), score, round: roundName, next: roundNo === 3 ? 'the NBA Finals' : ['the Conference Semifinals', 'the Conference Finals'][roundNo - 1], wseed: s.winner === s.hi ? s.hiSeed : s.loSeed, lseed: s.winner === s.hi ? s.loSeed : s.hiSeed };
+    const c = { winner: W.name, loser: Lo.name, lposs: poss(Lo.name), score, round: roundName, next: roundNo === 3 ? 'the NBA Finals' : [`the ${confWord} Semifinals`, `the ${confWord} Finals`][roundNo - 1], wseed: s.winner === s.hi ? s.hiSeed : s.loSeed, lseed: s.winner === s.hi ? s.loSeed : s.hiSeed };
     const sit = score === '4-0' ? 'series.sweep' : score === '4-3' ? 'series.game7' : upset ? 'series.upset' : 'series.end';
     const B = {
       'series.sweep': ['Brooms out: {winner} sweep {loser}', '{winner} sweep {loser}, advance to {next}'],

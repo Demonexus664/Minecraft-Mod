@@ -62,6 +62,20 @@ HL.DEFAULT_RULES = () => ({
   HL.autoMinutes = function (players, starters, totalMinutes = 240) {
     const bench = players.filter(p => !starters.includes(p)).sort((a, b) => b.ovr - a.ovr);
     const mins = {};
+    // Real players: the healthy rotation gets its real minutes; the end of the bench gets what's left
+    // (like a real coach, not a proportional cut for everyone).
+    if (players.filter(p => p.realMpg).length >= 7) {
+      const want = p => p.realMpg != null ? p.realMpg : Math.max(0, (p.ovr - 60) * 0.8);
+      const order = players.slice().sort((a, b) => (starters.includes(b) - starters.includes(a)) || (want(b) - want(a)));
+      let left = totalMinutes;
+      for (const p of order) {
+        const m = Math.min(starters.includes(p) ? Math.max(want(p), 24) : want(p), left, 46);
+        mins[p.id] = Math.max(0, m);
+        left -= mins[p.id];
+      }
+      if (left > 0) for (const p of order.slice(0, 8)) mins[p.id] += left / 8; // short-handed: starters play more
+      return mins;
+    }
     const sTemplate = [34, 33, 32, 31, 30];
     const bTemplate = [24, 20, 16, 12, 8, 0, 0, 0, 0, 0];
     starters.slice().sort((a, b) => b.ovr - a.ovr).forEach((p, i) => {
@@ -115,7 +129,9 @@ HL.DEFAULT_RULES = () => ({
     const scored = cands.map(p => {
       const s = T.st[p.id];
       const need = (s.target - s.played) / Math.max(60, remaining);
-      let score = need * 2.2 + (s.energy - 0.7) * 1.5;
+      // Iron-man roles (40+ minute targets, common before the 1980s) barely rest.
+      const ironMan = s.target > 38 * 60;
+      let score = need * (ironMan ? 3.2 : 2.2) + (s.energy - 0.7) * (ironMan ? 0.5 : 1.5);
       if (T.onCourt.includes(p)) score += 0.35;
       if (s.target <= 0) score -= 3;
       if (quarterStart && (quarter === 1 || quarter === 3) && T.starters.includes(p)) score += 4;
@@ -123,8 +139,8 @@ HL.DEFAULT_RULES = () => ({
         const closers = T.strat.closers;
         if (closers ? closers.includes(p.id) : true) score += (p.ovr - 70) * 0.08 + (closers ? 2 : 0);
       }
-      if (garbage) score += T.starters.includes(p) ? -3 : 1 - (p.ovr - 70) * 0.03;
-      if (s.energy < 0.35) score -= 2;
+      if (garbage && !(ironMan && Math.abs(diff) < 30)) score += T.starters.includes(p) ? -3 : 1 - (p.ovr - 70) * 0.03;
+      if (s.energy < (ironMan ? 0.15 : 0.35)) score -= 2;
       return { p, score };
     }).sort((a, b) => b.score - a.score);
 
@@ -169,9 +185,9 @@ HL.DEFAULT_RULES = () => ({
 
   function shotWeights(T, shooter, rules, strat, oppDef) {
     const t = shooter.tend;
-    let three = rules.threePoint ? t.three : 0;
+    let three = rules.threePoint ? t.three * 0.85 : 0;
     let mid = t.mid;
-    let rim = t.drive + t.post * 0.6 + (isBig(shooter) ? 15 : 0);
+    let rim = t.drive + t.post * 0.6 + (isBig(shooter) ? 5 : 0);
     if (strat.focus === 'inside') { rim *= 1.3; three *= 0.8; }
     if (strat.focus === 'perimeter') { three *= 1.3; rim *= 0.85; }
     if (oppDef === 'zone') { three *= 1.25; rim *= 0.8; }
@@ -180,6 +196,8 @@ HL.DEFAULT_RULES = () => ({
     if (rules.handCheck) { rim *= 0.85; mid *= 1.15; }
     return { three: Math.max(0, three), mid: Math.max(1, mid), rim: Math.max(1, rim) };
   }
+
+  let E = { pace: 99.4, efg: 0, tov: 0, orb: 0, ftr: 1 }; // era adjustments for the current game
 
   // ---------- Main ----------
   HL.simGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
@@ -190,8 +208,19 @@ HL.DEFAULT_RULES = () => ({
     const teams = [H, A];
     for (const T of teams) for (const p of T.starters) T.st[p.id].line.gs = 1;
 
+    // Era profile: the season's real league averages shift pace, shooting, turnovers, boards and fouls.
+    // The sim is calibrated on 2025-26, so everything is relative to that season.
+    const prof = rules.profile || null;
+    const BASE = { pace: 99.4, efg: 0.546, tov: 12.7, orb: 26.0, ftr: 0.206 };
+    E = {
+      pace: prof && prof.pace ? prof.pace : BASE.pace,
+      efg: prof && prof.efg ? prof.efg - BASE.efg + (prof.tpar != null && prof.tpar < 0.12 ? 0.028 : prof.tpar == null ? 0.03 : 0) : 0,
+      tov: prof ? ((prof.tov != null ? prof.tov : 16.5) - BASE.tov) / 100 * 0.55 : 0,
+      orb: prof ? ((prof.orb != null ? prof.orb : 31) - BASE.orb) / 100 : 0,
+      ftr: 1, // real players' foul drawing already reflects their era
+    };
     const paceAdj = ((H.strat.pace + A.strat.pace) / 2 - 50) * 0.12;
-    const possPerTeam48 = 99.6 * 1.045 + paceAdj + (opts.paceMod || 0);
+    const possPerTeam48 = E.pace * 1.045 + paceAdj + (opts.paceMod || 0);
     const avgPossSec = 2880 / (possPerTeam48 * 2);
     const regSeconds = rules.quarterLen * 60 * 4;
 
@@ -241,7 +270,8 @@ HL.DEFAULT_RULES = () => ({
             const s = T.st[p.id];
             if (T.onCourt.includes(p)) {
               s.played += dur; s.line.min += dur / 60;
-              const drain = dur / (60 * (9 + p.attrs.stam / 9)) * (0.6 + p.tend.effort / 125);
+              let drain = dur / (60 * (6 + p.attrs.stam / 5.5)) * (0.6 + p.tend.effort / 125);
+              if (s.target > 38 * 60) drain *= 0.5; // conditioned for heavy minutes
               s.energy = Math.max(0, s.energy - drain);
             } else {
               s.energy = Math.min(1, s.energy + dur / (60 * 5));
@@ -291,9 +321,11 @@ HL.DEFAULT_RULES = () => ({
       const focusStar = strat.focus === 'star';
       // Offensive pecking order on the floor: the alpha gets the most touches.
       const order = O.orderCache === lineup ? O.order : (O.orderCache = lineup, O.order = lineup.slice().sort((a, b) => offRating(b) - offRating(a)));
-      const RANK = [1.22, 1.04, 0.98, 0.93, 0.9];
+      const RANK = [1.15, 1.04, 1, 0.95, 0.92];
       const initiator = pickBy(lineup, p => {
-        let w = Math.pow(p.tend.usage / 50, 0.8) * Math.pow(p.ovr / 75, 2.2) * RANK[order.indexOf(p)];
+        // Usage tendency already encodes the real role (from usage %), so talent only nudges it.
+        // Usage tendency maps back to usage % (usage/3.4 + 10): touches are proportional to it.
+        let w = (Math.max(0, p.tend.usage) / 3.4 + 10) * Math.pow(p.ovr / 75, 0.5) * RANK[order.indexOf(p)];
         if (focusStar) w *= Math.pow(p.ovr / 75, 3);
         if (strat.usageLock && strat.usageLock[p.id]) w *= strat.usageLock[p.id];
         return w;
@@ -308,6 +340,7 @@ HL.DEFAULT_RULES = () => ({
       if (dstrat.defense === 'press') pTO += 0.025;
       if (strat.focus === 'motion') pTO += 0.008;
       if (transition) pTO += 0.01;
+      pTO += E.tov;
       if (R.chance(HL.clamp(pTO, 0.06, 0.25))) {
         O.st[initiator.id].line.tov++;
         const stealP = 0.56 + (dSteal - 62) * 0.008;
@@ -323,7 +356,7 @@ HL.DEFAULT_RULES = () => ({
 
       // Non-shooting foul (common foul); in the bonus this sends the offense to the line.
       if (!rules.noFouls && R.chance(0.1)) {
-        const fouler = pickBy(dline, p => 1 + p.tend.foulAggr / 50);
+        const fouler = pickBy(dline, p => Math.pow(p.tend.foulAggr / 50, 1.6));
         foul(D, fouler, rules, log);
         if (D.teamFouls > 4) {
           shootFTs(O, initiator, 2, rules, log);
@@ -331,16 +364,10 @@ HL.DEFAULT_RULES = () => ({
         }
       }
 
-      // Create the shot: initiator shoots or creates for a teammate.
-      let shooter = initiator, passer = null;
-      let passP = 0.53 + (initiator.tend.passFirst - 50) / 115;
-      if (strat.focus === 'motion') passP += 0.12;
-      if (focusStar) passP -= 0.08;
-      if (R.chance(HL.clamp(passP, 0.1, 0.8))) {
-        const others = lineup.filter(p => p !== initiator);
-        shooter = pickBy(others, p => Math.pow(p.tend.usage / 50, 0.8) * Math.pow(p.ovr / 75, 2));
-        passer = initiator;
-      }
+      // The usage pick IS the player who uses the possession (like usage %). Whether a teammate
+      // set the shot up is decided after the shot type (catch-and-shoot threes are usually assisted).
+      const shooter = initiator;
+      let passer = null;
       const sIdx = lineup.indexOf(shooter);
       const sDef = dline[sIdx] || defender;
       const helper = dline.slice().sort((a, b) => (b.attrs.intD + b.attrs.block) - (a.attrs.intD + a.attrs.block))[0];
@@ -348,6 +375,16 @@ HL.DEFAULT_RULES = () => ({
       const w = shotWeights(O, shooter, rules, strat, dstrat.defense);
       let type = R.weighted(['three', 'mid', 'rim'], k => w[k]);
       if (transition && R.chance(0.45)) type = 'rim';
+      // Assisted or self-created: real NBA ~85% of made threes, ~55% at the rim, ~40% mid-range are assisted;
+      // high-usage creators make their own shots far more often.
+      const usgPct = shooter.tend.usage / 3.4 + 10;
+      let pAst = { three: 0.84, rim: 0.56, mid: 0.42 }[type] * HL.clamp(1.35 - usgPct * 0.021, 0.3, 1.2);
+      if (strat.focus === 'motion') pAst += 0.08;
+      if (focusStar) pAst -= 0.05;
+      if (transition) pAst += 0.1;
+      if (R.chance(HL.clamp(pAst, 0.05, 0.95))) {
+        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst));
+      }
 
       let makeP, value = 2, blockP = 0, foulP = 0, label;
       // Team context: five-man defense and floor spacing affect every shot.
@@ -361,21 +398,21 @@ HL.DEFAULT_RULES = () => ({
           ? (eff(O, shooter, 'post') * 0.6 + eff(O, shooter, 'close') * 0.4)
           : Math.max(eff(O, shooter, 'layup'), eff(O, shooter, 'dunk') * 0.92 + shooter.attrs.vert * 0.08, eff(O, shooter, 'close') * 0.97);
         const help = (eff(D, helper, 'intD') + eff(D, helper, 'block')) / 2;
-        makeP = 0.662 + (soft(finish) - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013;
+        makeP = 0.682 + (soft(finish) - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013;
         if (transition) makeP += 0.07;
         if (dstrat.defense === 'drop') makeP -= 0.015;
         blockP = 0.068 + (helper.attrs.block - 65) * 0.0022;
-        foulP = 0.24 + (shooter.attrs.str + finish - 140) * 0.0012;
+        foulP = 0.29 + (shooter.attrs.str + finish - 140) * 0.0012;
         label = isPost ? 'post' : (shooter.attrs.dunk > 70 && R.chance(0.35) ? 'dunk' : 'layup');
       } else if (type === 'mid') {
-        makeP = 0.43 + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024;
+        makeP = 0.455 + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024;
         if (dstrat.defense === 'drop') makeP += 0.02;
         blockP = 0.018; foulP = 0.055;
         label = 'jumper';
       } else {
         let deep = rules.fourPoint && R.chance(0.12);
         value = deep ? 4 : (rules.threeValue || 3);
-        makeP = 0.325 + (soft(eff(O, shooter, 'three')) - 70) * 0.0055 - (contest('perD') - 65) * 0.0015;
+        makeP = 0.338 + (soft(eff(O, shooter, 'three')) - 70) * 0.0055 - (contest('perD') - 65) * 0.0015;
         if (deep) makeP -= 0.09;
         if (passer) makeP += 0.018; else makeP -= 0.015;
         if (dstrat.defense === 'switch') makeP -= 0.008;
@@ -388,11 +425,12 @@ HL.DEFAULT_RULES = () => ({
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
       if (rules.handCheck && type !== 'rim') makeP -= 0.012;
       if (clutch) makeP += (shooter.traits.clutch - 55) * 0.0012;
-      makeP += homeBoost;
+      makeP += homeBoost + E.efg;
       // Score effects: big leads breed complacency, trailing teams push harder.
       makeP -= HL.clamp(lead, -18, 26) * 0.0016;
-      // Elite scorers draw more fouls (they attack, sell contact and get the whistle).
-      foulP *= HL.clamp(1 + (offRating(shooter) - 104) / 55, 0.7, 1.5);
+      // Foul drawing: real players use their real free-throw rate; generated players use scoring talent.
+      const draw = shooter.tend.drawFoul != null ? Math.pow(shooter.tend.drawFoul / 44, 0.85) : 1 + (offRating(shooter) - 104) / 55;
+      foulP *= HL.clamp(draw, 0.35, 2.4) * E.ftr;
       if (rules.noFouls) foulP = 0;
       if (rules.tackling && type === 'rim') { makeP -= 0.06; }
       makeP = HL.clamp(makeP, 0.05, 0.9);
@@ -410,7 +448,9 @@ HL.DEFAULT_RULES = () => ({
       const fouled = R.chance(HL.clamp(foulP, 0, 0.35));
       const made = R.chance(fouled ? makeP * 0.55 : makeP);
       if (fouled) {
-        const fouler = type === 'rim' ? (R.chance(0.6) ? sDef : helper) : sDef;
+        // Who gets whistled: mostly the man guarding the shooter, sometimes the help; scaled by each
+        // player's real foul rate (Wilt never fouled out; some bigs live in foul trouble).
+        const fouler = pickBy(dline, p => (p === sDef ? 1.6 : p === helper && type === 'rim' ? 0.7 : 0.35) * Math.pow(p.tend.foulAggr / 50, 1.6));
         foul(D, fouler, rules, log);
       }
       if (made) {
@@ -418,11 +458,9 @@ HL.DEFAULT_RULES = () => ({
         if (value >= 3) { sl.tpa++; sl.tpm++; }
         O.score += value; addPM(O, value); addPM(D, -value);
         let astTxt = '';
-        const assisted = passer ? R.chance(0.9) : R.chance(type === 'rim' ? 0.32 : 0.22);
-        if (assisted) {
-          const ap = passer || pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3.2));
-          O.st[ap.id].line.ast++;
-          astTxt = ` (${ap.name} assist)`;
+        if (passer) {
+          O.st[passer.id].line.ast++;
+          astTxt = ` (${passer.name} assist)`;
         }
         log(`${shooter.name} makes ${value === 4 ? 'a ' : value === 3 ? 'a ' : 'a '}${label}${astTxt}.`, O);
         if (fouled) {
@@ -464,7 +502,7 @@ HL.DEFAULT_RULES = () => ({
     function rebound(O, D, rules, type, log) {
       const oStr = O.onCourt.reduce((s, p) => s + eff(O, p, 'oreb') * (0.75 + p.tend.crash / 200), 0) / 5;
       const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb'), 0) / 5;
-      let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012;
+      let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012 + E.orb;
       if (type === 'three') pOff += 0.02;
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {

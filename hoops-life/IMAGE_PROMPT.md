@@ -1,8 +1,10 @@
 # ChatGPT prompt: Hoops Life image pack
 
-Real team logos and real player headshots load automatically from the NBA/ESPN image servers when
-you're online, so you do NOT need images of real players or logos. This pack is for everything else:
-generated players, people in your story, scenes, cars, houses and items.
+Real players already show their official NBA.com headshots and real team logos load from ESPN
+automatically when you're online. You can ALSO use your own images of real players (see
+"Real player portraits" at the bottom) and they will replace the official headshot everywhere.
+The main pack below covers everything else: generated players, people in your story, scenes,
+cars, houses and items.
 
 Paste the prompt below into ChatGPT (image generation). Ask for one folder at a time if it stops early.
 Put the files into `hoops-life/assets/` keeping the folder names, then save the manifest file it writes
@@ -33,4 +35,35 @@ window.HL_ASSETS = {
   "item.item_watch_01": "items/item_watch_01.jpg",
   "ui.ui_title_bg_01": "ui/ui_title_bg_01.jpg"
 };
+```
+
+---
+
+## Real player portraits (optional)
+
+Any image you put in `assets/real/` replaces that player's headshot in every save. Add one line per
+player to `assets/manifest.js` using the player's name in lowercase with dashes:
+
+```
+"real.michael-jordan": "real/michael-jordan.png",
+"real.nikola-jokic": "real/nikola-jokic.png",
+```
+
+You can use photos you find yourself, or ask ChatGPT with the prompt below. (ChatGPT sometimes declines
+images of specific real people. If it does for someone, the official NBA.com headshot is used instead.)
+
+```
+Create stylized basketball trading-card portraits (head and shoulders, painted illustration style,
+dark gradient background, no text, no team logos, no jersey numbers) of these NBA players, one image
+each, 512x512 PNG, named with the player's name in lowercase with dashes (e.g. michael-jordan.png).
+Then give me a .zip of the images plus a manifest snippet with one line per image in this format:
+"real.michael-jordan": "real/michael-jordan.png",
+
+Players: Michael Jordan, Kareem Abdul-Jabbar, Bill Russell, Wilt Chamberlain, Magic Johnson, Larry Bird,
+Oscar Robertson, Jerry West, Elgin Baylor, Bob Cousy, Julius Erving, Moses Malone, Hakeem Olajuwon,
+Shaquille O'Neal, Tim Duncan, Kobe Bryant, LeBron James, Stephen Curry, Kevin Durant, Dirk Nowitzki,
+Kevin Garnett, Charles Barkley, Karl Malone, John Stockton, Isiah Thomas, David Robinson, Patrick Ewing,
+Scottie Pippen, Allen Iverson, Dwyane Wade, Chris Paul, Steve Nash, Jason Kidd, Gary Payton,
+Giannis Antetokounmpo, Nikola Jokic, Shai Gilgeous-Alexander, Luka Doncic, Victor Wembanyama
+(continue with any players you want)
 ```

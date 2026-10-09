@@ -24,6 +24,7 @@ HL.defaultTendencies = function (p) {
     crash: HL.clamp(Math.round(25 + (a.oreb - 55) * 0.9), 0, 100),
     effort: 75,
     foulAggr: 50,
+    drawFoul: HL.clamp(Math.round(37 + (a.layup + a.dunk + a.str - 200) * 0.25 + (p.ovr - 72) * 0.6), 10, 90),
   };
 };
 

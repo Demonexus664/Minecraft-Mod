@@ -90,7 +90,9 @@ HL.UI = (function () {
     const L = HL.League.get();
     const t = team || (p.teamId != null && L ? L.teams[p.teamId] : null);
     const color = t ? teamAccent(t).c : '#3a3f48';
-    const src = asset('player.' + p.id) || HL.headshotUrl(p);
+    // Your own images win: assets/manifest.js can map "real.<name-slug>" (e.g. real.michael-jordan) for real players.
+    const slug = (p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
     const img = src ? `<img src="${src}" alt="" loading="lazy" onerror="this.remove()">` : '';
     return `<span class="face" style="width:${size}px;height:${size}px">${svgFace(p, color)}${img}</span>`;
   }
