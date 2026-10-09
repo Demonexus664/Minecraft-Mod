@@ -66,10 +66,11 @@ HL.DEFAULT_RULES = () => ({
     // (like a real coach, not a proportional cut for everyone).
     if (players.filter(p => p.realMpg).length >= 7) {
       const want = p => p.realMpg != null ? p.realMpg : Math.max(0, (p.ovr - 60) * 0.8);
-      const order = players.slice().sort((a, b) => (starters.includes(b) - starters.includes(a)) || (want(b) - want(a)));
+      // Players with a set role (minutesLock: game plans, a career player's earned minutes) are slotted first.
+      const order = players.slice().sort((a, b) => (!!b.minutesLock - !!a.minutesLock) || (starters.includes(b) - starters.includes(a)) || (want(b) - want(a)));
       let left = totalMinutes;
       for (const p of order) {
-        const m = Math.min(starters.includes(p) ? Math.max(want(p), 24) : want(p), left, 46);
+        const m = Math.min(starters.includes(p) && !p.minutesLock ? Math.max(want(p), 24) : want(p), left, 46);
         mins[p.id] = Math.max(0, m);
         left -= mins[p.id];
       }

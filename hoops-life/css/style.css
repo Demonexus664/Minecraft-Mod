@@ -428,3 +428,18 @@ html[data-era="00s"] .block > header { background: linear-gradient(#1f2633, #171
 
 .spinbox { display: grid; place-items: center; min-width: 72px; height: 72px; padding: 0 10px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--surface-2); animation: jiggle .12s linear infinite; }
 @keyframes jiggle { 50% { transform: translateY(-3px); } }
+
+/* ---------- Skill Draft career hub ---------- */
+.statstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); border: 1px solid var(--rule); border-radius: var(--r); background: var(--surface-2); }
+.statstrip > div { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin: 0 -1px -1px 0; }
+.statstrip b { font-family: var(--display); font-size: 24px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.statstrip span { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.offers { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.offer { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--rule); border-radius: var(--r); background: var(--surface-2); }
+.offer .nm { font-family: var(--display); font-weight: 700; font-size: 18px; text-transform: uppercase; line-height: 1.05; }
+.offer .kv { padding: 4px 0; font-size: 13px; }
+.offer .mates { display: flex; flex-direction: column; gap: 5px; padding: 6px 0; border-top: 1px solid var(--rule); }
+.offer .btn { margin-top: auto; justify-content: center; }
+.ser { display: grid; grid-template-columns: 150px 1fr auto; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--rule); }
+.ser:last-of-type { border-bottom: 0; }
+@media (max-width: 760px) { .ser { grid-template-columns: 1fr auto; } .ser > .t3 { grid-column: 1 / -1; } }

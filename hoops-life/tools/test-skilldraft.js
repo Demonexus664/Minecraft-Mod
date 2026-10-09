@@ -8,7 +8,7 @@ const runs = +(process.argv[2] || 20);
 const style = process.argv[3] || 'good';
 const seasons = fs.readdirSync(path.join(__dirname, '../data/history/seasons')).map(f => `data/history/seasons/${f}`);
 const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', ...seasons]);
-ctx.HL.UI = { esc: s => String(s) };
+ctx.HL.UI = { esc: s => String(s), money: m => '$' + m.toFixed(1) + 'M', ordinal: n => n + 'th' };
 load(['js/modes/challenge820.js', 'js/modes/skilldraft.js']);
 const R = HL.RNG;
 R.setSeed(+(process.argv[4] || 7));
@@ -39,7 +39,7 @@ function draftPicks() {
     const minors = c.seasons.filter(s => s.minors).length;
     const best = c.seasons.slice().sort((a, b) => b.ppg - a.ppg)[0];
     const n = name => c.awards.filter(a => a.award === name).length;
-    console.log(`${String(i + 1).padStart(3)} ${c.debut} ${c.me.pos} ${HL.fmtHeight(c.me.height)} prime ${c.primeOvr} peak ${peak} | ${c.seasons.length} yrs (${minors} minors), pick ${c.pick || "undrafted"} | best ${best ? best.ppg.toFixed(1) : '-'} ppg | MVP ${n('MVP')} AS ${n('All-Star')} rings ${c.rings} | ${c.altered.length} changes | legacy ${c.legacy.score} #${c.legacy.rank} -> ${tier}`);
+    console.log(`${String(i + 1).padStart(3)} ${c.debut} ${c.teams.length}tm ${c.end} | ${c.me.pos} ${HL.fmtHeight(c.me.height)} prime ${c.primeOvr} peak ${peak} | ${c.seasons.length} yrs (${minors} minors), pick ${c.pick || "undrafted"} | best ${best ? best.ppg.toFixed(1) : '-'} ppg | MVP ${n('MVP')} AS ${n('All-Star')} rings ${c.rings} | ${c.altered.length} changes | legacy ${c.legacy.score} #${c.legacy.rank} -> ${tier}`);
   }
   console.log(`\n${runs} careers (${style}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   console.log(Object.entries(tiers).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' | '));
