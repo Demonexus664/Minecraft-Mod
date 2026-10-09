@@ -36,15 +36,16 @@ HL.GFX = (function () {
     const gid = id('j');
     // Retro eras get thicker trim and tighter lettering.
     const trimW = era === '70s' || era === '80s' ? 9 : 6;
-    return `<svg class="gfx-jersey" viewBox="0 0 200 110" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
+    // Wide shoulders (edge to edge) so the photo's own shirt never shows; the torso and lettering stay centered.
+    return `<svg class="gfx-jersey" viewBox="0 0 360 110" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
       <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity="1"/><stop offset="1" stop-color="${c}" stop-opacity=".92"/></linearGradient>
-        <linearGradient id="${gid}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".35"/><stop offset=".3" stop-color="#000" stop-opacity="0"/><stop offset=".7" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".35"/></linearGradient></defs>
-      <path d="M0 110 L0 46 Q4 22 40 14 L74 6 Q100 38 126 6 L160 14 Q196 22 200 46 L200 110 Z" fill="url(#${gid})"/>
-      <path d="M0 110 L0 46 Q4 22 40 14 L74 6 Q100 38 126 6 L160 14 Q196 22 200 46 L200 110 Z" fill="url(#${gid}s)"/>
-      <path d="M74 6 Q100 38 126 6" fill="none" stroke="${trim}" stroke-width="${trimW}" stroke-linecap="round"/>
-      <path d="M40 14 Q34 58 22 110 M160 14 Q166 58 178 110" fill="none" stroke="${trim}" stroke-width="${trimW - 1}" opacity=".95"/>
-      ${word ? `<text x="100" y="62" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word.length > 7 ? 15 : 18}" letter-spacing="1" fill="${trim}">${esc(word)}</text>` : ''}
-      <text x="100" y="${word ? 100 : 92}" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word ? 36 : 44}" fill="#fff" stroke="${trim}" stroke-width="2" paint-order="stroke">${number}</text>
+        <linearGradient id="${gid}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset=".22" stop-color="#000" stop-opacity=".12"/><stop offset=".4" stop-color="#000" stop-opacity="0"/><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset=".78" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></linearGradient></defs>
+      <path d="M0 110 L0 36 Q12 18 92 12 L150 3 Q180 40 210 3 L268 12 Q348 18 360 36 L360 110 Z" fill="url(#${gid})"/>
+      <path d="M0 110 L0 36 Q12 18 92 12 L150 3 Q180 40 210 3 L268 12 Q348 18 360 36 L360 110 Z" fill="url(#${gid}s)"/>
+      <path d="M150 3 Q180 40 210 3" fill="none" stroke="${trim}" stroke-width="${trimW}" stroke-linecap="round"/>
+      <path d="M118 9 Q108 60 96 110 M242 9 Q252 60 264 110" fill="none" stroke="${trim}" stroke-width="${trimW - 1}" opacity=".95"/>
+      ${word ? `<text x="180" y="62" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word.length > 7 ? 15 : 18}" letter-spacing="1" fill="${trim}">${esc(word)}</text>` : ''}
+      <text x="180" y="${word ? 100 : 92}" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word ? 36 : 44}" fill="#fff" stroke="${trim}" stroke-width="2" paint-order="stroke">${number}</text>
     </svg>`;
   }
 
@@ -55,7 +56,7 @@ HL.GFX = (function () {
     const slug = (p.name || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
     return `<div class="gfx-figure" style="--c:${c}">
-      <div class="gfx-head">${U.svgFace(p, 'transparent')}${src ? `<img src="${src}" alt="" loading="lazy" onerror="this.remove()">` : ''}</div>
+      <div class="gfx-head">${U.svgFace(p, 'transparent')}${src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : ''}</div>
       ${jersey(team, HL.jerseyNumber(p), opts)}
     </div>`;
   }
@@ -150,5 +151,55 @@ HL.GFX = (function () {
     </div>`;
   }
 
-  return { figure, jersey, playerCard, matchupPoster, awardCard, moveCard, championPoster, rays, trophy };
+  // ---------- media day & social (composed from the stored media-day pieces) ----------
+  // A media-day portrait: backdrop, figure in the stored jersey and number, expression, framing and lighting.
+  function portrait(p, comp, opts = {}) {
+    const team = comp ? { name: comp.jersey.team, city: comp.jersey.city, abbr: comp.jersey.abbr, color: comp.jersey.color, color2: comp.jersey.color2 } : null;
+    const { c, c2 } = teamColors(team);
+    const look = Object.assign({}, p, comp && comp.look && Object.keys(comp.look).length ? { look: comp.look } : {}, comp ? { number: comp.number } : {});
+    const light = { 'harsh flash': 'brightness(1.25) contrast(1.2) saturate(.8)', moody: 'brightness(.72) contrast(1.15)', backlit: 'brightness(.8) contrast(1.1)', studio: 'none' }[comp && comp.lighting] || 'none';
+    const frame = { 'low angle': 'scale(1.06) translateY(4%)', 'high angle': 'scale(.92) translateY(8%)', 'tight crop': 'scale(1.35) translateY(14%)', 'straight on': 'none' }[comp && comp.angle] || 'none';
+    const ball = comp && /ball/.test(comp.pose) ? `<div class="gfx-ball ${comp.pose.includes('overhead') ? 'up' : comp.pose.includes('spinning') ? 'spin' : ''}"></div>` : '';
+    const back = comp && comp.backdrop === 'step-and-repeat' ? `<div class="gfx-repeat">${Array.from({ length: 24 }, () => `<span>${esc(team ? team.abbr : '')}</span>`).join('')}</div>` : '';
+    const face = U.svgFace(look, 'transparent', { expression: comp && comp.expression });
+    const asset = U.asset;
+    const slug = (p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
+    return `<div class="gfx gfx-portrait ${comp ? 'bd-' + comp.backdrop.replace(/[^a-z]/g, '') : ''} ${opts.cls || ''}" style="--c:${c};--c2:${c2}">
+      <div class="gfx-bg"></div>${back}
+      <div class="gfx-stage" style="transform:${frame};filter:${light}"><div class="gfx-figure"><div class="gfx-head">${face}${src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : ''}</div>${jersey(team, comp ? comp.number : HL.jerseyNumber(p), {})}</div>${ball}</div>
+      ${opts.plate === false ? '' : `<div class="gfx-nameplate"><div class="gfx-pos">${esc(team ? team.name : '')} · Media day${comp ? ' ' + comp.season : ''}</div><div class="gfx-name">${esc(p.name)}</div>${comp ? `<div class="gfx-sub">${esc(comp.pose)} · ${esc(comp.expression)}</div>` : ''}</div>`}
+    </div>`;
+  }
+  const k = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n);
+  // A vertical short-video post: the portrait as the frame, caption burned in, side actions, sound line.
+  function shortVideo(p, comp, v, handle) {
+    return `<div class="gfx-short">
+      ${portrait(p, comp, { plate: false })}
+      <div class="sv-top">${esc(v.platform || 'ClipFeed')}</div>
+      <div class="sv-caption">${esc(v.caption)}</div>
+      <div class="sv-side"><span><b>${k(v.counts.likes)}</b>likes</span><span><b>${k(v.counts.comments)}</b>comments</span><span><b>${k(v.counts.shares)}</b>shares</span></div>
+      <div class="sv-foot"><b>${esc(/^@/.test(handle || '') ? handle : '@' + (handle || 'hoopclips'))}</b><div class="sv-sound">${esc(v.sound)}</div></div>
+    </div>`;
+  }
+  // A video thumbnail: portrait on one side, a two-word title, an arrow and a circle.
+  function thumbnail(p, comp, v, channel) {
+    return `<div class="gfx-thumb">
+      ${portrait(p, comp, { plate: false })}
+      <div class="th-title">${esc(v.title || 'WASHED?')}</div>
+      <svg class="th-arrow" viewBox="0 0 100 60"><path d="M4 30 H70 M50 8 L78 30 L50 52" fill="none" stroke="#ff2b2b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="th-ring"></div>
+      <div class="th-meta">${esc(v.platform || 'StreamTube')} · ${esc(channel || 'Hoop Talk')} · ${k(v.counts.likes * 6)} views</div>
+    </div>`;
+  }
+  // A quote graphic; once checked, a fabricated one is stamped.
+  function quoteCard(p, comp, v) {
+    return `<div class="gfx-quote ${v.fabricated ? 'fake' : ''}">
+      ${portrait(p, comp, { plate: false })}
+      <div class="qc-text">“${esc(v.quote)}”<div class="qc-by">— attributed to ${esc(p.name)}</div></div>
+      ${v.fabricated ? '<div class="qc-stamp">Fabricated</div>' : ''}
+    </div>`;
+  }
+
+  return { figure, jersey, playerCard, matchupPoster, awardCard, moveCard, championPoster, rays, trophy, portrait, shortVideo, thumbnail, quoteCard };
 })();

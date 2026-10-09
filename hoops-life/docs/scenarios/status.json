@@ -1,21 +1,214 @@
 {
-  "_note": "Implementation status for scenarios-1.json (ChatGPT handoff) and claude-additions.json. Statuses: implemented, partial, blocked, not started (default). Regenerate LEDGER.md with: node tools/scenario-ledger.js",
-  "record.five_by_five": { "status": "implemented", "handler": "HL.Events.fromGame (js/league/events.js) -> HL.EventNews.story", "data": "box score", "evidence": "tools/test-events.js: 5x5 triggers / 4-block near miss" },
-  "record.quadruple_double": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score", "evidence": "tools/test-events.js: trigger + near miss" },
-  "record.perfect_high_volume": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score (FGA >= 10, FGM = FGA)", "evidence": "tools/test-events.js: 10-for-10 vs 9-for-9; seen in full-season run" },
-  "record.assist_turnover_clean": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score", "evidence": "tools/test-events.js: 20/0 vs 20/1" },
-  "record.team_zero_turnovers": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "team box totals", "evidence": "tools/test-events.js" },
-  "record.minutes_sixth_overtime": { "status": "implemented", "handler": "HL.Events.fromGame + L.records.franchise[tid].min", "data": "franchise minutes record kept within the save", "evidence": "detection path; 6-overtime games are vanishingly rare in the sim", "note": "Franchise minute records start with the save (real franchise records are not in the dataset)." },
-  "record.career_free_throw_mark": { "status": "blocked", "note": "Needs each real player's career-to-date totals at the save's start season (build-history.py exports only full-career totals)." },
-  "record.oldest_debut": { "status": "blocked", "note": "Needs a debut-age record table and first-appearance tracking for generated/draft players." },
-  "record.one_point_scoring_record": { "status": "not started", "note": "Needs season FTM record book; box data exists." },
-  "record.shared_jersey_milestone": { "status": "not started", "note": "Needs career milestone tracking (career totals per player in the save)." },
-  "court.four_point_play": { "status": "implemented", "handler": "gamesim track.four -> HL.Events.fromGame", "data": "made three + shooting foul + made free throw", "evidence": "~40 per simulated season (real NBA ~40-60); test-events.js" },
-  "court.charge_triple": { "status": "implemented", "handler": "gamesim offensive fouls (charges drawn per defender) -> HL.Events.fromGame", "data": "charges drawn", "evidence": "~15 per season; test-events.js 3 vs 2 charges" },
-  "court.no_field_goals_quarter": { "status": "implemented", "handler": "gamesim per-quarter FG counts -> HL.Events.fromGame", "data": "field goals by quarter", "evidence": "test-events.js; does not occur in normal play (as in reality)" },
-  "court.self_rebound_putback": { "status": "partial", "handler": "gamesim marks putbacks (offensive rebounder scoring next)", "note": "Recorded on decisive shots only (as part of game-winner events); not published as its own story because it happens many times a game." },
-  "court.shot_clock_buzzer_make": { "status": "blocked", "note": "Needs a per-possession shot-clock model; the sim uses possession durations, and only period-ending shots are timed." },
-  "court.buzzer_review_reversal": { "status": "blocked", "note": "Needs an officiating/replay layer in the game sim." },
-  "court.backcourt_violation_decider": { "status": "blocked", "note": "Needs turnover types (violations) in the sim." },
-  "court.heave_team_record": { "status": "partial", "handler": "gamesim heaves (final < 2 seconds)", "note": "Heaves exist; shot distance is not modeled, so no distance record yet." }
+ "_note": "Implementation status for scenarios-1.json (ChatGPT handoff) and claude-additions.json. Statuses: implemented, partial, blocked, not started (default). Regenerate LEDGER.md with: node tools/scenario-ledger.js",
+ "record.five_by_five": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame (js/league/events.js) -> HL.EventNews.story",
+  "data": "box score",
+  "evidence": "tools/test-events.js: 5x5 triggers / 4-block near miss"
+ },
+ "record.quadruple_double": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame",
+  "data": "box score",
+  "evidence": "tools/test-events.js: trigger + near miss"
+ },
+ "record.perfect_high_volume": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame",
+  "data": "box score (FGA >= 10, FGM = FGA)",
+  "evidence": "tools/test-events.js: 10-for-10 vs 9-for-9; seen in full-season run"
+ },
+ "record.assist_turnover_clean": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame",
+  "data": "box score",
+  "evidence": "tools/test-events.js: 20/0 vs 20/1"
+ },
+ "record.team_zero_turnovers": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame",
+  "data": "team box totals",
+  "evidence": "tools/test-events.js"
+ },
+ "record.minutes_sixth_overtime": {
+  "status": "implemented",
+  "handler": "HL.Events.fromGame + L.records.franchise[tid].min",
+  "data": "franchise minutes record kept within the save",
+  "evidence": "detection path; 6-overtime games are vanishingly rare in the sim",
+  "note": "Franchise minute records start with the save (real franchise records are not in the dataset)."
+ },
+ "record.career_free_throw_mark": {
+  "status": "blocked",
+  "note": "Needs each real player's career-to-date totals at the save's start season (build-history.py exports only full-career totals)."
+ },
+ "record.oldest_debut": {
+  "status": "blocked",
+  "note": "Needs a debut-age record table and first-appearance tracking for generated/draft players."
+ },
+ "record.one_point_scoring_record": {
+  "status": "not started",
+  "note": "Needs season FTM record book; box data exists."
+ },
+ "record.shared_jersey_milestone": {
+  "status": "not started",
+  "note": "Needs career milestone tracking (career totals per player in the save)."
+ },
+ "court.four_point_play": {
+  "status": "implemented",
+  "handler": "gamesim track.four -> HL.Events.fromGame",
+  "data": "made three + shooting foul + made free throw",
+  "evidence": "~40 per simulated season (real NBA ~40-60); test-events.js"
+ },
+ "court.charge_triple": {
+  "status": "implemented",
+  "handler": "gamesim offensive fouls (charges drawn per defender) -> HL.Events.fromGame",
+  "data": "charges drawn",
+  "evidence": "~15 per season; test-events.js 3 vs 2 charges"
+ },
+ "court.no_field_goals_quarter": {
+  "status": "implemented",
+  "handler": "gamesim per-quarter FG counts -> HL.Events.fromGame",
+  "data": "field goals by quarter",
+  "evidence": "test-events.js; does not occur in normal play (as in reality)"
+ },
+ "court.self_rebound_putback": {
+  "status": "partial",
+  "handler": "gamesim marks putbacks (offensive rebounder scoring next)",
+  "note": "Recorded on decisive shots only (as part of game-winner events); not published as its own story because it happens many times a game."
+ },
+ "court.shot_clock_buzzer_make": {
+  "status": "blocked",
+  "note": "Needs a per-possession shot-clock model; the sim uses possession durations, and only period-ending shots are timed."
+ },
+ "court.buzzer_review_reversal": {
+  "status": "blocked",
+  "note": "Needs an officiating/replay layer in the game sim."
+ },
+ "court.backcourt_violation_decider": {
+  "status": "blocked",
+  "note": "Needs turnover types (violations) in the sim."
+ },
+ "court.heave_team_record": {
+  "status": "partial",
+  "handler": "gamesim heaves (final < 2 seconds)",
+  "note": "Heaves exist; shot distance is not modeled, so no distance record yet."
+ },
+ "media.day.first_impression_hype": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): rookies (OVR 72+) and star arrivals; positive reactions vs 4,000 threshold",
+  "evidence": "media day test run + Media Day page",
+  "note": "Publicity only; no rating change."
+ },
+ "media.social.washed_slander": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): age 31+, peak 84+, 4+ below peak or falling; reaction count vs threshold; opens an ignore/joke/clap back/let the game answer thread",
+  "evidence": "media day test run + Media Day page",
+  "note": "Opinion only; ratings untouched. Real career peak from the history data."
+ },
+ "media.social.washed_rebuttal": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): tick(): days after a washed thread, chance rises with OVR; distinct supporters stored",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.day.fitness_change": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): measured weight vs last media day (stored per player)",
+  "evidence": "media day test run + Media Day page",
+  "note": "Ratings change only through progression, not appearance."
+ },
+ "media.day.chemistry_body_language": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): portrait pose/expression tags (arms crossed, looking off camera, not smiling)",
+  "evidence": "media day test run + Media Day page",
+  "note": "Interpretation only; no chemistry change."
+ },
+ "media.social.bad_clip_pile_on": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): clip descriptor + whether the circulating cut was edited (stored at creation)",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.social.selective_edit_exposed": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): respond(context): only when the stored clip was edited; otherwise the full clip confirms it",
+  "evidence": "media day test run + Media Day page",
+  "note": "Original circulation stays on record."
+ },
+ "media.social.fake_quote_corrected": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): fabricated quote graphic, labeled and corrected; quote card stamped Fabricated",
+  "evidence": "media day test run + Media Day page",
+  "note": "No player statement is created."
+ },
+ "media.social.player_response_backfire": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): respond(joke/clap back): measured sentiment before/after; ego raises the risk",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.social.player_response_redeemed": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): afterGame(): a big game line within the window after a response or \"let the game answer\"",
+  "evidence": "media day test run + Media Day page",
+  "note": "Needs both the response and a verified game."
+ },
+ "media.social.unflattering_photo_reaction": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): portrait lighting/angle tags and negative photo reactions",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.social.audience_split": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): positive and negative shares stored",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.social.old_clip_recycled": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): original date attached to the story",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.social.unexpected_rival_support": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): tick(): rival from a close playoff series in this league (noteSeries) defends the target",
+  "evidence": "media day test run + Media Day page",
+  "note": "Rivalries form from playoff series played in the save."
+ },
+ "media.social.meme_to_charity": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): respond(charity): recipient confirmation 10-25 days later with the delivered amount",
+  "evidence": "media day test run + Media Day page",
+  "note": "Only delivered money is reported."
+ },
+ "media.social.pose_becomes_meme": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): meme-prone poses + remake count",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.day.number_reveal_reaction": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): first professional number or a new number",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.day.new_team_jersey_debate": {
+  "status": "implemented",
+  "handler": "HL.MediaDay (js/media/mediaday.js): run(): first portrait in a new uniform (needs last season's media day record, so from the second season of a save)",
+  "evidence": "media day test run + Media Day page",
+  "note": ""
+ },
+ "media.day.rivals_group_photo": {
+  "status": "partial",
+  "handler": "HL.MediaDay (js/media/mediaday.js): rivals who became teammates share a frame",
+  "note": "Needs rivalries from a previous playoff series and a move that puts both on one team."
+ },
+ "media.day.hairstyle_reveal": {
+  "status": "partial",
+  "handler": "HL.MediaDay (js/media/mediaday.js): look pieces on generated players",
+  "note": "Real players use their real headshot, so hairstyle pieces only show on generated players."
+ }
 }

@@ -62,12 +62,20 @@ HL.UI = (function () {
   function hashStr(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
 
   // Layered SVG portrait for generated people (and fallback when a real headshot can't load).
-  function svgFace(p, color) {
+  // p.look (hair style, beard, headband) overrides the defaults; opts.expression changes eyes and mouth.
+  function svgFace(p, color, opts = {}) {
     const h = hashStr(p.name || 'x');
+    const look = p.look || {};
     const skins = ['#f1c7a5', '#e0ac85', '#c68a62', '#a86b45', '#8a5433', '#6b3f25', '#4f2e1b'];
     const hairs = ['#141414', '#2b1b10', '#4a2f1b', '#6b4423', '#a07040', '#d9b26f', '#8a8a8a'];
-    const skin = skins[h % skins.length], hair = hairs[(h >> 3) % hairs.length];
-    const style = (h >> 6) % 5, beard = (h >> 9) % 3 === 0;
+    const skin = skins[h % skins.length], hair = hairs[look.hairColor != null ? look.hairColor : (h >> 3) % hairs.length];
+    const style = look.hair != null ? look.hair : (h >> 6) % 5, beard = look.beard != null ? look.beard : (h >> 9) % 3 === 0;
+    const ex = opts.expression || 'neutral';
+    const mouth = { smiling: '<path d="M43 54 Q50 60 57 54" stroke="#5a3322" stroke-width="1.8" fill="none" stroke-linecap="round"/>', laughing: '<path d="M43 53 Q50 63 57 53 Z" fill="#5a3322"/>', serious: '<path d="M45 56 L55 56" stroke="#5a3322" stroke-width="1.6" stroke-linecap="round"/>', tired: '<path d="M45 57 Q50 55.5 55 57" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>', squinting: '<path d="M46 56 Q50 57 54 56" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>' }[ex] || '<path d="M45 55 Q50 57.5 55 55" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>';
+    const eyes = ex === 'squinting' || ex === 'laughing' ? '<path d="M40.5 45 h5 M54.5 45 h5" stroke="#161616" stroke-width="1.6" stroke-linecap="round"/>'
+      : ex === 'tired' ? '<circle cx="43" cy="45.5" r="1.5" fill="#161616"/><circle cx="57" cy="45.5" r="1.5" fill="#161616"/><path d="M40 43.5 h6 M54 43.5 h6" stroke="' + skin + '" stroke-width="2.4"/><path d="M40.5 48.5 q2.5 1.2 5 0 M54.5 48.5 q2.5 1.2 5 0" stroke="#00000055" stroke-width="1" fill="none"/>'
+      : '<circle cx="43" cy="45" r="1.7" fill="#161616"/><circle cx="57" cy="45" r="1.7" fill="#161616"/>';
+    const band = look.headband ? `<rect x="31" y="31" width="38" height="5" rx="2" fill="${look.headband === true ? '#ffffff' : look.headband}"/>` : '';
     const hairPath = [
       `<path d="M31 41 Q50 17 69 41 Q69 29 50 25 Q31 29 31 41Z" fill="${hair}"/>`,
       `<ellipse cx="50" cy="32" rx="21" ry="12" fill="${hair}"/>`,
@@ -82,8 +90,7 @@ HL.UI = (function () {
       <ellipse cx="50" cy="44" rx="18" ry="21" fill="${skin}"/>
       ${hairPath}
       ${beard ? `<path d="M34 50 Q36 66 50 67 Q64 66 66 50 Q60 60 50 60 Q40 60 34 50Z" fill="${hair}"/>` : ''}
-      <circle cx="43" cy="45" r="1.7" fill="#161616"/><circle cx="57" cy="45" r="1.7" fill="#161616"/>
-      <path d="M45 55 Q50 57.5 55 55" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      ${band}${eyes}${mouth}
     </svg>`;
   }
 
@@ -94,8 +101,8 @@ HL.UI = (function () {
     // Your own images win: assets/manifest.js can map "real.<name-slug>" (e.g. real.michael-jordan) for real players.
     const slug = (p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
-    const img = src ? `<img src="${src}" alt="" loading="lazy" onerror="this.remove()">` : '';
-    return `<span class="face" style="width:${size}px;height:${size}px">${svgFace(p, color)}${img}</span>`;
+    const img = src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : '';
+    return `<span class="face" style="width:${size}px;height:${size}px;--fc:${color}">${svgFace(p, color)}${img}</span>`;
   }
 
   function rtClass(v) { return v >= 95 ? 'r-99' : v >= 90 ? 'r-90' : v >= 85 ? 'r-85' : v >= 80 ? 'r-80' : v >= 75 ? 'r-75' : v >= 70 ? 'r-70' : 'r-lo'; }

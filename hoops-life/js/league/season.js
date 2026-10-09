@@ -305,6 +305,7 @@ HL.League = {};
       if (item && ['game.buzzer_beater', 'game.game_winner', 'game.comeback', 'record.single_game'].includes(ev.key)) covered = true;
     }
     if (!covered) HL.News && HL.News.game && HL.News.game(L, g, res, playoffs);
+    HL.MediaDay && HL.MediaDay.afterGame(L, res);
   }
 
   function healPlayer(p) {
@@ -341,6 +342,8 @@ HL.League = {};
   // ---------- Regular season ----------
   HL.League.simDay = function () {
     if (L.phase !== 'regular') return HL.League.simPostseasonDay();
+    // Media day happens before the opener; social threads and follow-ups move day by day.
+    if (HL.MediaDay) { if (L.day === 0) HL.MediaDay.run(L); HL.MediaDay.tick(L); }
     const games = L.schedule.filter(g => g.day === L.day && !g.res);
     for (const g of games) {
       ensureHealthy(g.home); ensureHealthy(g.away);
@@ -502,7 +505,7 @@ HL.League = {};
         if (r.winner === s.hi) s.wins[0]++; else s.wins[1]++;
         if (s.wins[0] === need) s.winner = s.hi;
         if (s.wins[1] === need) s.winner = s.lo;
-        if (s.winner != null) HL.News && HL.News.seriesEnd && HL.News.seriesEnd(L, s, s.conf === 'Finals' ? 99 : po.rounds.length);
+        if (s.winner != null) { HL.News && HL.News.seriesEnd && HL.News.seriesEnd(L, s, s.conf === 'Finals' ? 99 : po.rounds.length); HL.MediaDay && HL.MediaDay.noteSeries(L, s); }
       }
       L.day += 2;
       if (round.every(s => s.winner != null)) {

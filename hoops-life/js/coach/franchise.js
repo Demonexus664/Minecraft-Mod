@@ -10,7 +10,7 @@ HL.Franchise = (function () {
 
   // ---------------- navigation map ----------------
   const SECTIONS = [
-    ['home', 'Home', [['overview', 'Overview'], ['news', 'News']]],
+    ['home', 'Home', [['overview', 'Overview'], ['news', 'News'], ['mediaday', 'Media Day']]],
     ['team', 'Team', [['roster', 'Roster'], ['rotation', 'Rotation & Game Plan'], ['schedule', 'Schedule'], ['stats', 'Player Stats']]],
     ['league', 'League', [['standings', 'Standings'], ['leaders', 'Leaders'], ['playoffs', 'Playoffs'], ['players', 'Players'], ['history', 'History']]],
     ['office', 'Front Office', [['trades', 'Trades', 1], ['freeagency', 'Free Agency', 1], ['draft', 'Draft', 1], ['finances', 'Finances', 1], ['staff', 'Staff', 1]]],
@@ -237,6 +237,7 @@ HL.Franchise = (function () {
   function heroFor(n) {
     const Lg = L();
     try {
+      if (n.type === 'media' && n.visual) return `<div style="max-width:${n.visual.kind === 'short' ? 280 : n.visual.kind === 'thumb' ? 520 : 340}px">${mediaVisual(n)}</div>`;
       if (n.type === 'champion' && n.teamIds) {
         const t = Lg.teams[n.teamIds[0]];
         return HL.GFX.championPoster(t, topStars(t.id), n.season + 1, { sub: n.body || '' });
@@ -257,7 +258,31 @@ HL.Franchise = (function () {
     return '';
   }
 
+  // Composed visual for a media-day / social story (pieces stored at media day).
+  function mediaVisual(n) {
+    const Lg = L();
+    const v = n.visual;
+    const p = Lg.players[n.playerIds[0]];
+    if (!p) return '';
+    const comp = v.asset ? HL.MediaDay.portraitFor(Lg, v.asset) : null;
+    const handle = n.reactions && n.reactions[0] ? n.reactions[0].voice.handle : 'hoopclips';
+    if (v.kind === 'short') return HL.GFX.shortVideo(p, comp, v, handle);
+    if (v.kind === 'thumb') return HL.GFX.thumbnail(p, comp, v, n.reactions && n.reactions[1] ? n.reactions[1].voice.outlet : 'Hoop Talk');
+    if (v.kind === 'quote') return HL.GFX.quoteCard(p, comp, v);
+    return HL.GFX.portrait(p, comp);
+  }
+
   function bindCommon(el) {
+    el.querySelectorAll('[data-md-resp]').forEach(x => x.onclick = () => {
+      const [id, choice] = x.dataset.mdResp.split(':');
+      const th = (L().mediaThreads || []).find(t => String(t.id) === id);
+      if (!th) return;
+      const e = HL.MediaDay.respond(L(), th, choice);
+      const p = L().players[th.pid];
+      const what = { ignore: `${p.name} says nothing.`, joke: `${p.name} laughs it off.`, clapback: `${p.name} fires back.`, hoop: `${p.name} will let the games answer.`, repost: `${p.name} posts his own pick of the shoot.`, context: th.note || 'The team releases the full clip.', embrace: `${p.name} recreates the meme himself.`, charity: `${p.name} links the meme to a fundraiser. Only delivered money will count.` }[choice];
+      U.toast(esc(what) + (e ? `<br><b>${esc(e.key.endsWith('backfire') ? 'It backfired.' : e.key.endsWith('exposed') ? 'The full clip changes the story.' : '')}</b>` : ''));
+      renderPage();
+    });
     el.querySelectorAll('[data-player]').forEach(x => x.onclick = (e) => { e.stopPropagation(); playerSheet(+x.dataset.player); });
     el.querySelectorAll('[data-box]').forEach(x => x.onclick = () => boxScore(x.dataset.box));
     el.querySelectorAll('[data-goto]').forEach(x => x.onclick = () => { const [s, p] = x.dataset.goto.split('/'); go(s, p); });
@@ -310,7 +335,7 @@ HL.Franchise = (function () {
       <div class="en"><span>${k(Math.round(r.reposts * 0.6))} replies</span><span>${k(r.reposts)} reposts</span><span>${k(r.likes)} likes</span></div></div></div>`;
   }
   function kicker(n) {
-    const types = { game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
+    const types = { media: 'Media day', game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
     const events = { 'game.buzzer_beater': 'Buzzer-beater', 'game.game_winner': 'Game-winner', 'game.comeback': 'Comeback', 'record.single_game': 'Record book', 'record.single_game_tie': 'Record book', 'record.minutes_sixth_overtime': 'Record book', 'court.four_point_play': 'Four-point play', 'court.five_point_play': 'Five-point play', 'court.charge_triple': 'Defense', 'court.no_field_goals_quarter': 'Defense' };
     const label = n.type === 'event' ? (events[n.key] || 'Rare feat') : (types[n.type] || n.type);
     return `${label} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
@@ -409,6 +434,33 @@ HL.Franchise = (function () {
       if (filter === 'top') items = items.filter(n => n.importance >= 2);
       return `<div class="page-title"><h2>News</h2><div class="ml-auto">${U.seg('filter', [['all', 'All'], ['top', 'Top stories'], ['mine', esc(t.name)]], filter)}</div></div>
         <section class="block" style="max-width:860px">${items.length ? leadStory(items[0]) + items.slice(1, 80).map(n => story(n)).join('') : '<div class="empty">No news yet. Sim some games.</div>'}</section>`;
+    },
+
+    mediaday() {
+      const Lg = L(), t = me();
+      if (!HL.MediaDay.enabled(Lg)) return `<div class="page-title"><h2>Media Day</h2></div><section class="block"><div class="empty">Media day and social media coverage begin with the 2010s. In ${seasonLabel(Lg.season)}, the newspapers and radio cover your team.</div></section>`;
+      const md = (Lg.mediaDays || {})[Lg.season];
+      if (!md) return `<div class="page-title"><h2>Media Day</h2></div><section class="block"><div class="body row wrap" style="gap:14px"><div class="grow"><h3>Before the opener</h3><div class="t2 sm">Every team shoots portraits and short interviews. The internet does the rest.</div></div><button class="btn go" data-md-run>Hold media day</button></div></section>`;
+      const items = Lg.news.filter(n => n.type === 'media' && n.season === Lg.season).reverse();
+      const mine = (Lg.mediaThreads || []).filter(th => th.season === Lg.season && th.teamId === t.id);
+      const open = mine.filter(th => th.status === 'open');
+      const evOf = id => (Lg.events || []).find(e => e.id === id);
+      const decisions = open.map(th => {
+        const n = Lg.news.find(x => x.eventId === th.eventId);
+        const p = Lg.players[th.pid];
+        return `<div class="offer"><div class="row">${U.face(p, 40, t)}<div class="grow"><div class="nm">${esc(p.name)}</div><div class="t3 xs">${esc(n ? n.headline : th.kind)}</div></div></div>
+          ${n && n.visual ? `<div style="max-width:260px">${mediaVisual(n)}</div>` : ''}
+          <div class="caps">How does he respond?</div>
+          <div class="stack" style="gap:6px">${(HL.MediaDay.OPTIONS[th.kind] || ['ignore']).map(o => `<button class="btn" style="justify-content:flex-start;height:auto;padding:8px 12px;text-align:left" data-md-resp="${th.id}:${o}"><div><b>${esc(HL.MediaDay.OPTION_TEXT[o][0])}</b><div class="t3 xs">${esc(HL.MediaDay.OPTION_TEXT[o][1])}</div></div></button>`).join('')}</div></div>`;
+      }).join('');
+      const portraits = md.portraits.filter(c => c.teamId === t.id).slice(0, 15).map(c => { const p = Lg.players[c.pid]; return p ? HL.GFX.portrait(p, c) : ''; }).join('');
+      const feed = items.slice(0, 18).map(n => `<div class="mdpost">${n.visual ? mediaVisual(n) : ''}<div class="hl">${esc(n.headline)}</div>${(n.reactions || []).slice(0, 2).map(post).join('')}</div>`).join('');
+      const history = mine.filter(th => th.status !== 'open').map(th => { const p = Lg.players[th.pid]; const fu = th.followups.map(evOf).filter(Boolean); return `<div class="kv"><span>${esc(p ? p.name : '')} · ${esc(th.kind)}</span><b class="sm">${th.response ? esc(HL.MediaDay.OPTION_TEXT[th.response.choice][0]) : '—'}${fu.length ? ` → ${fu.map(e => esc(e.key.split('.').pop().replace(/_/g, ' '))).join(', ')}` : ''}${th.status === 'proof' ? ' (waiting on a big game)' : th.status === 'charity' ? ' (fundraiser running)' : ''}</b></div>`; }).join('');
+      return `<div class="page-title"><h2>Media Day ${Lg.season}</h2><span class="t2">${md.portraits.length} portraits · ${md.events.length} stories</span></div>
+        ${decisions ? `<section class="block"><header><h3>Your players need an answer</h3></header><div class="body"><div class="offers">${decisions}</div></div></section>` : ''}
+        ${portraits ? `<section class="block"><header><h3>${esc(t.name)} portraits</h3></header><div class="body"><div class="mdgrid">${portraits}</div></div></section>` : ''}
+        ${history ? `<section class="block"><header><h3>How your players handled it</h3></header><div class="body">${history}</div></section>` : ''}
+        <section class="block"><header><h3>Around the league</h3></header><div class="body"><div class="mdfeed">${feed || '<div class="empty">Quiet media day.</div>'}</div></div></section>`;
     },
 
     roster() {
@@ -640,6 +692,7 @@ HL.Franchise = (function () {
   // ---------------- page bindings ----------------
   const BIND = {
     news(el) { el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { pageState.filter = b.dataset.v; renderPage(); }); },
+    mediaday(el) { const b = el.querySelector('[data-md-run]'); if (b) b.onclick = () => { HL.MediaDay.run(L()); renderPage(); }; },
     roster(el) { el.querySelector('[data-team-select]').onchange = (e) => { pageState.team = +e.target.value; renderPage(); }; },
     players(el) {
       const q = el.querySelector('[data-q]');

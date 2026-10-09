@@ -7,7 +7,7 @@ A scenario counts as implemented only when the game simulates its trigger and co
 
 | | Implemented | Partial | Blocked | Not started | Total |
 |---|---|---|---|---|---|
-| Proposed scenarios | 9 | 2 | 5 | 1124 | 1140 |
+| Proposed scenarios | 27 | 4 | 5 | 1104 | 1140 |
 | Claude additions | 9 | 0 | 0 | 0 | 9 |
 | Original media catalog (emitted by the game) | 55 | | | 97 | 152 |
 
@@ -643,6 +643,28 @@ Not started: `wellbeing.travel_sleep_environment_changed`, `wellbeing.preventive
 
 ### Media day, social reactions, and configurable portraits
 
-20 not started
+18 implemented · 2 partial
 
-Not started: `media.day.first_impression_hype`, `media.social.washed_slander`, `media.social.washed_rebuttal`, `media.day.fitness_change`, `media.day.chemistry_body_language`, `media.social.bad_clip_pile_on`, `media.social.selective_edit_exposed`, `media.social.fake_quote_corrected`, `media.social.player_response_backfire`, `media.social.player_response_redeemed`, `media.social.unflattering_photo_reaction`, `media.social.audience_split`, `media.social.old_clip_recycled`, `media.social.unexpected_rival_support`, `media.social.meme_to_charity`, `media.social.pose_becomes_meme`, `media.day.number_reveal_reaction`, `media.day.new_team_jersey_debate`, `media.day.rivals_group_photo`, `media.day.hairstyle_reveal`
+| Key | Status | Handler / data | Evidence / note |
+|---|---|---|---|
+| `media.day.first_impression_hype` | implemented | HL.MediaDay (js/media/mediaday.js): run(): rookies (OVR 72+) and star arrivals; positive reactions vs 4,000 threshold | media day test run + Media Day page Publicity only; no rating change. |
+| `media.social.washed_slander` | implemented | HL.MediaDay (js/media/mediaday.js): run(): age 31+, peak 84+, 4+ below peak or falling; reaction count vs threshold; opens an ignore/joke/clap back/let the game answer thread | media day test run + Media Day page Opinion only; ratings untouched. Real career peak from the history data. |
+| `media.social.washed_rebuttal` | implemented | HL.MediaDay (js/media/mediaday.js): tick(): days after a washed thread, chance rises with OVR; distinct supporters stored | media day test run + Media Day page |
+| `media.day.fitness_change` | implemented | HL.MediaDay (js/media/mediaday.js): run(): measured weight vs last media day (stored per player) | media day test run + Media Day page Ratings change only through progression, not appearance. |
+| `media.day.chemistry_body_language` | implemented | HL.MediaDay (js/media/mediaday.js): run(): portrait pose/expression tags (arms crossed, looking off camera, not smiling) | media day test run + Media Day page Interpretation only; no chemistry change. |
+| `media.social.bad_clip_pile_on` | implemented | HL.MediaDay (js/media/mediaday.js): run(): clip descriptor + whether the circulating cut was edited (stored at creation) | media day test run + Media Day page |
+| `media.social.selective_edit_exposed` | implemented | HL.MediaDay (js/media/mediaday.js): respond(context): only when the stored clip was edited; otherwise the full clip confirms it | media day test run + Media Day page Original circulation stays on record. |
+| `media.social.fake_quote_corrected` | implemented | HL.MediaDay (js/media/mediaday.js): run(): fabricated quote graphic, labeled and corrected; quote card stamped Fabricated | media day test run + Media Day page No player statement is created. |
+| `media.social.player_response_backfire` | implemented | HL.MediaDay (js/media/mediaday.js): respond(joke/clap back): measured sentiment before/after; ego raises the risk | media day test run + Media Day page |
+| `media.social.player_response_redeemed` | implemented | HL.MediaDay (js/media/mediaday.js): afterGame(): a big game line within the window after a response or "let the game answer" | media day test run + Media Day page Needs both the response and a verified game. |
+| `media.social.unflattering_photo_reaction` | implemented | HL.MediaDay (js/media/mediaday.js): run(): portrait lighting/angle tags and negative photo reactions | media day test run + Media Day page |
+| `media.social.audience_split` | implemented | HL.MediaDay (js/media/mediaday.js): run(): positive and negative shares stored | media day test run + Media Day page |
+| `media.social.old_clip_recycled` | implemented | HL.MediaDay (js/media/mediaday.js): run(): original date attached to the story | media day test run + Media Day page |
+| `media.social.unexpected_rival_support` | implemented | HL.MediaDay (js/media/mediaday.js): tick(): rival from a close playoff series in this league (noteSeries) defends the target | media day test run + Media Day page Rivalries form from playoff series played in the save. |
+| `media.social.meme_to_charity` | implemented | HL.MediaDay (js/media/mediaday.js): respond(charity): recipient confirmation 10-25 days later with the delivered amount | media day test run + Media Day page Only delivered money is reported. |
+| `media.social.pose_becomes_meme` | implemented | HL.MediaDay (js/media/mediaday.js): run(): meme-prone poses + remake count | media day test run + Media Day page |
+| `media.day.number_reveal_reaction` | implemented | HL.MediaDay (js/media/mediaday.js): run(): first professional number or a new number | media day test run + Media Day page |
+| `media.day.new_team_jersey_debate` | implemented | HL.MediaDay (js/media/mediaday.js): run(): first portrait in a new uniform (needs last season's media day record, so from the second season of a save) | media day test run + Media Day page |
+| `media.day.rivals_group_photo` | partial | HL.MediaDay (js/media/mediaday.js): rivals who became teammates share a frame | Needs rivalries from a previous playoff series and a move that puts both on one team. |
+| `media.day.hairstyle_reveal` | partial | HL.MediaDay (js/media/mediaday.js): look pieces on generated players | Real players use their real headshot, so hairstyle pieces only show on generated players. |
+
