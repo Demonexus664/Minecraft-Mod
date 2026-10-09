@@ -214,6 +214,48 @@ HL.Franchise = (function () {
   const hurt = p => p.injury && p.injury.games > 0 ? `<span class="tag hurt">${esc(p.injury.name)} · ${p.injury.games}g</span>` : '';
   const teamLink = (t, size = 22) => `<div class="who" data-teamv="${t.id}">${U.logo(t, size)}<span class="nm">${esc(t.name)}</span></div>`;
   const seasonLabel = s => `${s}-${String(s + 1).slice(2)}`;
+  const topStars = (tid, n = 3) => HL.League.teamPlayers(tid).filter(p => !p.injury || p.injury.games <= 0).sort((a, b) => b.ovr - a.ovr).slice(0, n);
+  function seriesStatus(s) {
+    const T = id => L().teams[id];
+    const [a, b] = s.wins;
+    if (s.winner != null) return `${T(s.winner).name} win ${Math.max(a, b)}-${Math.min(a, b)}`;
+    if (a === b) return a === 0 ? `Game 1 · best of ${s.bestOf || 7}` : `Series tied ${a}-${b}`;
+    return `${T(a > b ? s.hi : s.lo).name} lead ${Math.max(a, b)}-${Math.min(a, b)}`;
+  }
+  function roundName(s) {
+    if (s.conf === 'Finals') return `${L().season + 1} NBA Finals`;
+    const P = L().playoffs, fmt = P.format;
+    const n = Math.ceil(Math.log2(Math.max(2, fmt.perConf)));
+    const idx = P.rounds.findIndex(r => r.includes(s));
+    const word = L().season < 1970 ? 'Division' : 'Conference';
+    return `${s.conf}ern ${idx === n - 1 ? word + ' Finals' : idx === n - 2 ? word + ' Semifinals' : 'First Round'}`;
+  }
+  function seriesPoster(s) {
+    const A = L().teams[s.hi], B = L().teams[s.lo];
+    return HL.GFX.matchupPoster(A, B, topStars(A.id, 2), topStars(B.id, 2), { kicker: roundName(s), title: s.conf === 'Finals' ? 'The Finals' : `${A.abbr} vs ${B.abbr}`, status: seriesStatus(s), wide: true });
+  }
+  function heroFor(n) {
+    const Lg = L();
+    try {
+      if (n.type === 'champion' && n.teamIds) {
+        const t = Lg.teams[n.teamIds[0]];
+        return HL.GFX.championPoster(t, topStars(t.id), n.season + 1, { sub: n.body || '' });
+      }
+      if (n.type === 'award' && n.playerIds && n.playerIds.length && n.importance >= 3) {
+        const p = Lg.players[n.playerIds[0]];
+        const t = p.teamId != null ? Lg.teams[p.teamId] : null;
+        return HL.GFX.awardCard(p, t, 'Most Valuable Player', n.body || '');
+      }
+      if (n.type === 'game' && n.playerIds && n.playerIds.length && n.teamIds) {
+        const p = Lg.players[n.playerIds[0]];
+        const A = Lg.teams[n.teamIds[1]], H = Lg.teams[n.teamIds[0]];
+        if (!p) return '';
+        const mine = p.teamId === A.id ? A : H, other = mine === A ? H : A;
+        return HL.GFX.matchupPoster(mine, other, [p].concat(topStars(mine.id, 2).filter(x => x !== p)).slice(0, 2), topStars(other.id, 2), { kicker: HL.fmtDay(n.season, n.day, { weekday: 1 }), title: n.headline.length > 42 ? `${mine.abbr} vs ${other.abbr}` : n.headline, status: '' });
+      }
+    } catch (e) { return ''; }
+    return '';
+  }
 
   function bindCommon(el) {
     el.querySelectorAll('[data-player]').forEach(x => x.onclick = (e) => { e.stopPropagation(); playerSheet(+x.dataset.player); });
@@ -279,7 +321,8 @@ HL.Franchise = (function () {
       ${posts.length ? `<div class="posts">${posts.map(post).join('')}</div>` : ''}</article>`;
   }
   function leadStory(n) {
-    return `<article class="lead-story"><div class="kicker">${kicker(n)}</div><h2>${esc(n.headline)}</h2>${n.body ? `<div class="t2">${esc(n.body)}</div>` : ''}
+    const hero = heroFor(n);
+    return `<article class="lead-story">${hero ? `<div style="margin-bottom:12px">${hero}</div>` : ''}<div class="kicker">${kicker(n)}</div><h2>${esc(n.headline)}</h2>${n.body ? `<div class="t2">${esc(n.body)}</div>` : ''}
       ${n.gid ? `<button class="btn small" style="margin-top:8px" data-box="${n.gid}">Box score</button>` : ''}
       ${(n.reactions || []).length ? `<div class="posts">${n.reactions.slice(0, 3).map(post).join('')}</div>` : ''}</article>`;
   }
@@ -323,7 +366,15 @@ HL.Franchise = (function () {
         nextHtml = `<div class="empty">${Lg.phase === 'regular' ? 'Regular season complete.' : Lg.phase === 'offseason' ? 'Offseason. Start the next season from the top bar.' : 'Playoff schedule is on the Playoffs page.'}</div>`;
       }
       return `
-      ${champ ? `<section class="block"><div class="body row" style="gap:18px">${U.logo(Lg.teams[champ.champion], 72)}<div><div class="caps">${seasonLabel(champ.season)} NBA Champions</div><h2 style="font-size:36px;margin-top:4px">${esc(Lg.teams[champ.champion].city)} ${esc(Lg.teams[champ.champion].name)}</h2><div class="t2" style="margin-top:4px">Beat the ${esc(Lg.teams[champ.runnerUp].name)} ${champ.finalsScore}${champ.fmvp != null ? ` · Finals MVP ${esc(Lg.players[champ.fmvp].name)}` : ''}</div></div></div></section>` : ''}
+      ${champ ? HL.GFX.championPoster(Lg.teams[champ.champion], topStars(champ.champion), champ.season + 1, { wide: true, sub: `Beat the ${Lg.teams[champ.runnerUp].name} ${champ.finalsScore}${champ.fmvp != null ? ` · Finals MVP ${Lg.players[champ.fmvp].name}` : ''}` }) : ''}
+      ${(() => {
+        if (Lg.phase !== 'playoffs' || !Lg.playoffs) return '';
+        const round = Lg.playoffs.rounds[Lg.playoffs.rounds.length - 1] || [];
+        const mine = round.find(x => x.hi === t.id || x.lo === t.id);
+        const fin = round.find(x => x.conf === 'Finals');
+        const s = mine || fin;
+        return s ? seriesPoster(s) : '';
+      })()}
       ${teamBand(t)}
       <div class="cols c-main">
         <div class="stack" style="gap:16px">
@@ -478,7 +529,7 @@ HL.Franchise = (function () {
       };
       return `<div class="page-title"><h2>${Lg.season + 1} Playoffs</h2><span class="t2">${fmt.bestOf.map((b, i) => `${i === fmt.bestOf.length - 1 ? 'Finals' : 'R' + (i + 1)}: best of ${b}`).join(' · ')}</span></div>
         ${P.champion != null ? `<section class="block"><div class="body row" style="gap:16px">${U.logo(T(P.champion), 64)}<div><div class="caps">NBA Champions</div><h2 style="font-size:34px;margin-top:4px">${esc(T(P.champion).city)} ${esc(T(P.champion).name)}</h2></div></div></section>` : ''}
-        ${finals.length ? `<section class="block"><header><h3>NBA Finals</h3></header><div class="body" style="max-width:320px">${finals.map(seriesBox).join('')}</div></section>` : ''}
+        ${finals.length ? seriesPoster(finals[0]) : ''}
         <div class="cols c2">${confs.map(c => `<section class="block"><header><h3>${c}</h3></header><div class="body"><div class="row" style="align-items:flex-start;gap:12px;overflow-x:auto">
           ${Array.from({ length: nConfRounds }, (_, i) => { const r = confRounds[i] ? confRounds[i].filter(x => x.conf === c) : []; return `<div class="stack" style="gap:8px;min-width:130px"><div class="caps">${roundTitle(i, nConfRounds)}</div>${r.length ? r.map(seriesBox).join('') : '<div class="series"><div class="s t3">TBD</div></div>'}</div>`; }).join('')}
           ${P.byes && P.byes[c] && P.byes[c].length ? `<div class="stack" style="gap:6px;min-width:120px"><div class="caps">Byes</div>${P.byes[c].map(id => `<div class="row sm">${U.logo(T(id), 18)} ${esc(T(id).abbr)}</div>`).join('')}</div>` : ''}
@@ -647,7 +698,7 @@ HL.Franchise = (function () {
     const meter = (label, v) => `<div class="meter"><span class="lbl">${label}</span><span class="val">${v}</span><div class="track"><i class="${v >= 80 ? 'hi' : v < 55 ? 'lo' : 'mid'}" style="width:${v}%"></i></div></div>`;
     const m = U.sheet(`${t ? U.logo(t, 24) : ''}<h3>${esc(p.name)}</h3>`, `
       <div class="phead">
-        <div class="shot" style="--team-c:${acc.c}">${U.face(p, 200, t)}</div>
+        <div class="shot" style="--team-c:${acc.c}">${HL.GFX.figure(p, t)}</div>
         <div class="info">
           <div class="jersey">${t ? esc(t.city + ' ' + t.name) : 'Free agent'} · ${p.pos}</div>
           <div class="pname">${esc(p.name)}</div>

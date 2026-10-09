@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Graphics preview</title>
+<link rel="stylesheet" href="../css/fonts.css"><link rel="stylesheet" href="../css/style.css">
+<style>body{padding:16px} .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));max-width:1400px} .card{max-width:300px}</style></head>
+<body><h2 style="margin-bottom:12px">Composed graphics preview</h2><div class="grid" id="g"></div>
+<script src="../js/core/rng.js"></script><script src="../data/names.js"></script><script src="../data/injuries.js"></script><script src="../data/numbers.js"></script><script src="../data/nbaids.js"></script>
+<script src="../js/league/teams.js"></script><script src="../js/league/ratings.js"></script><script src="../js/league/player.js"></script><script src="../js/league/gamesim.js"></script>
+<script src="../js/league/draft.js"></script><script src="../js/league/history.js"></script><script src="../js/media/engine.js"></script><script src="../js/media/news.js"></script>
+<script src="../js/league/season.js"></script><script src="../js/core/ui.js"></script><script src="../js/core/graphics.js"></script>
+<script src="../data/history/index.js"></script><script src="../data/history/seasons/2025.js"></script>
+<script>
+  const L = HL.League.createFromSeason({ seasonKey: '2025', seed: 3 });
+  const find = n => Object.values(L.players).find(p => p.name.includes(n));
+  const team = a => L.teams.find(t => t.abbr === a);
+  const stars = id => HL.League.teamPlayers(id).sort((a, b) => b.ovr - a.ovr);
+  const G = document.getElementById('g');
+  const add = h => { const d = document.createElement('div'); d.innerHTML = h; G.appendChild(d); };
+  const steph = find('Stephen Curry');
+  add(`<div class="card">${HL.GFX.playerCard(steph, team('GSW'), { sub: 'Golden State Warriors' })}</div>`);
+  add(`<div class="card">${HL.GFX.playerCard(steph, team('LAL'), { sub: 'What if: Steph on the Lakers' })}</div>`);
+  add(HL.GFX.matchupPoster(team('OKC'), team('NYK'), stars(team('OKC').id), stars(team('NYK').id), { kicker: '2026 NBA Finals', title: 'The Finals', status: 'Series tied 2-2 · Game 5 Tue, Jun 9' }));
+  add(HL.GFX.awardCard(find('Jokić'), team('DEN'), 'Most Valuable Player', '29.6 PPG · 12.7 RPG · 10.2 APG'));
+  add(HL.GFX.moveCard(find('Kevin Durant'), team('HOU'), team('BOS'), 'Traded'));
+  add(HL.GFX.championPoster(team('SAS'), stars(team('SAS').id), 2026, { sub: 'Beat the Celtics 4-2 · Finals MVP Victor Wembanyama' }));
+</script></body></html>
