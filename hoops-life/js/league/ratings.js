@@ -118,14 +118,16 @@ HL.progressionDelta = function (age, potentialGap, workEthic, difficultyMult = 1
   else if (age <= 24) base = 2.0;
   else if (age <= 26) base = 0.9;
   else if (age <= 29) base = 0;
-  else if (age <= 31) base = -1.2;
-  else if (age <= 33) base = -2.5;
-  else if (age <= 35) base = -3.8;
-  else base = -5.5;
+  else if (age <= 31) base = -0.8;
+  else if (age <= 33) base = -1.7;
+  else if (age <= 35) base = -2.6;
+  else if (age <= 37) base = -3.4;
+  else base = -4.2;
   if (base > 0) base *= HL.clamp(potentialGap / 10, 0.2, 1.6) * difficultyMult;
-  base += (workEthic - 50) / 40;
+  // Work ethic helps young players grow and slows the decline of veterans.
+  base += (workEthic - 50) / (base < 0 ? 60 : 40);
   // Variance: breakouts, busts and sudden drops.
-  return base + R.normal(0, 2.2);
+  return base + R.normal(0, age >= 30 ? 1.6 : 2.2);
 };
 
 HL.applyProgression = function (p, delta) {

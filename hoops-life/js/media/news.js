@@ -9,6 +9,8 @@ HL.News = (function () {
   const full = t => `${t.city} ${t.name}`;
   const last = p => p.name.split(' ').slice(1).join(' ') || p.name;
   const poss = n => n.endsWith('s') ? n + "'" : n + "'s";
+  const injName = n => n.split(' ').map(w => /^[A-Z]{2,}$/.test(w) ? w : w.toLowerCase()).join(' ');
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
   const aan = w => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
   const ord = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
 
@@ -56,14 +58,14 @@ HL.News = (function () {
     { id: 'g_blowout2', when: c => c.margin >= 25, w: 2, h: (L, c) => `${c.margin}-point ${R.pick(['beatdown', 'massacre', 'statement', 'clinic', 'disaster'])}: ${c.W.abbr} ${c.ws}, ${c.Lo.abbr} ${c.ls}` },
     { id: 'g_ot', when: c => c.ot > 0, w: 3, h: (L, c) => `${c.ot > 1 ? (c.ot === 2 ? 'Double' : c.ot === 3 ? 'Triple' : c.ot + 'x') + '-overtime' : 'Overtime'} ${R.pick(['thriller', 'classic', 'marathon', 'instant classic', 'war'])}: ${c.W.name} ${f(L, 'edge')} ${c.Lo.name} ${c.ws}-${c.ls}` },
     { id: 'g_close', when: c => c.margin <= 3 && !c.ot, w: 2, h: (L, c) => `${c.W.name} ${f(L, 'edge')} ${c.Lo.name} ${c.ws}-${c.ls} in a ${R.pick(['nail-biter', 'tight one', 'down-to-the-wire finish', 'heart-stopper', 'gut-check win'])}` },
-    { id: 'g_star', when: c => c.star && c.star.l.pts >= 40, w: 4, h: (L, c) => `${c.star.p.name} ${f(L, 'scored')} ${c.star.l.pts} as ${c.starWon ? `${c.star.t.name} ${f(L, 'beat')} ${c.starOpp.name}` : `${c.star.t.name} still fell to ${c.starOpp.name}`}` },
+    { id: 'g_star', when: c => c.star && c.star.l.pts >= 40, w: 4, h: (L, c) => `${c.star.p.name} ${R.pick(['scores', 'pours in', 'erupts for', 'drops', 'goes for', 'hangs'])} ${c.star.l.pts} as ${c.starWon ? `${c.star.t.name} ${f(L, 'beat')} ${c.starOpp.name}` : `${c.star.t.name} still fall to ${c.starOpp.name}`}` },
     { id: 'g_star2', when: c => c.star && c.star.l.pts >= 50, w: 6, h: (L, c) => `${c.star.l.pts}! ${c.star.p.name} has a ${f(L, 'big')} ${f(L, 'night')} ${c.starWon ? 'in the win' : 'in a losing effort'}` },
     { id: 'g_td', when: c => c.star && isTripleDouble(c.star.l), w: 4, h: (L, c) => `Triple-double: ${c.star.p.name} posts ${statStr(c.star.l)} ${c.starWon ? 'in the win' : 'but ' + c.star.t.name + ' come up short'}` },
-    { id: 'g_streakW', when: c => c.W.streak >= 6, w: 3, h: (L, c) => `${c.W.name} are ${f(L, 'streak_w')}: ${c.W.streak} straight wins after beating ${c.Lo.name}` },
+    { id: 'g_streakW', when: c => c.W.streak >= 6, w: 3, h: (L, c) => `${c.W.name} ${R.pick(['stay', 'remain', 'keep rolling,'])} ${f(L, 'streak_w')}: ${c.W.streak} straight after beating ${c.Lo.name}` },
     { id: 'g_streakL', when: c => c.Lo.streak <= -6, w: 3, h: (L, c) => `${c.Lo.name} ${f(L, 'streak_l')}: ${-c.Lo.streak} straight losses after falling to ${c.W.name}` },
     { id: 'g_upset', when: c => c.upset, w: 3, h: (L, c) => `Upset alert: ${c.W.w - 1 <= c.W.l ? 'struggling ' : ''}${c.W.name} (${c.W.w}-${c.W.l}) ${f(L, 'beat')} ${c.Lo.name} (${c.Lo.w}-${c.Lo.l})` },
-    { id: 'g_plain', w: 1, h: (L, c) => `${c.W.name} ${f(L, 'beat')} ${c.Lo.name} ${c.ws}-${c.ls}${c.star ? `; ${last(c.star.p)} leads with ${c.star.l.pts}` : ''}` },
-    { id: 'g_plain2', w: 1, h: (L, c) => `${c.star ? `${poss(c.star.p.name)} ${c.star.l.pts} ` + (c.starWon ? 'powers' : 'not enough for') + ` ${c.star.t.name}` : `${c.W.name} win`} ${c.starWon ? 'past' : 'against'} ${c.starWon ? c.starOpp.name : c.starOpp.name}, ${c.ws}-${c.ls}` },
+    { id: 'g_plain', w: 1, h: (L, c) => `${c.W.name} ${f(L, 'beat')} ${c.Lo.name} ${c.ws}-${c.ls}${c.star ? (c.starWon ? `; ${last(c.star.p)} scores ${c.star.l.pts}` : ` despite ${poss(c.star.p.name)} ${c.star.l.pts}`) : ''}` },
+    { id: 'g_plain2', w: 1, when: c => !!c.star, h: (L, c) => c.starWon ? `${poss(c.star.p.name)} ${c.star.l.pts} ${R.pick(['powers', 'lifts', 'carries', 'propels'])} ${c.star.t.name} past ${c.starOpp.name}, ${c.ws}-${c.ls}` : `${poss(c.star.p.name)} ${c.star.l.pts} not enough as ${c.W.name} ${f(L, 'beat')} ${c.Lo.name}, ${c.ws}-${c.ls}` },
   ];
 
   function gameReactions(L, c) {
@@ -79,7 +81,7 @@ HL.News = (function () {
       out.push(social(L, 'oldhead', `${f(L, 'old_open')} getting beat by ${c.margin} meant extra practice and no plane snacks. ${c.Lo.name} need to look in the mirror.`, c.Lo));
     }
     if (c.Lo.streak <= -5) out.push(social(L, 'beat', `Postgame in ${c.Lo.city}: ${f(L, 'team_mood_bad')}. That's ${-c.Lo.streak} straight.`, c.Lo));
-    if (c.W.streak >= 5) out.push(social(L, 'homer', `${c.W.streak} STRAIGHT. ${f(L, 'team_mood_good')} ${f(L, 'emoji_hype')}`, c.W, { hype: 1.4 }));
+    if (c.W.streak >= 5) out.push(social(L, 'homer', `${c.W.streak} STRAIGHT. ${cap(f(L, 'team_mood_good'))}. ${f(L, 'emoji_hype')}`, c.W, { hype: 1.4 }));
     if (c.ot) out.push(social(L, 'memes', `My heart cannot take ${c.ot > 1 ? c.ot + ' overtimes' : 'overtime'} on a ${R.pick(['Tuesday', 'Wednesday', 'Thursday', 'school night', 'work night'])} ${f(L, 'emoji_sad')}`, c.W));
     return out;
   }
@@ -115,13 +117,13 @@ HL.News = (function () {
     const weeks = Math.round(inj.games / 3.5);
     const longTerm = inj.games >= 50;
     const hl = M.choose(L, [
-      { id: 'i1', h: () => `${p.name} (${inj.name.toLowerCase()}) expected to miss ${weeks >= 2 ? `${weeks} weeks` : `${inj.games} games`}` },
-      { id: 'i2', h: () => `${f(L, 'injury_sad')} ${poss(t.name)} ${p.name} sidelined with ${inj.name.toLowerCase()}` },
-      { id: 'i3', when: () => longTerm, w: 3, h: () => `${p.name} suffers ${inj.name.toLowerCase()}; ${inj.games >= 82 ? 'season in jeopardy' : 'out for months'}` },
-      { id: 'i4', when: () => p.ovr >= 85, w: 2, h: () => `Major blow for ${t.name}: star ${p.name} out with ${inj.name.toLowerCase()}` },
+      { id: 'i1', h: () => `${p.name} (${injName(inj.name)}) expected to miss ${weeks >= 2 ? `${weeks} weeks` : `${inj.games} games`}` },
+      { id: 'i2', h: () => `${f(L, 'injury_sad')} ${poss(t.name)} ${p.name} sidelined with ${aan(injName(inj.name))}` },
+      { id: 'i3', when: () => longTerm, w: 3, h: () => `${p.name} suffers ${aan(injName(inj.name))}; ${inj.games >= 82 ? 'season in jeopardy' : 'out for months'}` },
+      { id: 'i4', when: () => p.ovr >= 85, w: 2, h: () => `Major blow for ${t.name}: star ${p.name} out with ${aan(injName(inj.name))}` },
     ], {}).h();
     const reactions = [
-      social(L, 'insider', `${f(L, 'sources')} ${t.name} ${p.pos} ${p.name} has been diagnosed with ${aan(inj.name.toLowerCase())} and will be re-evaluated in ${Math.max(1, weeks)} week${weeks === 1 ? '' : 's'}.`, t, { hype: p.ovr >= 85 ? 3 : 1 }),
+      social(L, 'insider', `${f(L, 'sources')} ${t.name} ${p.pos} ${p.name} has been diagnosed with ${aan(injName(inj.name))} and will be re-evaluated in ${Math.max(1, weeks)} week${weeks === 1 ? '' : 's'}.`, t, { hype: p.ovr >= 85 ? 3 : 1 }),
     ];
     if (p.ovr >= 85) reactions.push(social(L, 'odds', `${t.name} title odds move from +${R.int(6, 20) * 100} to +${R.int(21, 60) * 100} after the ${last(p)} news.`, t));
     if (longTerm) reactions.push(social(L, 'homer', `Praying for ${last(p)}. Come back stronger. 🙏`, t));

@@ -1,73 +1,79 @@
-// Detailed Franchise (MyNBA-style): setup + hub with organized sections.
+// Detailed Franchise (MyNBA-style): setup + hub.
 window.HL = window.HL || {};
 
 HL.Franchise = (function () {
   const U = HL.UI;
   const esc = U.esc;
-  let view = 'dashboard';
-  let viewState = {};
   const L = () => HL.League.get();
   const me = () => L().teams[L().userTeamId];
+  let section = 'home', page = 'overview', pageState = {};
+
+  // ---------------- navigation map ----------------
+  const SECTIONS = [
+    ['home', 'Home', [['overview', 'Overview'], ['news', 'News']]],
+    ['team', 'Team', [['roster', 'Roster'], ['rotation', 'Rotation & Game Plan'], ['schedule', 'Schedule'], ['stats', 'Player Stats']]],
+    ['league', 'League', [['standings', 'Standings'], ['leaders', 'Leaders'], ['playoffs', 'Playoffs'], ['players', 'Players'], ['history', 'History']]],
+    ['office', 'Front Office', [['trades', 'Trades', 1], ['freeagency', 'Free Agency', 1], ['draft', 'Draft', 1], ['finances', 'Finances', 1], ['staff', 'Staff', 1]]],
+    ['league-office', 'League Office', [['rules', 'Rulebook'], ['settings', 'Settings']]],
+  ];
+  const go = (sec, pg, state = {}) => { section = sec; page = pg; pageState = state; render(); window.scrollTo(0, 0); };
 
   // ---------------- SETUP ----------------
   function setup() {
-    HL.App.setAccent();
+    U.applyTeamTheme(null);
     const st = { team: null, difficulty: 'pro', depth: 'detailed', role: 'gm' };
     const teams = HL.TEAMS.slice().sort((a, b) => a.city.localeCompare(b.city));
+    const strengths = {};
+    for (const t of teams) {
+      const ovrs = HL.ROSTERS_2025[t.abbr].trim().split('\n').map(l => +l.split('|')[4]).sort((a, b) => b - a).slice(0, 8);
+      strengths[t.id] = Math.round(ovrs.reduce((s, v, i) => s + v * [1.4, 1.3, 1.2, 1.1, 1, .7, .6, .5][i], 0) / 7.8);
+    }
     const render = () => {
       U.app().innerHTML = `
-      <div class="content" style="max-width:1200px;margin:0 auto">
-        <div class="row wrap">
-          <button class="btn sm ghost" data-back>← Back</button>
-          <h1 style="font-size:32px">New Franchise</h1>
-          <span class="chip accent">${esc(HL.ROSTER_META.label)}</span>
-        </div>
-        <div class="grid c3">
-          <div class="panel"><h3>Start</h3>
-            <div class="col">
-              <label class="row"><input type="radio" checked> <b>Current season</b> <span class="muted small">real 2025-26 rosters</span></label>
-              <label class="row muted"><input type="radio" disabled> Any era (1960s → today) <span class="chip soon">soon</span></label>
-              <label class="row muted"><input type="radio" disabled> Fantasy draft (any era) <span class="chip soon">soon</span></label>
-            </div>
-          </div>
-          <div class="panel"><h3>Your role</h3>
-            ${U.seg('role', [['coach', 'Coach'], ['gm', 'GM'], ['owner', 'Owner']], st.role)}
-            <p class="muted small" style="margin-top:10px">${{ coach: 'Rotations, strategy and player relationships. The front office handles roster moves.', gm: 'Coach + front office: roster, contracts, trades, draft (MyGM-style RPG).', owner: 'Total control, including business, budget and the rulebook (MyNBA-style).' }[st.role]}</p>
-          </div>
-          <div class="panel"><h3>Difficulty & depth</h3>
-            <div class="col">
+      <div class="frame">
+        <div class="masthead"><div class="bar">
+          <div class="wordmark" data-home>Hoops<i>Life</i></div>
+          <div class="mainnav"><button class="on">New Franchise</button></div>
+        </div></div>
+        <div class="page">
+          <div class="page-title"><h2>New Franchise</h2><span class="t2">${esc(HL.ROSTER_META.label)}</span></div>
+          <div class="cols c3">
+            <section class="block"><header><h3>Start</h3></header><div class="body">
+              <div class="setting"><div class="grow"><b>Current season</b><div class="d">Real 2025-26 rosters, ratings and contracts</div></div><span class="tag team">Selected</span></div>
+              <div class="setting"><div class="grow t3"><b>Any era</b><div class="d">Start in 1965, 1984, 1996… and rewrite history</div></div><span class="tag new">Soon</span></div>
+              <div class="setting"><div class="grow t3"><b>Fantasy draft</b><div class="d">Draft from any era's player pool</div></div><span class="tag new">Soon</span></div>
+            </div></section>
+            <section class="block"><header><h3>Your role</h3></header><div class="body stack">
+              ${U.seg('role', [['coach', 'Coach'], ['gm', 'GM'], ['owner', 'Owner']], st.role)}
+              <div class="t2 sm">${{ coach: 'Rotations, game plans and player relationships. The front office makes the roster moves.', gm: 'Coach plus front office: roster, contracts, trades and the draft.', owner: 'Everything, including the business side and the rulebook.' }[st.role]}</div>
+            </div></section>
+            <section class="block"><header><h3>Difficulty & depth</h3></header><div class="body stack">
               ${U.seg('difficulty', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['hof', 'Hall of Fame']], st.difficulty)}
               ${U.seg('depth', [['simple', 'Simple'], ['detailed', 'Detailed']], st.depth)}
-              <span class="muted small">Simple lets the AI handle the details. Detailed puts every system in your hands. You can change this any time.</span>
-            </div>
+              <div class="t2 sm">Simple lets the AI handle the details. Detailed hands you every system. You can change this any time.</div>
+            </div></section>
           </div>
-        </div>
-        <div class="panel">
-          <h3>Pick your team</h3>
-          <div class="team-grid">
-            ${teams.map(t => `<div class="team-card ${st.team === t.id ? 'sel' : ''}" style="--c:${t.color}" data-team="${t.id}">
-              ${U.logo(t, 64)}
-              <div class="tn">${esc(t.city)}<br>${esc(t.name)}</div>
-              <span class="muted tiny">${t.conf} · ${t.div}</span>
-            </div>`).join('')}
-          </div>
-        </div>
-        <div class="row" style="justify-content:flex-end">
-          <button class="btn primary lg" data-start ${st.team == null ? 'disabled' : ''}>Start Franchise →</button>
+          <section class="block"><header><h3>Choose a team</h3><span class="t3 sm ml-auto">Team strength = top-8 weighted OVR</span></header>
+            <div class="body flush"><div class="picker" style="border:0;border-radius:0">
+              ${teams.map(t => `<button class="pick ${st.team === t.id ? 'on' : ''}" style="--c:${U.teamAccent(t).c}" data-team="${t.id}">
+                ${U.logo(t, 40)}<div><div class="cty">${esc(t.city)}</div><div class="nm">${esc(t.name)}</div></div>
+                <div class="str"><div class="num" style="font-size:22px">${strengths[t.id]}</div><div class="caps" style="font-size:10px">${t.conf}</div></div>
+              </button>`).join('')}
+            </div></div>
+          </section>
+          <div class="row"><button class="btn quiet" data-back>${U.icon('back')} Back</button>
+            <button class="btn go big ml-auto" data-start ${st.team == null ? 'disabled' : ''}>${st.team != null ? `Start as the ${esc(HL.TEAMS[st.team].name)}` : 'Pick a team'}</button></div>
         </div>
       </div>`;
-      U.app().querySelector('[data-back]').onclick = () => HL.App.title();
-      U.app().querySelectorAll('[data-team]').forEach(el => el.onclick = () => {
-        st.team = +el.dataset.team;
-        const t = HL.TEAMS[st.team];
-        HL.App.setAccent(t.color, t.color2);
-        render();
-      });
-      U.app().querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { st[sg.dataset.seg] = b.dataset.v; render(); }));
-      U.app().querySelector('[data-start]').onclick = () => {
+      const root = U.app();
+      root.querySelector('[data-back]').onclick = () => HL.App.title();
+      root.querySelector('[data-home]').onclick = () => HL.App.title();
+      root.querySelectorAll('[data-team]').forEach(el => el.onclick = () => { st.team = +el.dataset.team; U.applyTeamTheme(HL.TEAMS[st.team]); render(); });
+      root.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { st[sg.dataset.seg] = b.dataset.v; render(); }));
+      root.querySelector('[data-start]').onclick = () => {
         HL.League.create({ userTeamId: st.team, settings: { difficulty: st.difficulty, depth: st.depth, role: st.role } });
         L().mode = 'franchise';
-        view = 'dashboard';
+        section = 'home'; page = 'overview'; pageState = {};
         open();
         autosave();
       };
@@ -75,64 +81,47 @@ HL.Franchise = (function () {
     render();
   }
 
-  // ---------------- SHELL ----------------
-  const NAV = [
-    ['Home', [['dashboard', '🏠', 'Dashboard'], ['news', '📰', 'News & Media']]],
-    ['Team', [['roster', '👥', 'Roster'], ['strategy', '🧠', 'Rotation & Strategy'], ['schedule', '📅', 'Schedule & Results'], ['teamstats', '📊', 'Team Stats']]],
-    ['League', [['standings', '🏆', 'Standings'], ['leaders', '⭐', 'League Leaders'], ['playoffs', '🗂️', 'Playoffs'], ['players', '🔎', 'Player Search'], ['history', '📜', 'History & Awards']]],
-    ['Front Office', [['trades', '🔁', 'Trades', true], ['freeagency', '✍️', 'Free Agency', true], ['draft', '🎓', 'Draft & Scouting', true], ['finances', '💰', 'Finances', true], ['staff', '🧑‍🏫', 'Staff', true]]],
-    ['League Office', [['rules', '📘', 'Rulebook'], ['settings', '⚙️', 'Settings & Saves']]],
-  ];
-
+  // ---------------- FRAME ----------------
   function open() {
-    const t = me();
-    HL.App.setAccent(t.color, t.color2);
+    U.applyTeamTheme(me());
+    U.setEra(L().settings.eraTheme && L().settings.eraTheme !== 'auto' ? L().settings.eraTheme : HL.eraForSeason(L().season));
     render();
   }
 
   function render() {
-    const t = me(), Lg = L();
-    const phaseLabel = { regular: `Regular season · Day ${Lg.day + 1}`, playin: 'Play-In Tournament', playoffs: 'Playoffs', offseason: 'Offseason' }[Lg.phase];
-    const seed = HL.League.standings(t.conf).indexOf(t) + 1;
+    const sec = SECTIONS.find(s => s[0] === section);
     U.app().innerHTML = `
-    <div class="shell">
-      <aside class="sidebar" id="sidebar">
-        <div class="brand">Hoops<span>Life</span></div>
-        ${NAV.map(([g, items]) => `<div class="nav-group"><div class="label">${g}</div>
-          ${items.map(([id, ic, label, soon]) => `<button class="nav-item ${view === id ? 'active' : ''}" data-view="${id}"><span class="ic">${ic}</span>${label}${soon ? '<span class="soon">SOON</span>' : ''}</button>`).join('')}
-        </div>`).join('')}
-        <div class="nav-group"><button class="nav-item" data-quit><span class="ic">⏏️</span>Main menu</button></div>
-      </aside>
-      <div class="main">
-        <div class="topbar">
-          <button class="btn sm menu-toggle" data-menu>☰</button>
-          <div class="team-id">${U.logo(t, 42)}<div><div class="name">${esc(t.city)} ${esc(t.name)}</div>
-            <div class="rec">${t.w}-${t.l} · ${seed}${['th', 'st', 'nd', 'rd'][seed] || 'th'} in ${t.conf} · ${Lg.season}-${String(Lg.season + 1).slice(2)} · ${phaseLabel}</div></div></div>
-          <div class="sim">${simButtons()}</div>
+    <div class="frame">
+      <div class="masthead">
+        <div class="bar">
+          <div class="wordmark" data-quit title="Main menu">Hoops<i>Life</i></div>
+          <nav class="mainnav">${SECTIONS.map(([id, label, pages]) => `<button class="${id === section ? 'on' : ''}" data-sec="${id}" data-first="${pages[0][0]}">${label}</button>`).join('')}</nav>
+          <div class="simbar">${simButtons()}</div>
         </div>
-        <div class="content" id="view"></div>
+        <nav class="subnav">${sec[2].map(([id, label, soon]) => `<button class="${id === page ? 'on' : ''}" data-page="${id}">${label}${soon ? '<span class="soon">SOON</span>' : ''}</button>`).join('')}</nav>
       </div>
+      <main class="page" id="page"></main>
     </div>`;
     const root = U.app();
-    root.querySelectorAll('[data-view]').forEach(b => b.onclick = () => { view = b.dataset.view; viewState = {}; render(); });
-    root.querySelector('[data-menu]').onclick = () => root.querySelector('#sidebar').classList.toggle('open');
+    root.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => go(b.dataset.sec, b.dataset.first));
+    root.querySelectorAll('[data-page]').forEach(b => b.onclick = () => go(section, b.dataset.page));
     root.querySelector('[data-quit]').onclick = async () => { await autosave(); HL.App.title(); };
     root.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => sim(b.dataset.sim));
-    renderView();
+    renderPage();
   }
 
   function simButtons() {
     const Lg = L();
     if (Lg.phase === 'regular') return `
-      <button class="btn sm primary" data-sim="next">▶ Play next game</button>
-      <button class="btn sm" data-sim="week">Week</button>
-      <button class="btn sm" data-sim="month">Month</button>
-      <button class="btn sm" data-sim="regular">To playoffs</button>`;
+      <button class="btn go small" data-sim="next">${U.icon('play')}<span class="lbl">Play next</span></button>
+      <button class="btn small" data-sim="week"><span>Week</span></button>
+      <button class="btn small" data-sim="month"><span>Month</span></button>
+      <button class="btn small" data-sim="regular">${U.icon('ff')}<span class="lbl">To playoffs</span></button>`;
     if (Lg.phase === 'playin' || Lg.phase === 'playoffs') return `
-      <button class="btn sm primary" data-sim="day">▶ Next day</button>
-      <button class="btn sm" data-sim="round">Finish round</button>
-      <button class="btn sm" data-sim="season">Finish playoffs</button>`;
-    return `<button class="btn sm primary" data-sim="advance">Start ${Lg.season + 1}-${String(Lg.season + 2).slice(2)} season →</button>`;
+      <button class="btn go small" data-sim="day">${U.icon('play')}<span class="lbl">Next day</span></button>
+      <button class="btn small" data-sim="round"><span>Round</span></button>
+      <button class="btn small" data-sim="season">${U.icon('ff')}<span class="lbl">Finish</span></button>`;
+    return `<button class="btn go small" data-sim="advance">${U.icon('next')}<span class="lbl">Start ${Lg.season + 1}-${String(Lg.season + 2).slice(2)}</span></button>`;
   }
 
   function sim(kind) {
@@ -140,9 +129,9 @@ HL.Franchise = (function () {
     const uid = Lg.userTeamId;
     if (kind === 'advance') {
       HL.League.advanceToNextSeason();
-      U.toast(`Welcome to the ${Lg.season}-${String(Lg.season + 1).slice(2)} season. The draft, progression, retirements and free agency are done.`);
-      view = 'dashboard';
-      render(); autosave();
+      U.toast(`The ${Lg.season}-${String(Lg.season + 1).slice(2)} season is here. The draft, player progression, retirements and free agency are complete.`);
+      go('home', 'overview');
+      autosave();
       return;
     }
     let total = 1, stepFn;
@@ -152,17 +141,16 @@ HL.Franchise = (function () {
       total = next ? next.day - Lg.day + 1 : 1;
       stepFn = () => { HL.League.simDay(); };
     } else if (kind === 'week' || kind === 'month') {
-      total = Math.min(kind === 'week' ? 7 : 30, lastDay - Lg.day + 1);
+      total = Math.max(1, Math.min(kind === 'week' ? 7 : 30, lastDay - Lg.day + 1));
       stepFn = () => { if (L().phase !== 'regular') return false; HL.League.simDay(); };
     } else if (kind === 'regular') {
-      total = lastDay - Lg.day + 1;
+      total = Math.max(1, lastDay - Lg.day + 1);
       stepFn = () => { if (L().phase !== 'regular') return false; HL.League.simDay(); };
     } else if (kind === 'day') {
-      total = 1; stepFn = () => HL.League.simDay();
+      stepFn = () => HL.League.simDay();
     } else if (kind === 'round') {
-      const startRounds = Lg.playoffs ? Lg.playoffs.rounds.length : 0;
-      const startPhase = Lg.phase;
-      total = 12;
+      const startRounds = Lg.playoffs ? Lg.playoffs.rounds.length : 0, startPhase = Lg.phase;
+      total = 14;
       stepFn = () => {
         HL.League.simDay();
         const P = L().playoffs;
@@ -175,18 +163,15 @@ HL.Franchise = (function () {
       stepFn = () => { if (L().phase === 'offseason') return false; HL.League.simDay(); };
     }
     const before = Lg.news.length;
-    U.runWithProgress('Simulating…', Math.max(1, total), stepFn, () => {
+    U.runWithProgress(kind === 'next' ? 'Playing…' : 'Simulating…', total, stepFn, () => {
       render();
       autosave();
-      // Surface the user's latest game.
       if (kind === 'next' || kind === 'day') {
-        const g = [...L().schedule].reverse().find(x => x.res && (x.home === uid || x.away === uid));
-        const recentBox = Object.keys(L().boxScores).reverse().find(k => { const b = L().boxScores[k]; return b.home.teamId === uid || b.away.teamId === uid; });
-        if (kind === 'next' && g) boxScore(g.gid);
-        else if (kind === 'day' && recentBox) boxScore(recentBox);
+        const key = Object.keys(L().boxScores).reverse().find(k => { const b = L().boxScores[k]; return b.home.teamId === uid || b.away.teamId === uid; });
+        if (key && (kind === 'next' || L().boxScores[key].day === L().day - 1)) boxScore(key);
       }
-      const fresh = L().news.slice(before).filter(n => n.importance >= 3);
-      if (fresh.length) U.toast(`📰 ${esc(fresh[fresh.length - 1].headline)}`, 4000);
+      const big = L().news.slice(before).filter(n => n.importance >= 3);
+      if (big.length) U.toast(esc(big[big.length - 1].headline), 4200);
     });
   }
 
@@ -194,498 +179,491 @@ HL.Franchise = (function () {
     try { await HL.Saves.save(L()); } catch (e) { console.warn('autosave failed', e); }
   }
 
-  // ---------------- VIEWS ----------------
-  function renderView() {
-    const el = document.getElementById('view');
-    const fn = VIEWS[view] || VIEWS.soon;
-    el.innerHTML = fn();
-    bindCommon(el);
-    if (BIND[view]) BIND[view](el);
-  }
+  // ---------------- shared fragments ----------------
+  const who = (p, size = 30, sub) => `<div class="who" data-player="${p.id}">${U.face(p, size)}<div style="min-width:0"><div class="nm">${esc(p.name)}</div>${sub !== false ? `<div class="meta">${sub || `${p.pos} · ${HL.fmtHeight(p.height)} · ${p.age}`}</div>` : ''}</div></div>`;
+  const hurt = p => p.injury && p.injury.games > 0 ? `<span class="tag hurt">${esc(p.injury.name)} · ${p.injury.games}g</span>` : '';
+  const teamLink = (t, size = 22) => `<div class="who" data-teamv="${t.id}">${U.logo(t, size)}<span class="nm">${esc(t.name)}</span></div>`;
+  const seasonLabel = s => `${s}-${String(s + 1).slice(2)}`;
 
   function bindCommon(el) {
-    el.querySelectorAll('[data-player]').forEach(x => x.onclick = (e) => { e.stopPropagation(); playerCard(+x.dataset.player); });
+    el.querySelectorAll('[data-player]').forEach(x => x.onclick = (e) => { e.stopPropagation(); playerSheet(+x.dataset.player); });
     el.querySelectorAll('[data-box]').forEach(x => x.onclick = () => boxScore(x.dataset.box));
-    el.querySelectorAll('[data-goto]').forEach(x => x.onclick = () => { view = x.dataset.goto; render(); });
-    el.querySelectorAll('[data-team-view]').forEach(x => x.onclick = () => teamCard(+x.dataset.teamView));
+    el.querySelectorAll('[data-goto]').forEach(x => x.onclick = () => { const [s, p] = x.dataset.goto.split('/'); go(s, p); });
+    el.querySelectorAll('[data-teamv]').forEach(x => x.onclick = (e) => { e.stopPropagation(); go('team', 'roster', { team: +x.dataset.teamv }); });
   }
 
-  const plCell = (p, size = 32) => `<div class="pl" data-player="${p.id}">${U.avatar(p, size)}<div><div class="nm"><b>${esc(p.name)}</b></div><div class="tiny muted">${p.pos} · ${HL.fmtHeight(p.height)} · ${p.age}y</div></div></div>`;
-  const injTag = p => p.injury && p.injury.games > 0 ? `<div class="injury">🩹 ${esc(p.injury.name)} · ${p.injury.games}g</div>` : '';
-
-  function nextGameOf(tid) {
-    return L().schedule.find(g => !g.res && (g.home === tid || g.away === tid));
+  function teamBand(t) {
+    const Lg = L();
+    const conf = HL.League.standings(t.conf);
+    const seed = conf.indexOf(t) + 1;
+    const gp = t.w + t.l;
+    const net = gp ? (t.pf - t.pa) / gp : 0;
+    const payroll = HL.League.teamPlayers(t.id).reduce((s, p) => s + p.contract.amount, 0);
+    const l10 = t.last10.length ? `${t.last10.filter(x => x).length}-${t.last10.filter(x => !x).length}` : '—';
+    return `<section class="teamband">
+      <div class="flag">${U.logo(t, 70)}</div>
+      <div class="ident"><div class="city">${esc(t.city)} · ${seasonLabel(Lg.season)}</div><div class="name">${esc(t.name)}</div></div>
+      <div class="facts">
+        <div class="fact"><b>${t.w}-${t.l}</b><span>Record</span></div>
+        <div class="fact"><b>${gp ? U.ordinal(seed) : '—'}</b><span>${t.conf}</span></div>
+        <div class="fact"><b class="${net > 0 ? 'win' : net < 0 ? 'loss' : ''}">${gp ? (net > 0 ? '+' : '') + net.toFixed(1) : '—'}</b><span>Net / game</span></div>
+        <div class="fact"><b>${t.streak > 0 ? 'W' + t.streak : t.streak < 0 ? 'L' + (-t.streak) : '—'}</b><span>Streak</span></div>
+        <div class="fact"><b>${l10}</b><span>Last 10</span></div>
+        <div class="fact"><b>${U.money(payroll)}</b><span>Payroll</span></div>
+      </div>
+    </section>`;
   }
 
-  function newsItem(n, compact) {
-    const big = n.importance >= 3;
-    const rx = (n.reactions || []).slice(0, compact ? 1 : 4);
-    return `<div class="news-item ${big ? 'big' : ''}">
-      <div class="meta">${n.type.toUpperCase()} · ${n.season}-${String(n.season + 1).slice(2)} ${n.phase === 'regular' ? '· Day ' + (n.day + 1) : '· ' + n.phase}
-        ${(n.teamIds || []).slice(0, 2).map(id => U.logo(L().teams[id], 18)).join('')}</div>
-      <div class="hl">${esc(n.headline)}</div>
-      ${n.body ? `<div class="muted">${esc(n.body)}</div>` : ''}
-      ${n.gid && !compact ? `<button class="btn sm" style="align-self:flex-start" data-box="${n.gid}">Box score</button>` : ''}
-      ${rx.map(r => post(r)).join('')}
-    </div>`;
+  function resultRow(g, tid) {
+    const Lg = L();
+    const home = g.home === tid;
+    const opp = Lg.teams[home ? g.away : g.home];
+    if (!g.res) return `<div class="res-row future"><span class="wl t3">·</span><span class="d">Day ${g.day + 1}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.city)} ${esc(opp.name)}</span></div><span class="t3 sm">${opp.w}-${opp.l}</span></div>`;
+    const my = home ? g.res.hs : g.res.as, their = home ? g.res.as : g.res.hs;
+    const won = my > their;
+    return `<div class="res-row" data-box="${g.gid}"><span class="wl ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span><span class="d">Day ${g.day + 1}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.name)}</span></div><span class="num" style="font-size:17px">${my}-${their}${g.res.ot ? `<span class="t3 xs"> ${g.res.ot > 1 ? g.res.ot : ''}OT</span>` : ''}</span></div>`;
   }
 
+  const VOICE_COLORS = { debate: '#b42318', stats: '#1570ef', insider: '#067647', beat: '#6941c6', oldhead: '#93370d', memes: '#c11574', homer: 'var(--team)', hater: '#475467', odds: '#087443', pod: '#7a2e98', wire: '#344054' };
   function post(r) {
-    const initials = r.voice.outlet.replace(/[^A-Za-z ]/g, '').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-    const colors = { debate: '#dc2626', stats: '#0ea5e9', insider: '#16a34a', beat: '#7c3aed', oldhead: '#a16207', memes: '#db2777', homer: 'var(--accent)', hater: '#475569', odds: '#059669', pod: '#9333ea', wire: '#334155' };
+    const initials = r.voice.outlet.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const k = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K' : n;
-    return `<div class="post"><div class="pfp" style="--c:${colors[r.voice.key] || '#334'}">${initials}</div>
-      <div><div class="who"><b>${esc(r.voice.outlet)}</b> <span>${esc(r.voice.handle)} · ${esc(r.voice.kind)}</span></div>
-      <div class="txt">${esc(r.text)}</div>
-      <div class="eng"><span>💬 ${k(Math.round(r.reposts * 0.6))}</span><span>🔁 ${k(r.reposts)}</span><span>❤️ ${k(r.likes)}</span></div></div></div>`;
+    return `<div class="post"><div class="av" style="--c:${VOICE_COLORS[r.voice.key] || '#444'}">${initials}</div>
+      <div><div class="hd"><b>${esc(r.voice.outlet)}</b> <span>${esc(r.voice.handle)}</span></div><div class="tx">${esc(r.text)}</div>
+      <div class="en"><span>${k(Math.round(r.reposts * 0.6))} replies</span><span>${k(r.reposts)} reposts</span><span>${k(r.likes)} likes</span></div></div></div>`;
+  }
+  function kicker(n) {
+    const types = { game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
+    return `${types[n.type] || n.type} · ${seasonLabel(n.season)} · ${n.phase === 'regular' ? 'Day ' + (n.day + 1) : n.phase}`;
+  }
+  function story(n, opts = {}) {
+    const posts = (n.reactions || []).slice(0, opts.posts ?? 3);
+    return `<article class="story"><div class="kicker">${kicker(n)} ${(n.teamIds || []).slice(0, 2).map(id => U.logo(L().teams[id], 16)).join('')}</div>
+      <h4>${esc(n.headline)}</h4>${n.body ? `<div class="dek">${esc(n.body)}</div>` : ''}
+      ${n.gid && opts.box !== false ? `<button class="btn small" style="margin-top:8px" data-box="${n.gid}">Box score</button>` : ''}
+      ${posts.length ? `<div class="posts">${posts.map(post).join('')}</div>` : ''}</article>`;
+  }
+  function leadStory(n) {
+    return `<article class="lead-story"><div class="kicker">${kicker(n)}</div><h2>${esc(n.headline)}</h2>${n.body ? `<div class="t2">${esc(n.body)}</div>` : ''}
+      ${n.gid ? `<button class="btn small" style="margin-top:8px" data-box="${n.gid}">Box score</button>` : ''}
+      ${(n.reactions || []).length ? `<div class="posts">${n.reactions.slice(0, 3).map(post).join('')}</div>` : ''}</article>`;
   }
 
-  const VIEWS = {
-    dashboard() {
+  function statsTable(rows) {
+    return `<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>GP</th><th>GS</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th><th>+/-</th></tr></thead><tbody>
+      ${rows.map(({ p, s }) => `<tr><td class="l">${who(p, 28)}</td><td>${s.gp}</td><td>${s.gs}</td><td>${U.fx(s.min)}</td><td class="hi">${U.fx(s.pts)}</td><td>${U.fx(s.reb)}</td><td>${U.fx(s.ast)}</td><td>${U.fx(s.stl)}</td><td>${U.fx(s.blk)}</td><td>${U.fx(s.tov)}</td><td>${U.pct(s.fgp)}</td><td>${U.pct(s.tpp)}</td><td>${U.pct(s.ftp)}</td><td>${U.pct(s.ts)}</td><td class="${s.pm >= 0 ? 'win' : 'loss'}">${s.pm >= 0 ? '+' : ''}${U.fx(s.pm)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+  }
+
+  function winProb(tid, oid, home) {
+    const a = HL.News.teamStrength(L(), tid), b = HL.News.teamStrength(L(), oid);
+    const d = (a - b) / 10 + (home ? 1 : -1);
+    return Math.round(100 / (1 + Math.exp(-d / 2.2)));
+  }
+  const maxGP = () => Math.max(1, ...L().teams.map(t => t.w + t.l));
+
+  // ---------------- PAGES ----------------
+  const PAGES = {
+    overview() {
       const t = me(), Lg = L();
       const players = HL.League.teamPlayers(t.id).sort((a, b) => b.ovr - a.ovr);
-      const ng = nextGameOf(t.id);
-      const opp = ng ? Lg.teams[ng.home === t.id ? ng.away : ng.home] : null;
-      const recent = Lg.schedule.filter(g => g.res && (g.home === t.id || g.away === t.id)).slice(-5).reverse();
+      const ng = Lg.schedule.find(g => !g.res && (g.home === t.id || g.away === t.id));
+      const recent = Lg.schedule.filter(g => g.res && (g.home === t.id || g.away === t.id)).slice(-6).reverse();
       const conf = HL.League.standings(t.conf);
-      const news = Lg.news.slice().reverse().filter(n => n.importance >= 2 || (n.teamIds || []).includes(t.id)).slice(0, 6);
-      const leaders = ['pts', 'reb', 'ast'].map(k => {
-        const rows = players.map(p => ({ p, s: HL.League.perGame(p, Lg.season) })).filter(x => x.s);
-        rows.sort((a, b) => b.s[k] - a.s[k]);
-        return { k, x: rows[0] };
-      });
+      const news = Lg.news.slice().reverse().filter(n => n.importance >= 2 || (n.teamIds || []).includes(t.id)).slice(0, 7);
       const champ = Lg.phase === 'offseason' && Lg.history.length ? Lg.history[Lg.history.length - 1] : null;
+      const rows = players.map(p => ({ p, s: HL.League.perGame(p, Lg.season) })).filter(x => x.s);
+      const lead = k => rows.slice().sort((a, b) => b.s[k] - a.s[k])[0];
+      let nextHtml;
+      if (ng) {
+        const A = Lg.teams[ng.away], H = Lg.teams[ng.home];
+        const wp = winProb(t.id, ng.home === t.id ? ng.away : ng.home, ng.home === t.id);
+        nextHtml = `<div class="bug">
+          <div class="tm away" style="--c:${U.teamAccent(A).c}">${U.logo(A, 44)}<div><div class="abbr">${esc(A.abbr)}</div><div class="rec">${A.w}-${A.l}</div></div></div>
+          <div class="mid"><b>Day ${ng.day + 1}</b><span>${esc(H.arena)}</span></div>
+          <div class="tm home" style="--c:${U.teamAccent(H).c}">${U.logo(H, 44)}<div><div class="abbr">${esc(H.abbr)}</div><div class="rec">${H.w}-${H.l}</div></div></div>
+        </div>
+        <div class="row sm" style="margin-top:10px"><span class="t2">Win probability</span><div class="grow" style="height:4px;background:var(--surface-3)"><div style="height:100%;width:${wp}%;background:var(--team)"></div></div><span class="num" style="font-size:17px">${wp}%</span></div>`;
+      } else {
+        nextHtml = `<div class="empty">${Lg.phase === 'regular' ? 'Regular season complete.' : Lg.phase === 'offseason' ? 'Offseason. Start the next season from the top bar.' : 'Playoff schedule is on the Playoffs page.'}</div>`;
+      }
       return `
-      ${champ ? `<div class="panel" style="text-align:center;background:linear-gradient(120deg,color-mix(in srgb,${Lg.teams[champ.champion].color} 45%,#000),#0b0f16)">
-        <div class="row" style="justify-content:center">${U.logo(Lg.teams[champ.champion], 80)}</div>
-        <h1 style="margin-top:8px">${esc(Lg.teams[champ.champion].city)} ${esc(Lg.teams[champ.champion].name)}</h1>
-        <div class="muted">${champ.season}-${String(champ.season + 1).slice(2)} NBA Champions · beat ${esc(Lg.teams[champ.runnerUp].name)} ${champ.finalsScore}${champ.fmvp != null ? ` · Finals MVP ${esc(Lg.players[champ.fmvp].name)}` : ''}</div>
-      </div>` : ''}
-      <div class="grid c3">
-        <div class="stat-tile"><div class="v">${t.w}-${t.l}</div><div class="k">Record · ${t.streak > 0 ? 'W' + t.streak : t.streak < 0 ? 'L' + (-t.streak) : '—'} streak</div></div>
-        <div class="stat-tile"><div class="v">${conf.indexOf(t) + 1}${['th', 'st', 'nd', 'rd'][conf.indexOf(t) + 1] || 'th'}</div><div class="k">${t.conf}ern Conference</div></div>
-        <div class="stat-tile"><div class="v">${t.w + t.l ? ((t.pf - t.pa) / (t.w + t.l)).toFixed(1) : '0.0'}</div><div class="k">Point differential / game</div></div>
-      </div>
-      <div class="grid c2">
-        <div class="panel"><h3>Next game</h3>
-          ${ng ? `<div class="row" style="justify-content:space-around;padding:10px 0">
-            <div class="col center" style="align-items:center">${U.logo(Lg.teams[ng.away], 64)}<b>${esc(Lg.teams[ng.away].name)}</b><span class="muted small">${Lg.teams[ng.away].w}-${Lg.teams[ng.away].l}</span></div>
-            <div class="center"><h2>@</h2><div class="muted small">Day ${ng.day + 1}<br>${esc(Lg.teams[ng.home].arena)}</div></div>
-            <div class="col center" style="align-items:center">${U.logo(Lg.teams[ng.home], 64)}<b>${esc(Lg.teams[ng.home].name)}</b><span class="muted small">${Lg.teams[ng.home].w}-${Lg.teams[ng.home].l}</span></div>
+      ${champ ? `<section class="block"><div class="body row" style="gap:18px">${U.logo(Lg.teams[champ.champion], 72)}<div><div class="caps">${seasonLabel(champ.season)} NBA Champions</div><h2 style="font-size:36px;margin-top:4px">${esc(Lg.teams[champ.champion].city)} ${esc(Lg.teams[champ.champion].name)}</h2><div class="t2" style="margin-top:4px">Beat the ${esc(Lg.teams[champ.runnerUp].name)} ${champ.finalsScore}${champ.fmvp != null ? ` · Finals MVP ${esc(Lg.players[champ.fmvp].name)}` : ''}</div></div></div></section>` : ''}
+      ${teamBand(t)}
+      <div class="cols c-main">
+        <div class="stack" style="gap:16px">
+          <div class="cols c2">
+            <section class="block"><header><h3>Next game</h3></header><div class="body">${nextHtml}</div></section>
+            <section class="block"><header><h3>Recent results</h3><button class="more" data-goto="team/schedule">Schedule</button></header><div class="body flush">${recent.length ? recent.map(g => resultRow(g, t.id)).join('') : '<div class="empty">No games played yet.</div>'}</div></section>
           </div>
-          <div class="muted small center">Projected edge: ${edgeText(t.id, opp.id, ng.home === t.id)}</div>`
-          : `<div class="empty">${Lg.phase === 'regular' ? 'Season complete.' : Lg.phase === 'offseason' ? 'Offseason. Start the next season from the top bar.' : 'Playoff games are on the Playoffs page.'}</div>`}
+          <section class="block"><header><h3>Around the league</h3><button class="more" data-goto="home/news">All news</button></header>
+            <div class="body flush">${news.length ? leadStory(news[0]) + news.slice(1).map(n => story(n, { posts: 1, box: false })).join('') : '<div class="empty">Quiet so far. Sim some games.</div>'}</div></section>
         </div>
-        <div class="panel"><h3>Recent results</h3>
-          ${recent.length ? recent.map(g => gameRow(g, t.id)).join('') : '<div class="empty">No games played yet.</div>'}
-        </div>
-      </div>
-      <div class="grid c2">
-        <div class="panel"><h3>Team leaders</h3>
-          ${leaders.map(({ k, x }) => x ? `<div class="row" style="padding:6px 0">${plCell(x.p, 40)}<div class="right center"><div style="font-family:var(--font-display);font-size:26px">${x.s[k].toFixed(1)}</div><div class="tiny muted">${k.toUpperCase()}</div></div></div>` : '').join('') || '<div class="empty">Stats appear after the first game.</div>'}
-          <h3 style="margin-top:14px">Injury report</h3>
-          ${players.filter(p => p.injury && p.injury.games > 0).map(p => `<div class="row" style="padding:4px 0">${plCell(p, 30)}<span class="right injury">${esc(p.injury.name)} · out ${p.injury.games} games</span></div>`).join('') || '<div class="muted small">All healthy. ✅</div>'}
-        </div>
-        <div class="panel"><h3>Headlines</h3>
-          <div class="col">${news.map(n => newsItem(n, true)).join('') || '<div class="empty">Quiet so far.</div>'}</div>
-          <button class="btn sm" style="margin-top:10px" data-goto="news">All news →</button>
+        <div class="stack" style="gap:16px">
+          <section class="block"><header><h3>${t.conf}</h3><button class="more" data-goto="league/standings">Standings</button></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Team</th><th>W</th><th>L</th><th>GB</th></tr></thead><tbody>
+            ${conf.slice(0, 10).map((x, i) => `<tr class="${x.id === t.id ? 'mine' : ''} ${i === 5 || i === 9 ? 'line' : ''}"><td class="rk">${i + 1}</td><td class="l">${teamLink(x)}</td><td>${x.w}</td><td>${x.l}</td><td class="t3">${i ? HL.League.gamesBack(x, conf[0]).toFixed(1) : '—'}</td></tr>`).join('')}
+          </tbody></table></div></div></section>
+          <section class="block"><header><h3>Team leaders</h3></header><div class="body">
+            ${rows.length ? [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists']].map(([k, label]) => { const x = lead(k); return `<div class="row" style="padding:6px 0">${who(x.p, 36, label)}<span class="num ml-auto" style="font-size:26px">${x.s[k].toFixed(1)}</span></div>`; }).join('') : '<div class="t3 sm">Leaders appear after the first game.</div>'}
+          </div></section>
+          <section class="block"><header><h3>Injury report</h3></header><div class="body">
+            ${players.filter(p => p.injury && p.injury.games > 0).map(p => `<div class="row" style="padding:5px 0">${who(p, 28, `${p.injury.name}`)}<span class="tag hurt ml-auto">Out ${p.injury.games}g</span></div>`).join('') || '<div class="t3 sm">No injuries.</div>'}
+          </div></section>
         </div>
       </div>`;
     },
 
     news() {
       const Lg = L(), t = me();
-      const filter = viewState.filter || 'all';
+      const filter = pageState.filter || 'all';
       let items = Lg.news.slice().reverse();
       if (filter === 'mine') items = items.filter(n => (n.teamIds || []).includes(t.id));
-      if (filter === 'big') items = items.filter(n => n.importance >= 2);
-      return `<div class="row wrap"><h2>News & Media</h2><div class="right">${U.seg('filter', [['all', 'All'], ['big', 'Top stories'], ['mine', 'My team']], filter)}</div></div>
-        <div class="col" style="max-width:820px">${items.slice(0, 80).map(n => newsItem(n)).join('') || '<div class="empty">No news yet. Sim some games.</div>'}</div>`;
+      if (filter === 'top') items = items.filter(n => n.importance >= 2);
+      return `<div class="page-title"><h2>News</h2><div class="ml-auto">${U.seg('filter', [['all', 'All'], ['top', 'Top stories'], ['mine', esc(t.name)]], filter)}</div></div>
+        <section class="block" style="max-width:860px">${items.length ? leadStory(items[0]) + items.slice(1, 80).map(n => story(n)).join('') : '<div class="empty">No news yet. Sim some games.</div>'}</section>`;
     },
 
     roster() {
-      const t = viewState.team != null ? L().teams[viewState.team] : me();
+      const t = pageState.team != null ? L().teams[pageState.team] : me();
       const players = HL.League.teamPlayers(t.id).sort((a, b) => b.ovr - a.ovr);
-      const payroll = players.reduce((s, p) => s + p.contract.amount, 0);
-      return `<div class="row wrap"><h2>${esc(t.name)} Roster</h2><span class="chip">${players.length} players</span><span class="chip">Payroll ${U.money(payroll)}</span>
-        <div class="right"><select data-team-select>${L().teams.map(x => `<option value="${x.id}" ${x.id === t.id ? 'selected' : ''}>${esc(x.city)} ${esc(x.name)}</option>`).join('')}</select></div></div>
-        <div class="table-wrap"><table class="t"><thead><tr><th class="l">Player</th><th>OVR</th><th>POT</th><th class="l">Archetype</th><th>Age</th><th>Contract</th><th>PPG</th><th>RPG</th><th>APG</th><th class="l">Status</th></tr></thead><tbody>
+      return `${t.id === me().id ? teamBand(t) : `<div class="page-title"><h2>${esc(t.city)} ${esc(t.name)}</h2></div>`}
+        <section class="block"><header><h3>Roster</h3><span class="t3 sm">${players.length} players</span>
+          <select class="ml-auto" data-team-select>${L().teams.map(x => `<option value="${x.id}" ${x.id === t.id ? 'selected' : ''}>${esc(x.city)} ${esc(x.name)}</option>`).join('')}</select></header>
+        <div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>Pos</th><th>Age</th><th>Ht</th><th>OVR</th><th>Pot</th><th class="l">Style</th><th>Salary</th><th>Thru</th><th>PTS</th><th>REB</th><th>AST</th><th class="l">Status</th></tr></thead><tbody>
         ${players.map(p => {
           const s = HL.League.perGame(p, L().season);
-          return `<tr><td class="l">${plCell(p)}</td><td>${U.ovr(p.ovr)}</td><td class="muted">${p.potential}</td><td class="l small">${esc(HL.archetypeName(p))}</td><td>${p.age}</td>
-            <td>${U.money(p.contract.amount)} <span class="dim tiny">→${String(p.contract.exp + 1).slice(2)}</span></td>
-            <td>${s ? U.fx(s.pts) : '-'}</td><td>${s ? U.fx(s.reb) : '-'}</td><td>${s ? U.fx(s.ast) : '-'}</td><td class="l">${injTag(p) || '<span class="good tiny">Healthy</span>'}</td></tr>`;
-        }).join('')}</tbody></table></div>`;
+          return `<tr><td class="l">${who(p, 32, false)}</td><td>${p.pos}</td><td>${p.age}</td><td>${HL.fmtHeight(p.height)}</td><td>${U.rating(p.ovr)}</td><td class="t3">${p.potential}</td><td class="l t2 sm">${esc(HL.archetypeName(p))}</td>
+            <td>${U.money(p.contract.amount)}</td><td class="t3">${String(p.contract.exp + 1).slice(2)}</td><td>${s ? U.fx(s.pts) : '–'}</td><td>${s ? U.fx(s.reb) : '–'}</td><td>${s ? U.fx(s.ast) : '–'}</td><td class="l">${hurt(p) || (p.hardship ? '<span class="tag new">Hardship</span>' : '')}</td></tr>`;
+        }).join('')}</tbody></table></div></div></section>`;
     },
 
-    strategy() {
+    rotation() {
       const t = me();
       const s = Object.assign(HL.DEFAULT_STRATEGY(), t.strategy);
       const players = HL.League.teamPlayers(t.id).sort((a, b) => b.ovr - a.ovr);
       const avail = players.filter(p => !p.injury || p.injury.games <= 0);
-      const starters = (s.starters ? s.starters.map(id => L().players[id]).filter(p => p && avail.includes(p)) : null);
-      const autoS = HL.autoStarters(avail);
-      const st = starters && starters.length === 5 ? starters : autoS;
+      const chosen = s.starters ? s.starters.map(id => L().players[id]).filter(p => p && avail.includes(p)) : null;
+      const st = chosen && chosen.length === 5 ? chosen : HL.autoStarters(avail);
       const mins = s.minutes || HL.autoMinutes(avail, st, 240);
       const total = avail.reduce((a, p) => a + (mins[p.id] || 0), 0);
-      return `<div class="row wrap"><h2>Rotation & Strategy</h2><span class="muted small">Changes apply to the next game simmed.</span></div>
-      <div class="grid c2">
-        <div class="panel"><h3>Game plan</h3>
-          <div class="col">
-            <div class="field"><label>Pace · ${s.pace < 35 ? 'Grind it out' : s.pace > 65 ? 'Run and gun' : 'Balanced'}</label><input type="range" min="0" max="100" value="${s.pace}" data-strat="pace"></div>
-            <div class="field"><label>Offensive focus</label>${U.seg('focus', [['balanced', 'Balanced'], ['inside', 'Attack inside'], ['perimeter', 'Bomb threes'], ['star', 'Feed the star'], ['motion', 'Ball movement']], s.focus)}</div>
-            <div class="field"><label>Defensive scheme</label>${U.seg('defense', [['man', 'Man'], ['switch', 'Switch all'], ['drop', 'Drop coverage'], ['zone', '2-3 Zone'], ['press', 'Full-court press']], s.defense)}</div>
-            <div class="field"><label>Crash the offensive glass · ${s.crash}</label><input type="range" min="0" max="100" value="${s.crash}" data-strat="crash"></div>
-            <div class="muted small">Pace changes possessions per game. Zone gives up more threes but protects the rim. Press forces turnovers but allows easy layups. Crashing the glass gets more offensive rebounds.</div>
-          </div>
-        </div>
-        <div class="panel"><h3>Starting five</h3>
-          <div class="col">
-            ${[0, 1, 2, 3, 4].map(i => `<div class="row"><span class="chip" style="width:42px;justify-content:center">${HL.POSITIONS[i]}</span>
-              <select class="grow" data-starter="${i}">${avail.map(p => `<option value="${p.id}" ${st[i] && st[i].id === p.id ? 'selected' : ''}>${esc(p.name)} (${p.pos}, ${p.ovr})</option>`).join('')}</select></div>`).join('')}
-            <div class="row"><button class="btn sm" data-auto-starters>Auto (best lineup)</button></div>
-          </div>
-        </div>
+      const paceLabel = s.pace < 35 ? 'Grind it out' : s.pace > 65 ? 'Run and gun' : 'Balanced';
+      return `<div class="page-title"><h2>Rotation & Game Plan</h2><span class="t2">Applies from the next game.</span></div>
+      <div class="cols c2">
+        <section class="block"><header><h3>Game plan</h3></header><div class="body">
+          <div class="setting"><div class="grow"><b>Pace</b><div class="d">${paceLabel}. More possessions means more variance.</div></div><input type="range" min="0" max="100" value="${s.pace}" data-strat="pace" style="width:180px"></div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Offensive focus</b><div class="d">Who and where you attack.</div></div>${U.seg('focus', [['balanced', 'Balanced'], ['inside', 'Inside'], ['perimeter', 'Threes'], ['star', 'Star'], ['motion', 'Motion']], s.focus)}</div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Defensive scheme</b><div class="d">Zone gives up threes but protects the rim. Press forces turnovers but gives up layups.</div></div>${U.seg('defense', [['man', 'Man'], ['switch', 'Switch'], ['drop', 'Drop'], ['zone', 'Zone'], ['press', 'Press']], s.defense)}</div>
+          <div class="setting"><div class="grow"><b>Crash the glass</b><div class="d">More offensive rebounds, fewer fast breaks.</div></div><input type="range" min="0" max="100" value="${s.crash}" data-strat="crash" style="width:180px"></div>
+        </div></section>
+        <section class="block"><header><h3>Starting five</h3><button class="more" data-auto-starters>Reset to best</button></header><div class="body">
+          ${[0, 1, 2, 3, 4].map(i => `<div class="setting"><span class="caps" style="width:28px">${HL.POSITIONS[i]}</span>
+            <select class="grow" data-starter="${i}">${avail.map(p => `<option value="${p.id}" ${st[i] && st[i].id === p.id ? 'selected' : ''}>${esc(p.name)} · ${p.pos} · ${p.ovr}</option>`).join('')}</select></div>`).join('')}
+        </div></section>
       </div>
-      <div class="panel"><h3>Minutes</h3>
-        <div class="row wrap" style="margin-bottom:10px"><span class="chip ${Math.abs(total - 240) < 1 ? 'good' : 'bad'}">Total ${Math.round(total)} / 240</span>
-          <button class="btn sm" data-auto-min>Auto minutes</button><span class="muted small">Minutes are scaled to 240 at game time. Tired players lose effectiveness and get hurt more.</span></div>
-        <div class="table-wrap"><table class="t"><thead><tr><th class="l">Player</th><th>OVR</th><th>Stamina</th><th class="l" style="width:45%">Target minutes</th><th>MIN</th></tr></thead><tbody>
+      <section class="block"><header><h3>Minutes</h3><span class="tag ${Math.abs(total - 240) < 1 ? '' : 'hurt'}">${Math.round(total)} / 240</span><button class="more" data-auto-min>Auto minutes</button></header>
+        <div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>OVR</th><th>Stamina</th><th class="l" style="width:46%">Target</th><th>Min</th></tr></thead><tbody>
           ${players.map(p => {
             const inj = p.injury && p.injury.games > 0;
             const v = inj ? 0 : Math.round(mins[p.id] || 0);
-            return `<tr><td class="l">${plCell(p, 28)}${injTag(p)}</td><td>${U.ovr(p.ovr)}</td><td>${p.attrs.stam}</td>
-            <td class="l"><input type="range" min="0" max="48" value="${v}" data-min="${p.id}" ${inj ? 'disabled' : ''}></td><td class="mono" data-minv="${p.id}">${v}</td></tr>`;
+            return `<tr><td class="l"><div class="row">${who(p, 28)}${hurt(p)}</div></td><td>${U.rating(p.ovr)}</td><td>${p.attrs.stam}</td>
+            <td class="l"><input type="range" min="0" max="48" value="${v}" data-min="${p.id}" ${inj ? 'disabled' : ''}></td><td class="num" style="font-size:17px" data-minv="${p.id}">${v}</td></tr>`;
           }).join('')}
-        </tbody></table></div>
-      </div>`;
+        </tbody></table></div><div class="t3 sm" style="padding:10px 14px">Minutes are scaled to 240 at tip-off. Tired players lose effectiveness and get hurt more often.</div></div>
+      </section>`;
     },
 
     schedule() {
-      const t = me(), Lg = L();
-      const games = Lg.schedule.filter(g => g.home === t.id || g.away === t.id);
-      return `<h2>Schedule & Results</h2><div class="panel"><div class="col" style="gap:2px">
-        ${games.map(g => gameRow(g, t.id, true)).join('')}</div></div>`;
+      const t = me();
+      const games = L().schedule.filter(g => g.home === t.id || g.away === t.id);
+      const played = games.filter(g => g.res), upcoming = games.filter(g => !g.res);
+      return `<div class="page-title"><h2>Schedule</h2><span class="t2">${played.length} played · ${upcoming.length} remaining</span></div>
+        <div class="cols c2">
+          <section class="block"><header><h3>Results</h3></header><div class="body flush">${played.slice().reverse().map(g => resultRow(g, t.id)).join('') || '<div class="empty">No games yet.</div>'}</div></section>
+          <section class="block"><header><h3>Upcoming</h3></header><div class="body flush">${upcoming.map(g => resultRow(g, t.id)).join('') || '<div class="empty">Regular season complete.</div>'}</div></section>
+        </div>`;
     },
 
-    teamstats() {
+    stats() {
       const t = me(), Lg = L();
-      const players = HL.League.teamPlayers(t.id).map(p => ({ p, s: HL.League.perGame(p, Lg.season) })).filter(x => x.s).sort((a, b) => b.s.pts - a.s.pts);
-      if (!players.length) return `<h2>Team Stats</h2><div class="panel empty">Play some games first.</div>`;
-      return `<h2>${esc(t.name)} Player Stats</h2>${statsTable(players)}
-        ${Object.values(Lg.players).some(p => p.teamId === t.id && p.stats[Lg.season + 'p']) ? `<h3>Playoffs</h3>${statsTable(HL.League.teamPlayers(t.id).map(p => ({ p, s: HL.League.perGame(p, Lg.season, true) })).filter(x => x.s))}` : ''}`;
+      const rows = HL.League.teamPlayers(t.id).map(p => ({ p, s: HL.League.perGame(p, Lg.season) })).filter(x => x.s).sort((a, b) => b.s.pts - a.s.pts);
+      const po = HL.League.teamPlayers(t.id).map(p => ({ p, s: HL.League.perGame(p, Lg.season, true) })).filter(x => x.s).sort((a, b) => b.s.pts - a.s.pts);
+      return `<div class="page-title"><h2>Player Stats</h2><span class="t2">${seasonLabel(Lg.season)} · per game</span></div>
+        <section class="block"><header><h3>Regular season</h3></header><div class="body flush">${rows.length ? statsTable(rows) : '<div class="empty">Play some games first.</div>'}</div></section>
+        ${po.length ? `<section class="block"><header><h3>Playoffs</h3></header><div class="body flush">${statsTable(po)}</div></section>` : ''}`;
     },
 
     standings() {
-      return `<h2>Standings</h2><div class="grid c2">${['East', 'West'].map(conf => {
+      return `<div class="page-title"><h2>Standings</h2><span class="t2">1-6 clinch a playoff spot · 7-10 play-in</span></div><div class="cols c2">${['East', 'West'].map(conf => {
         const st = HL.League.standings(conf);
-        return `<div class="panel"><h3>${conf}ern Conference</h3><div class="table-wrap"><table class="t"><thead><tr><th class="l">#</th><th class="l">Team</th><th>W</th><th>L</th><th>PCT</th><th>GB</th><th>Home</th><th>Away</th><th>L10</th><th>Strk</th><th>Diff</th></tr></thead><tbody>
-          ${st.map((t, i) => `<tr class="${t.id === L().userTeamId ? 'me' : ''} ${i === 6 || i === 10 ? 'cut' : ''}"><td class="l">${i + 1}</td>
-            <td class="l"><div class="pl" data-team-view="${t.id}">${U.logo(t, 24)}<b class="nm">${esc(t.name)}</b></div></td>
-            <td>${t.w}</td><td>${t.l}</td><td>${(t.w / Math.max(1, t.w + t.l)).toFixed(3).replace(/^0/, '')}</td><td>${i ? HL.League.gamesBack(t, st[0]).toFixed(1) : '—'}</td>
+        return `<section class="block"><header><h3>${conf}ern Conference</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Team</th><th>W</th><th>L</th><th>Pct</th><th>GB</th><th>Home</th><th>Away</th><th>L10</th><th>Strk</th><th>Net</th></tr></thead><tbody>
+          ${st.map((t, i) => { const gp = t.w + t.l, net = gp ? (t.pf - t.pa) / gp : 0; return `<tr class="${t.id === L().userTeamId ? 'mine' : ''} ${i === 5 || i === 9 ? 'line' : ''}"><td class="rk">${i + 1}</td>
+            <td class="l">${teamLink(t)}</td><td>${t.w}</td><td>${t.l}</td><td>${(t.w / Math.max(1, gp)).toFixed(3).replace(/^0/, '')}</td><td class="t3">${i ? HL.League.gamesBack(t, st[0]).toFixed(1) : '—'}</td>
             <td>${t.homeW}-${t.homeL}</td><td>${t.awayW}-${t.awayL}</td><td>${t.last10.filter(x => x).length}-${t.last10.filter(x => !x).length}</td>
-            <td class="${t.streak > 0 ? 'good' : t.streak < 0 ? 'bad' : ''}">${t.streak > 0 ? 'W' + t.streak : t.streak < 0 ? 'L' + (-t.streak) : '-'}</td>
-            <td class="${t.pf - t.pa >= 0 ? 'good' : 'bad'}">${t.w + t.l ? ((t.pf - t.pa) / (t.w + t.l)).toFixed(1) : '0.0'}</td></tr>`).join('')}
-          </tbody></table></div><div class="tiny muted" style="margin-top:6px">1-6 make the playoffs · 7-10 go to the play-in</div></div>`;
+            <td class="${t.streak > 0 ? 'win' : t.streak < 0 ? 'loss' : ''}">${t.streak > 0 ? 'W' + t.streak : t.streak < 0 ? 'L' + (-t.streak) : '–'}</td>
+            <td class="${net >= 0 ? 'win' : 'loss'}">${net > 0 ? '+' : ''}${net.toFixed(1)}</td></tr>`; }).join('')}
+          </tbody></table></div></div></section>`;
       }).join('')}</div>`;
     },
 
     leaders() {
       const Lg = L();
       const rows = Object.values(Lg.players).filter(p => p.teamId != null).map(p => ({ p, s: HL.League.perGame(p, Lg.season) })).filter(x => x.s && x.s.gp >= Math.max(1, Math.floor(maxGP() * 0.5)));
-      const cats = [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists'], ['stl', 'Steals'], ['blk', 'Blocks'], ['ts', 'True Shooting %', true], ['tpp', '3P% (min 2 3PA)', true], ['pm', 'Plus/Minus']];
-      return `<h2>League Leaders</h2>${rows.length ? `<div class="grid c4">${cats.map(([k, label, isPct]) => {
-        let r = rows;
-        if (k === 'tpp') r = r.filter(x => x.p.stats[Lg.season].tpa / x.s.gp >= 2);
-        if (k === 'ts') r = r.filter(x => x.s.pts >= 10);
-        const top = r.slice().sort((a, b) => b.s[k] - a.s[k]).slice(0, 8);
-        return `<div class="panel"><h3>${label}</h3>${top.map((x, i) => `<div class="row" style="padding:4px 0"><span class="dim mono" style="width:16px">${i + 1}</span>
-          <div class="pl" data-player="${x.p.id}" style="cursor:pointer">${U.avatar(x.p, 28)}<span class="nm small"><b>${esc(x.p.name)}</b></span></div>
-          <span class="right mono"><b>${isPct ? U.pct(x.s[k]) : U.fx(x.s[k])}</b></span></div>`).join('')}</div>`;
-      }).join('')}</div>` : '<div class="panel empty">Leaders appear after a few games.</div>'}`;
+      const cats = [['pts', 'Points'], ['reb', 'Rebounds'], ['ast', 'Assists'], ['stl', 'Steals'], ['blk', 'Blocks'], ['ts', 'True shooting', 1], ['tpp', '3-point %', 1], ['pm', 'Plus-minus']];
+      return `<div class="page-title"><h2>League Leaders</h2><span class="t2">${seasonLabel(Lg.season)} · min. 50% of games played</span></div>
+        ${rows.length ? `<div class="cols c4">${cats.map(([k, label, isPct]) => {
+          let r = rows;
+          if (k === 'tpp') r = r.filter(x => x.p.stats[Lg.season].tpa / x.s.gp >= 2);
+          if (k === 'ts') r = r.filter(x => x.s.pts >= 10);
+          const top = r.slice().sort((a, b) => b.s[k] - a.s[k]).slice(0, 8);
+          return `<section class="block"><header><h3>${label}</h3></header><div class="body flush"><table class="tbl"><tbody>${top.map((x, i) => `<tr><td class="rk">${i + 1}</td><td class="l">${who(x.p, 26, L().teams[x.p.teamId].abbr)}</td><td class="hi">${isPct ? U.pct(x.s[k]) : U.fx(x.s[k])}</td></tr>`).join('')}</tbody></table></div></section>`;
+        }).join('')}</div>` : '<section class="block"><div class="empty">Leaders appear after a few games.</div></section>'}`;
     },
 
     playoffs() {
       const Lg = L(), P = Lg.playoffs;
-      if (!P) {
-        return `<h2>Playoffs</h2><div class="panel"><h3>If the season ended today</h3><div class="grid c2">${['East', 'West'].map(c => `<div><b>${c}</b>${HL.League.standings(c).slice(0, 10).map((t, i) => `<div class="row" style="padding:3px 0"><span class="dim mono" style="width:18px">${i + 1}</span>${U.logo(t, 22)} ${esc(t.name)} <span class="right muted">${t.w}-${t.l}</span>${i === 5 ? '' : ''}</div>`).join('')}</div>`).join('')}</div></div>`;
-      }
       const T = id => Lg.teams[id];
-      const pin = c => {
-        const pi = P.playin[c];
-        return `<div class="panel"><h3>${c} Play-In</h3>${pi.games.map((g, i) => g.a != null ? `<div class="row small" style="padding:4px 0"><span class="dim" style="width:70px">${['7 vs 8', '9 vs 10', 'Final'][i]}</span>${U.logo(T(g.a), 20)} ${esc(T(g.a).abbr)} <span class="dim">vs</span> ${U.logo(T(g.b), 20)} ${esc(T(g.b).abbr)} <span class="right">${g.winner != null ? `<b>${esc(T(g.winner).abbr)}</b> advances` : 'TBD'}</span></div>` : '').join('')}</div>`;
-      };
-      const seriesBox = s => `<div class="series">${[[s.hi, s.wins[0], s.hiSeed], [s.lo, s.wins[1], s.loSeed]].map(([id, w, seed]) => `<div class="tm ${s.winner != null ? (s.winner === id ? 'won' : 'lost') : ''}">${U.logo(T(id), 18)}<span>${seed ? `<span class="dim">${seed}</span> ` : ''}${esc(T(id).abbr)}</span><span class="w">${w}</span></div>`).join('')}</div>`;
+      if (!P) {
+        return `<div class="page-title"><h2>Playoff picture</h2><span class="t2">If the season ended today</span></div><div class="cols c2">${['East', 'West'].map(c => `<section class="block"><header><h3>${c}</h3></header><div class="body flush"><table class="tbl"><tbody>${HL.League.standings(c).slice(0, 10).map((t, i) => `<tr class="${t.id === L().userTeamId ? 'mine' : ''} ${i === 5 ? 'line' : ''}"><td class="rk">${i + 1}</td><td class="l">${teamLink(t)}</td><td>${t.w}-${t.l}</td><td class="t3 l">${i < 6 ? 'Playoffs' : 'Play-in'}</td></tr>`).join('')}</tbody></table></div></section>`).join('')}</div>`;
+      }
+      const seriesBox = s => `<div class="series">${[[s.hi, s.wins[0], s.hiSeed], [s.lo, s.wins[1], s.loSeed]].map(([id, w, seed]) => `<div class="s ${s.winner != null ? (s.winner === id ? 'won' : 'out') : ''}">${U.logo(T(id), 18)}${seed ? `<span class="t3">${seed}</span>` : ''}<span>${esc(T(id).abbr)}</span><span class="w">${w}</span></div>`).join('')}</div>`;
       const r = P.rounds;
       const col = (round, conf) => r[round] ? r[round].filter(s => s.conf === conf).map(seriesBox).join('') : '';
-      return `<h2>${Lg.season + 1} Playoffs</h2>
-        ${P.champion != null ? `<div class="panel center"><div class="row" style="justify-content:center">${U.logo(T(P.champion), 72)}</div><h2 style="margin-top:8px">${esc(T(P.champion).city)} ${esc(T(P.champion).name)}: Champions</h2></div>` : ''}
-        <div class="grid c2">${pin('East')}${pin('West')}</div>
-        ${r.length ? `<div class="panel"><div class="bracket">
-          <div class="colh">West R1</div><div class="colh">West Semis</div><div class="colh">West Finals</div><div class="colh">NBA Finals</div><div class="colh">East Finals</div><div class="colh">East Semis</div><div class="colh">East R1</div>
-          <div class="col">${col(0, 'West')}</div><div class="col">${col(1, 'West')}</div><div class="col">${col(2, 'West')}</div>
-          <div class="col">${r[3] ? r[3].map(seriesBox).join('') : '<div class="series center dim">TBD</div>'}</div>
-          <div class="col">${col(2, 'East')}</div><div class="col">${col(1, 'East')}</div><div class="col">${col(0, 'East')}</div>
-        </div></div>` : ''}`;
+      const pin = c => {
+        const pi = P.playin[c];
+        return `<section class="block"><header><h3>${c} play-in</h3></header><div class="body flush"><table class="tbl"><tbody>${pi.games.map((g, i) => g.a != null ? `<tr><td class="l t3">${['7 vs 8', '9 vs 10', 'For the 8 seed'][i]}</td><td class="l">${teamLink(T(g.a), 18)}</td><td class="l">${teamLink(T(g.b), 18)}</td><td class="l">${g.winner != null ? `<b>${esc(T(g.winner).abbr)}</b> wins` : '—'}</td></tr>` : '').join('')}</tbody></table></div></section>`;
+      };
+      return `<div class="page-title"><h2>${Lg.season + 1} Playoffs</h2></div>
+        ${P.champion != null ? `<section class="block"><div class="body row" style="gap:16px">${U.logo(T(P.champion), 64)}<div><div class="caps">NBA Champions</div><h2 style="font-size:34px;margin-top:4px">${esc(T(P.champion).city)} ${esc(T(P.champion).name)}</h2></div></div></section>` : ''}
+        ${r.length ? `<section class="block"><header><h3>Bracket</h3></header><div class="bracket">
+          <div class="colh">West R1</div><div class="colh">West semis</div><div class="colh">West finals</div><div class="colh">Finals</div><div class="colh">East finals</div><div class="colh">East semis</div><div class="colh">East R1</div>
+          <div class="stack" style="gap:8px">${col(0, 'West')}</div><div class="stack" style="gap:8px">${col(1, 'West')}</div><div class="stack">${col(2, 'West')}</div>
+          <div class="stack">${r[3] ? r[3].map(seriesBox).join('') : '<div class="series"><div class="s t3">TBD</div></div>'}</div>
+          <div class="stack">${col(2, 'East')}</div><div class="stack" style="gap:8px">${col(1, 'East')}</div><div class="stack" style="gap:8px">${col(0, 'East')}</div>
+        </div></section>` : ''}
+        <div class="cols c2">${pin('East')}${pin('West')}</div>`;
     },
 
     players() {
-      const q = (viewState.q || '').toLowerCase();
-      const pos = viewState.pos || 'all';
-      let list = Object.values(L().players).filter(p => !p.retired && (p.teamId != null));
+      const q = (pageState.q || '').toLowerCase();
+      const pos = pageState.pos || 'all';
+      let list = Object.values(L().players).filter(p => !p.retired && p.teamId != null);
       if (q) list = list.filter(p => p.name.toLowerCase().includes(q));
       if (pos !== 'all') list = list.filter(p => p.pos === pos);
       list.sort((a, b) => b.ovr - a.ovr);
-      return `<div class="row wrap"><h2>Player Search</h2><input type="text" placeholder="Search players…" value="${esc(viewState.q || '')}" data-q style="min-width:220px">
-        ${U.seg('pos', [['all', 'All'], ...HL.POSITIONS.map(p => [p, p])], pos)}</div>
-        <div class="table-wrap"><table class="t"><thead><tr><th class="l">Player</th><th class="l">Team</th><th>OVR</th><th>POT</th><th class="l">Archetype</th><th>Contract</th></tr></thead><tbody>
-        ${list.slice(0, 150).map(p => `<tr><td class="l">${plCell(p, 28)}</td><td class="l">${p.teamId != null ? `<div class="pl" data-team-view="${p.teamId}">${U.logo(L().teams[p.teamId], 22)}<span class="nm">${esc(L().teams[p.teamId].abbr)}</span></div>` : 'FA'}</td>
-          <td>${U.ovr(p.ovr)}</td><td class="muted">${p.potential}</td><td class="l small">${esc(HL.archetypeName(p))}</td><td>${U.money(p.contract.amount)}</td></tr>`).join('')}
-        </tbody></table></div>`;
+      return `<div class="page-title"><h2>Players</h2><input type="text" placeholder="Search by name" value="${esc(pageState.q || '')}" data-q style="min-width:240px">${U.seg('pos', [['all', 'All'], ...HL.POSITIONS.map(p => [p, p])], pos)}</div>
+        <section class="block"><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Player</th><th class="l">Team</th><th>Pos</th><th>Age</th><th>OVR</th><th>Pot</th><th class="l">Style</th><th>Salary</th></tr></thead><tbody>
+        ${list.slice(0, 200).map((p, i) => `<tr><td class="rk">${i + 1}</td><td class="l">${who(p, 28, false)}</td><td class="l">${teamLink(L().teams[p.teamId], 20)}</td><td>${p.pos}</td><td>${p.age}</td>
+          <td>${U.rating(p.ovr)}</td><td class="t3">${p.potential}</td><td class="l t2 sm">${esc(HL.archetypeName(p))}</td><td>${U.money(p.contract.amount)}</td></tr>`).join('')}
+        </tbody></table></div></div></section>`;
     },
 
     history() {
       const Lg = L();
-      if (!Lg.history.length && !Lg.awards[Lg.season]) return `<h2>History & Awards</h2><div class="panel empty">Your league's history starts after the first season. Real NBA history comes with era mode.</div>`;
-      const pn = id => id != null ? `<span class="pl" data-player="${id}" style="display:inline-flex;cursor:pointer"><span class="nm">${esc(Lg.players[id].name)}</span></span>` : '—';
-      return `<h2>History & Awards</h2>
-        ${Lg.awards[Lg.season] && !Lg.history.find(h => h.season === Lg.season) ? `<div class="panel"><h3>${Lg.season}-${String(Lg.season + 1).slice(2)} awards</h3>${awardsBlock(Lg.awards[Lg.season], pn)}</div>` : ''}
-        <div class="table-wrap"><table class="t"><thead><tr><th class="l">Season</th><th class="l">Champion</th><th class="l">Runner-up</th><th>Series</th><th class="l">MVP</th><th class="l">Finals MVP</th><th class="l">DPOY</th><th class="l">ROY</th></tr></thead><tbody>
-        ${Lg.history.slice().reverse().map(h => `<tr><td class="l">${h.season}-${String(h.season + 1).slice(2)}</td>
-          <td class="l"><div class="pl">${U.logo(Lg.teams[h.champion], 22)}<b>${esc(Lg.teams[h.champion].name)}</b></div></td><td class="l">${esc(Lg.teams[h.runnerUp].name)}</td><td>${h.finalsScore}</td>
+      const pn = id => id != null ? `<span class="who" data-player="${id}" style="display:inline-flex"><span class="nm">${esc(Lg.players[id].name)}</span></span>` : '—';
+      const cur = Lg.awards[Lg.season] && !Lg.history.find(h => h.season === Lg.season) ? Lg.awards[Lg.season] : null;
+      if (!Lg.history.length && !cur) return `<div class="page-title"><h2>History</h2></div><section class="block"><div class="empty">Your league's history begins after the first season. Real NBA history arrives with era mode.</div></section>`;
+      return `<div class="page-title"><h2>History</h2></div>
+        ${cur ? `<section class="block"><header><h3>${seasonLabel(Lg.season)} awards</h3></header><div class="body"><div class="cols c3">
+          ${[['MVP', cur.mvp], ['Defensive Player', cur.dpoy], ['Rookie of the Year', cur.roy], ['Sixth Man', cur.smoy], ['Scoring title', cur.scoringChamp]].map(([k, id]) => `<div class="kv"><span>${k}</span><b>${pn(id)}</b></div>`).join('')}
+          </div>${cur.allNba.map((tm, i) => `<div class="kv"><span>All-NBA ${['1st', '2nd', '3rd'][i]}</span><span>${tm.map(pn).join(', ')}</span></div>`).join('')}</div></section>` : ''}
+        ${Lg.history.length ? `<section class="block"><header><h3>Champions</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Season</th><th class="l">Champion</th><th class="l">Runner-up</th><th>Series</th><th class="l">MVP</th><th class="l">Finals MVP</th><th class="l">DPOY</th><th class="l">ROY</th></tr></thead><tbody>
+        ${Lg.history.slice().reverse().map(h => `<tr><td class="l">${seasonLabel(h.season)}</td><td class="l">${teamLink(Lg.teams[h.champion])}</td><td class="l t2">${esc(Lg.teams[h.runnerUp].name)}</td><td>${h.finalsScore}</td>
           <td class="l">${pn(h.mvp)}</td><td class="l">${pn(h.fmvp)}</td><td class="l">${pn(h.dpoy)}</td><td class="l">${pn(h.roy)}</td></tr>`).join('')}
-        </tbody></table></div>`;
+        </tbody></table></div></div></section>` : ''}`;
     },
 
     rules() {
       const r = L().rules;
-      const tog = (k, label, desc) => `<div class="row" style="padding:8px 0;border-bottom:1px solid #1b2431"><div class="grow"><b>${label}</b><div class="muted small">${desc}</div></div><label class="switch"><input type="checkbox" data-rule="${k}" ${r[k] ? 'checked' : ''}><span></span></label></div>`;
-      const num = (k, label, desc, min, max) => `<div class="row" style="padding:8px 0;border-bottom:1px solid #1b2431"><div class="grow"><b>${label}</b><div class="muted small">${desc}</div></div><input type="number" min="${min}" max="${max}" value="${r[k]}" data-rule-num="${k}" style="width:80px"></div>`;
-      return `<div class="row wrap"><h2>Rulebook</h2><span class="muted small">Every change affects the sim, and the league will react to it.</span></div>
-      <div class="grid c2">
-        <div class="panel"><h3>Court & scoring</h3>
-          ${tog('threePoint', 'Three-point line', 'Turn it off and watch the spacing disappear.')}
-          ${tog('fourPoint', '4-point line', 'A deep zone worth four. Shooters become gold.')}
-          ${num('threeValue', 'Three-pointer value', 'How many points a three is worth.', 2, 5)}
-        </div>
-        <div class="panel"><h3>Clock & game</h3>
-          ${num('quarterLen', 'Quarter length (min)', 'NBA: 12, FIBA: 10.', 4, 20)}
-          ${num('otLen', 'Overtime length (min)', 'NBA: 5.', 1, 12)}
-          ${num('shotClock', 'Shot clock (sec)', 'Shorter = faster pace.', 10, 35)}
-        </div>
-        <div class="panel"><h3>Contact & fouls (chaos)</h3>
-          ${tog('handCheck', 'Hand-checking allowed', '90s-style defense. Perimeter scoring gets harder.')}
-          ${tog('tackling', 'Allow tackling', 'Yes, really. Injuries skyrocket and the players\' union will riot.')}
-          ${tog('noFouls', 'No fouls called', 'Anything goes. No free throws.')}
-          ${num('foulOut', 'Foul-out limit (0 = never)', 'NBA: 6.', 0, 12)}
-        </div>
-        <div class="panel"><h3>Health</h3>
-          ${num('injuryMult', 'Injury frequency multiplier', '1 = realistic, 0 = no injuries.', 0, 5)}
-          <div class="muted small" style="margin-top:8px">More rule tabs are on the way (roster size, 3v3, season length, CBA, lottery, relegation…) plus full media reactions and league-integrity consequences.</div>
-        </div>
+      const tog = (k, label, desc) => `<div class="setting"><div class="grow"><b>${label}</b><div class="d">${desc}</div></div><label class="switch"><input type="checkbox" data-rule="${k}" ${r[k] ? 'checked' : ''}><span></span></label></div>`;
+      const num = (k, label, desc, min, max, step = 1) => `<div class="setting"><div class="grow"><b>${label}</b><div class="d">${desc}</div></div><input type="number" min="${min}" max="${max}" step="${step}" value="${r[k]}" data-rule-num="${k}" style="width:84px"></div>`;
+      return `<div class="page-title"><h2>Rulebook</h2><span class="t2">Every change affects the sim, and the league reacts. Changing rules mid-season is more controversial.</span></div>
+      <div class="cols c2">
+        <section class="block"><header><h3>Court & scoring</h3></header><div class="body">
+          ${tog('threePoint', 'Three-point line', 'Remove it and spacing disappears.')}
+          ${tog('fourPoint', 'Four-point line', 'A deep zone worth four points.')}
+          ${num('threeValue', 'Value of a three', 'Points awarded beyond the arc.', 2, 5)}
+        </div></section>
+        <section class="block"><header><h3>Clock</h3></header><div class="body">
+          ${num('quarterLen', 'Quarter length', 'Minutes. NBA 12, FIBA 10.', 4, 20)}
+          ${num('otLen', 'Overtime length', 'Minutes. NBA 5.', 1, 12)}
+          ${num('shotClock', 'Shot clock', 'Seconds. Shorter means faster pace.', 10, 35)}
+        </div></section>
+        <section class="block"><header><h3>Contact & fouls</h3></header><div class="body">
+          ${tog('handCheck', 'Hand-checking', '1990s-style perimeter defense.')}
+          ${tog('tackling', 'Tackling', 'Injuries skyrocket. The players\' union will not be happy.')}
+          ${tog('noFouls', 'No fouls called', 'No free throws. Anything goes.')}
+          ${num('foulOut', 'Foul-out limit', 'Personal fouls before disqualification. 0 = never.', 0, 12)}
+        </div></section>
+        <section class="block"><header><h3>Health</h3></header><div class="body">
+          ${num('injuryMult', 'Injury frequency', '1 = realistic, 0 = none.', 0, 5, 0.1)}
+          <div class="t3 sm" style="padding-top:10px">More rule groups are coming: roster size, 3-on-3, season length, CBA, lottery, relegation and more.</div>
+        </div></section>
       </div>`;
     },
 
     settings() {
       const s = L().settings;
-      return `<h2>Settings & Saves</h2><div class="grid c2">
-        <div class="panel"><h3>Game</h3><div class="col">
-          <div class="field"><label>Difficulty</label>${U.seg('difficulty', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['hof', 'Hall of Fame']], s.difficulty)}</div>
-          <div class="field"><label>Depth</label>${U.seg('depth', [['simple', 'Simple'], ['detailed', 'Detailed']], s.depth)}</div>
-        </div></div>
-        <div class="panel"><h3>Saves</h3><div class="col">
-          <button class="btn" data-save>💾 Save now</button>
-          <button class="btn" data-export>⬇️ Export save file</button>
-          <div class="muted small">The game autosaves after every sim. Saves live in this browser (IndexedDB). Export a file to back one up or move it.</div>
-        </div></div>
+      return `<div class="page-title"><h2>Settings</h2></div><div class="cols c2">
+        <section class="block"><header><h3>Game</h3></header><div class="body">
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Difficulty</b><div class="d">Affects player progression and AI decisions.</div></div>${U.seg('difficulty', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['hof', 'HOF']], s.difficulty)}</div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Depth</b><div class="d">Simple automates details. Detailed gives you everything.</div></div>${U.seg('depth', [['simple', 'Simple'], ['detailed', 'Detailed']], s.depth)}</div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Era presentation</b><div class="d">Auto follows the season being played. The others are previews.</div></div>${U.seg('eraTheme', [['auto', 'Auto'], ['60s', '60s'], ['70s', '70s'], ['80s', '80s'], ['90s', '90s'], ['00s', '00s'], ['modern', 'Modern']], s.eraTheme || 'auto')}</div>
+        </div></section>
+        <section class="block"><header><h3>Saves</h3></header><div class="body">
+          <div class="setting"><div class="grow"><b>Save now</b><div class="d">The game also autosaves after every sim.</div></div><button class="btn" data-save>${U.icon('save')} Save</button></div>
+          <div class="setting"><div class="grow"><b>Export</b><div class="d">Download a backup file you can import later.</div></div><button class="btn" data-export>${U.icon('download')} Export</button></div>
+        </div></section>
       </div>`;
     },
 
     soon() {
-      const titles = { trades: 'Trades & Trade Finder', freeagency: 'Free Agency', draft: 'Draft & Scouting', finances: 'Finances & Owner Goals', staff: 'Staff' };
-      return `<h2>${titles[view] || 'Coming soon'}</h2><div class="panel empty">This part of the front office is coming in the next milestone. The sim already handles it automatically (AI draft, re-signings and free agency each offseason).</div>`;
+      const titles = { trades: 'Trades', freeagency: 'Free Agency', draft: 'Draft & Scouting', finances: 'Finances', staff: 'Staff' };
+      return `<div class="page-title"><h2>${titles[page] || 'Coming soon'}</h2></div><section class="block"><div class="empty">This front-office tool is coming in the next milestone. Until then the league handles it automatically each offseason (draft, re-signings and free agency).</div></section>`;
     },
   };
-  VIEWS.trades = VIEWS.freeagency = VIEWS.draft = VIEWS.finances = VIEWS.staff = VIEWS.soon;
+  for (const k of ['trades', 'freeagency', 'draft', 'finances', 'staff']) PAGES[k] = PAGES.soon;
 
-  // ---------------- view bindings ----------------
+  function renderPage() {
+    const el = document.getElementById('page');
+    el.innerHTML = (PAGES[page] || PAGES.soon)();
+    bindCommon(el);
+    if (BIND[page]) BIND[page](el);
+  }
+
+  // ---------------- page bindings ----------------
   const BIND = {
-    news(el) { el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { viewState.filter = b.dataset.v; renderView(); }); },
-    roster(el) { el.querySelector('[data-team-select]').onchange = (e) => { viewState.team = +e.target.value; renderView(); }; },
+    news(el) { el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { pageState.filter = b.dataset.v; renderPage(); }); },
+    roster(el) { el.querySelector('[data-team-select]').onchange = (e) => { pageState.team = +e.target.value; renderPage(); }; },
     players(el) {
       const q = el.querySelector('[data-q]');
-      q.oninput = () => { viewState.q = q.value; renderView(); const n = document.querySelector('[data-q]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
-      el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { viewState.pos = b.dataset.v; renderView(); });
+      q.oninput = () => { pageState.q = q.value; renderPage(); const n = document.querySelector('[data-q]'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); };
+      el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { pageState.pos = b.dataset.v; renderPage(); });
     },
-    strategy(el) {
+    rotation(el) {
       const t = me();
       t.strategy = Object.assign(HL.DEFAULT_STRATEGY(), t.strategy);
-      el.querySelectorAll('[data-strat]').forEach(r => r.onchange = () => { t.strategy[r.dataset.strat] = +r.value; renderView(); });
-      el.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { t.strategy[sg.dataset.seg] = b.dataset.v; renderView(); }));
+      el.querySelectorAll('[data-strat]').forEach(r => r.onchange = () => { t.strategy[r.dataset.strat] = +r.value; renderPage(); });
+      el.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { t.strategy[sg.dataset.seg] = b.dataset.v; renderPage(); }));
       el.querySelectorAll('[data-starter]').forEach(sel => sel.onchange = () => {
         const ids = [...el.querySelectorAll('[data-starter]')].map(s => +s.value);
-        if (new Set(ids).size < 5) { U.toast('A player can only start at one position.'); return renderView(); }
+        if (new Set(ids).size < 5) { U.toast('A player can only start at one position.'); return renderPage(); }
         t.strategy.starters = ids;
-        renderView();
+        renderPage();
       });
-      el.querySelector('[data-auto-starters]').onclick = () => { t.strategy.starters = null; renderView(); };
-      el.querySelector('[data-auto-min]').onclick = () => { t.strategy.minutes = null; renderView(); };
+      el.querySelector('[data-auto-starters]').onclick = () => { t.strategy.starters = null; renderPage(); };
+      el.querySelector('[data-auto-min]').onclick = () => { t.strategy.minutes = null; renderPage(); };
       el.querySelectorAll('[data-min]').forEach(r => {
         r.oninput = () => { el.querySelector(`[data-minv="${r.dataset.min}"]`).textContent = r.value; };
         r.onchange = () => {
-          const players = HL.League.teamPlayers(t.id).filter(p => !p.injury || p.injury.games <= 0);
           if (!t.strategy.minutes) {
-            const st = HL.autoStarters(players);
-            t.strategy.minutes = HL.autoMinutes(players, st, 240);
+            const players = HL.League.teamPlayers(t.id).filter(p => !p.injury || p.injury.games <= 0);
+            t.strategy.minutes = HL.autoMinutes(players, HL.autoStarters(players), 240);
           }
           t.strategy.minutes[r.dataset.min] = +r.value;
-          renderView();
+          renderPage();
         };
       });
     },
     rules(el) {
       const r = L().rules;
-      el.querySelectorAll('[data-rule]').forEach(cb => cb.onchange = () => { r[cb.dataset.rule] = cb.checked; ruleReaction(cb.dataset.rule, cb.checked); });
+      el.querySelectorAll('[data-rule]').forEach(cb => cb.onchange = () => { r[cb.dataset.rule] = cb.checked; ruleChanged(cb.dataset.rule, cb.checked, !cb.checked); });
       el.querySelectorAll('[data-rule-num]').forEach(inp => inp.onchange = () => {
         const v = Math.max(+inp.min, Math.min(+inp.max, +inp.value));
         const old = r[inp.dataset.ruleNum];
         r[inp.dataset.ruleNum] = v;
-        if (old !== v) ruleReaction(inp.dataset.ruleNum, v, old);
+        if (old !== v) ruleChanged(inp.dataset.ruleNum, v, old);
       });
     },
     settings(el) {
-      el.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { L().settings[sg.dataset.seg] = b.dataset.v; renderView(); }));
-      el.querySelector('[data-save]').onclick = async () => { await autosave(); U.toast('Saved ✅'); };
+      el.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => {
+        L().settings[sg.dataset.seg] = b.dataset.v;
+        if (sg.dataset.seg === 'eraTheme') open(); else renderPage();
+        autosave();
+      }));
+      el.querySelector('[data-save]').onclick = async () => { await autosave(); U.toast('Game saved.'); };
       el.querySelector('[data-export]').onclick = () => HL.Saves.exportFile(L());
     },
   };
 
-  function ruleReaction(key, val, old) {
+  function ruleChanged(key, val, old) {
     const n = HL.RuleReactions ? HL.RuleReactions.react(L(), key, val, old) : null;
-    if (n) U.toast(`📰 ${esc(n.headline)}`, 4200);
+    if (n) U.toast(`<b>League office:</b> ${esc(n.headline)}`, 4200);
     autosave();
   }
 
-  // ---------------- shared bits ----------------
-  function maxGP() { return Math.max(1, ...L().teams.map(t => t.w + t.l)); }
-
-  function edgeText(tid, oid, home) {
-    const a = HL.News.teamStrength(L(), tid), b = HL.News.teamStrength(L(), oid);
-    const d = (a - b) / 10 + (home ? 1 : -1);
-    const pct = Math.round(100 / (1 + Math.exp(-d / 2.2)));
-    return `${pct}% win chance ${pct >= 50 ? '🟢' : '🔴'}`;
-  }
-
-  function gameRow(g, tid, showUnplayed) {
-    const Lg = L();
-    const home = g.home === tid;
-    const opp = Lg.teams[home ? g.away : g.home];
-    if (!g.res) return showUnplayed ? `<div class="game-row" style="cursor:default"><span class="res dim">·</span><span class="dim mono small" style="width:54px">Day ${g.day + 1}</span>${home ? 'vs' : '@'} ${U.logo(opp, 24)} <span>${esc(opp.city)} ${esc(opp.name)}</span></div>` : '';
-    const my = home ? g.res.hs : g.res.as, their = home ? g.res.as : g.res.hs;
-    const won = my > their;
-    return `<div class="game-row" data-box="${g.gid}"><span class="res ${won ? 'good' : 'bad'}">${won ? 'W' : 'L'}</span><span class="dim mono small" style="width:54px">Day ${g.day + 1}</span>${home ? 'vs' : '@'} ${U.logo(opp, 24)} <span>${esc(opp.name)}</span><span class="right mono"><b>${my}-${their}</b>${g.res.ot ? ` <span class="dim">${g.res.ot > 1 ? g.res.ot : ''}OT</span>` : ''}</span></div>`;
-  }
-
-  function statsTable(rows) {
-    return `<div class="table-wrap"><table class="t"><thead><tr><th class="l">Player</th><th>GP</th><th>GS</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th><th>+/-</th></tr></thead><tbody>
-      ${rows.map(({ p, s }) => `<tr><td class="l">${plCell(p, 28)}</td><td>${s.gp}</td><td>${s.gs}</td><td>${U.fx(s.min)}</td><td><b>${U.fx(s.pts)}</b></td><td>${U.fx(s.reb)}</td><td>${U.fx(s.ast)}</td><td>${U.fx(s.stl)}</td><td>${U.fx(s.blk)}</td><td>${U.fx(s.tov)}</td><td>${U.pct(s.fgp)}</td><td>${U.pct(s.tpp)}</td><td>${U.pct(s.ftp)}</td><td>${U.pct(s.ts)}</td><td class="${s.pm >= 0 ? 'good' : 'bad'}">${s.pm >= 0 ? '+' : ''}${U.fx(s.pm)}</td></tr>`).join('')}
-    </tbody></table></div>`;
-  }
-
-  function awardsBlock(a, pn) {
-    return `<div class="grid c3">
-      <div><div class="tiny muted">MVP</div><b>${pn(a.mvp)}</b></div>
-      <div><div class="tiny muted">Defensive POY</div><b>${pn(a.dpoy)}</b></div>
-      <div><div class="tiny muted">Rookie of the Year</div><b>${pn(a.roy)}</b></div>
-      <div><div class="tiny muted">Sixth Man</div><b>${pn(a.smoy)}</b></div>
-      <div><div class="tiny muted">Scoring title</div><b>${pn(a.scoringChamp)}</b></div>
-      <div><div class="tiny muted">MVP race</div>${a.mvpRace.map(pn).join(', ')}</div>
-    </div>
-    <div style="margin-top:10px">${a.allNba.map((tm, i) => `<div class="small" style="padding:3px 0"><span class="muted">All-NBA ${['1st', '2nd', '3rd'][i]}:</span> ${tm.map(pn).join(', ')}</div>`).join('')}</div>`;
-  }
-
-  // ---------------- MODALS ----------------
-  function playerCard(pid) {
+  // ---------------- SHEETS ----------------
+  function playerSheet(pid) {
     const Lg = L(), p = Lg.players[pid];
     if (!p) return;
     const t = p.teamId != null ? Lg.teams[p.teamId] : null;
-    const color = t ? t.color : '#334155';
+    const acc = t ? U.teamAccent(t) : { c: '#2a2d33' };
     const groups = {};
     for (const a of HL.ATTRS) (groups[a.group] = groups[a.group] || []).push(a);
     const seasons = Object.keys(p.stats).filter(k => !k.endsWith('p')).sort();
     const awards = p.careerAwards.reduce((m, a) => { m[a.award] = (m[a.award] || 0) + 1; return m; }, {});
-    const m = U.modal(`${t ? U.logo(t, 28) : ''}<h3>${esc(p.name)}</h3>`, `
-      <div class="hero" style="--c:${color}">
-        <div class="big-num">${p.ovr}</div>
-        ${U.avatar(p, 180, t)}
-        <div>
-          <div class="nm">${esc(p.name)}</div>
-          <div class="bio"><span>${p.pos}</span><span>${HL.fmtHeight(p.height)} · ${p.weight} lbs</span><span>Wingspan ${HL.fmtHeight(p.wingspan)}</span><span>Age ${p.age}</span><span>${t ? esc(t.city + ' ' + t.name) : 'Free agent'}</span></div>
-          <div class="row wrap" style="margin-top:10px"><span class="chip accent">${esc(HL.archetypeName(p))}</span><span class="chip">${U.money(p.contract.amount)} thru ${p.contract.exp + 1}</span>${p.real ? '<span class="chip">Real player</span>' : '<span class="chip">Generated</span>'}${injTag(p)}</div>
-          <div class="row wrap" style="margin-top:8px">${Object.entries(awards).map(([k, v]) => `<span class="chip ${k === 'Champion' || k === 'MVP' ? 'accent' : ''}">${v > 1 ? v + '× ' : ''}${esc(k)}</span>`).join('')}</div>
+    const meter = (label, v) => `<div class="meter"><span class="lbl">${label}</span><span class="val">${v}</span><div class="track"><i class="${v >= 80 ? 'hi' : v < 55 ? 'lo' : 'mid'}" style="width:${v}%"></i></div></div>`;
+    const m = U.sheet(`${t ? U.logo(t, 24) : ''}<h3>${esc(p.name)}</h3>`, `
+      <div class="phead">
+        <div class="shot" style="--team-c:${acc.c}">${U.face(p, 200, t)}</div>
+        <div class="info">
+          <div class="jersey">${t ? esc(t.city + ' ' + t.name) : 'Free agent'} · ${p.pos}</div>
+          <div class="pname">${esc(p.name)}</div>
+          <div class="bio"><span>${HL.fmtHeight(p.height)}</span><span>${p.weight} lbs</span><span>${HL.fmtHeight(p.wingspan)} wingspan</span><span>Age ${p.age}</span><span>${U.money(p.contract.amount)} through ${p.contract.exp + 1}</span></div>
+          <div class="row wrap"><span class="tag team">${esc(HL.archetypeName(p))}</span>${hurt(p)}${Object.entries(awards).map(([k, v]) => `<span class="tag">${v > 1 ? v + '× ' : ''}${esc(k)}</span>`).join('')}</div>
         </div>
-        <div class="ovr-box center">${U.ovr(p.ovr, true)}<div class="tiny muted" style="margin-top:4px">POT ${p.potential}</div></div>
+        <div class="ovrcol">${U.rating(p.ovr, true)}<span class="caps">Overall</span><span class="t2 sm">Potential ${p.potential}</span></div>
       </div>
-      <div class="tabs"><button class="tab active" data-tab="ratings">Ratings</button><button class="tab" data-tab="stats">Stats</button><button class="tab" data-tab="tend">Tendencies</button><button class="tab" data-tab="traits">Personality</button></div>
-      <div data-pane="ratings" class="grid c3">${Object.entries(groups).map(([g, attrs]) => `<div class="panel"><h3>${g}</h3><div class="col" style="gap:8px">${attrs.map(a => `<div class="attr"><span>${a.label}</span><b class="mono" style="text-align:right">${p.attrs[a.key]}</b><div class="bar"><i style="width:${p.attrs[a.key]}%"></i></div></div>`).join('')}</div></div>`).join('')}</div>
-      <div data-pane="stats" class="hidden">${seasons.length ? `<div class="table-wrap"><table class="t"><thead><tr><th class="l">Season</th><th class="l">Team</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead><tbody>
-        ${seasons.map(sk => { const s = HL.League.perGame(p, +sk); const tm = Lg.teams[p.stats[sk].teamId]; return s ? `<tr><td class="l">${sk}-${String(+sk + 1).slice(2)}</td><td class="l">${tm ? esc(tm.abbr) : '-'}</td><td>${s.gp}</td><td>${U.fx(s.min)}</td><td><b>${U.fx(s.pts)}</b></td><td>${U.fx(s.reb)}</td><td>${U.fx(s.ast)}</td><td>${U.fx(s.stl)}</td><td>${U.fx(s.blk)}</td><td>${U.pct(s.fgp)}</td><td>${U.pct(s.tpp)}</td><td>${U.pct(s.ftp)}</td><td>${U.pct(s.ts)}</td></tr>` : ''; }).join('')}
+      <div class="tabs"><button class="on" data-tab="ratings">Ratings</button><button data-tab="stats">Stats</button><button data-tab="tend">Tendencies</button><button data-tab="traits">Personality</button></div>
+      <div data-pane="ratings" class="cols c3">${Object.entries(groups).map(([g, attrs]) => `<section class="block"><header><h3>${g}</h3></header><div class="body stack" style="gap:10px">${attrs.map(a => meter(a.label, p.attrs[a.key])).join('')}</div></section>`).join('')}</div>
+      <div data-pane="stats" class="hidden">${seasons.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Season</th><th class="l">Team</th><th>GP</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th><th>3P%</th><th>FT%</th><th>TS%</th></tr></thead><tbody>
+        ${seasons.map(sk => { const s = HL.League.perGame(p, +sk); const tm = Lg.teams[p.stats[sk].teamId]; return s ? `<tr><td class="l">${seasonLabel(+sk)}</td><td class="l">${tm ? esc(tm.abbr) : '–'}</td><td>${s.gp}</td><td>${U.fx(s.min)}</td><td class="hi">${U.fx(s.pts)}</td><td>${U.fx(s.reb)}</td><td>${U.fx(s.ast)}</td><td>${U.fx(s.stl)}</td><td>${U.fx(s.blk)}</td><td>${U.pct(s.fgp)}</td><td>${U.pct(s.tpp)}</td><td>${U.pct(s.ftp)}</td><td>${U.pct(s.ts)}</td></tr>` : ''; }).join('')}
       </tbody></table></div>` : '<div class="empty">No games played yet.</div>'}</div>
-      <div data-pane="tend" class="hidden"><div class="grid c2">${Object.entries({ usage: 'Usage / shot volume', three: 'Three-point frequency', mid: 'Mid-range frequency', drive: 'Drive to the rim', post: 'Post-ups', passFirst: 'Pass-first', gamble: 'Gamble for steals', crash: 'Crash the glass', effort: 'Effort / intensity', foulAggr: 'Physicality' }).map(([k, label]) => `<div class="attr"><span>${label}</span><b class="mono" style="text-align:right">${p.tend[k]}</b><div class="bar"><i style="width:${p.tend[k]}%"></i></div></div>`).join('')}</div>
-        <div class="muted small" style="margin-top:10px">Tendencies drive this player's decisions in the possession sim. In Player Career you set your own.</div></div>
-      <div data-pane="traits" class="hidden"><div class="grid c2">${Object.entries({ workEthic: 'Work ethic', competitive: 'Competitiveness', clutch: 'Clutch', leadership: 'Leadership', loyalty: 'Loyalty', greed: 'Money motivation', ego: 'Ego', temperament: 'Temperament' }).map(([k, label]) => `<div class="attr"><span>${label}</span><b class="mono" style="text-align:right">${p.traits[k]}</b><div class="bar"><i style="width:${p.traits[k]}%"></i></div></div>`).join('')}</div></div>
+      <div data-pane="tend" class="hidden"><div class="cols c2">${Object.entries({ usage: 'Shot volume', three: 'Three-point frequency', mid: 'Mid-range frequency', drive: 'Drives to the rim', post: 'Post-ups', passFirst: 'Pass-first', gamble: 'Gambles for steals', crash: 'Crashes the glass', effort: 'Effort', foulAggr: 'Physicality' }).map(([k, label]) => meter(label, p.tend[k])).join('')}</div>
+        <div class="t3 sm" style="margin-top:12px">Tendencies drive this player's decisions in the possession sim. In Player Career you set your own.</div></div>
+      <div data-pane="traits" class="hidden"><div class="cols c2">${Object.entries({ workEthic: 'Work ethic', competitive: 'Competitiveness', clutch: 'Clutch', leadership: 'Leadership', loyalty: 'Loyalty', greed: 'Money motivation', ego: 'Ego', temperament: 'Temperament' }).map(([k, label]) => meter(label, p.traits[k])).join('')}</div></div>
     `);
-    requestAnimationFrame(() => m.querySelectorAll('.bar > i').forEach(i => { const w = i.style.width; i.style.width = '0'; requestAnimationFrame(() => { i.style.width = w; }); }));
     m.querySelectorAll('[data-tab]').forEach(tb => tb.onclick = () => {
-      m.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('active', x === tb));
+      m.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x === tb));
       m.querySelectorAll('[data-pane]').forEach(x => x.classList.toggle('hidden', x.dataset.pane !== tb.dataset.tab));
     });
-  }
-
-  function teamCard(tid) {
-    viewState = { team: tid };
-    view = 'roster';
-    render();
   }
 
   function boxScore(gid) {
     const Lg = L();
     const b = Lg.boxScores[gid];
-    if (!b) { U.toast('Box score no longer stored for that game.'); return; }
+    if (!b) { U.toast('That box score is no longer stored.'); return; }
     const H = Lg.teams[b.home.teamId], A = Lg.teams[b.away.teamId];
     const hs = b.home.score, as = b.away.score;
-    const qn = b.home.quarters.length;
     const side = (sd, team) => {
       const rows = Object.entries(sd.box).map(([id, l]) => ({ p: Lg.players[id], l })).sort((x, y) => (y.l.gs - x.l.gs) || (y.l.min - x.l.min));
       const tot = rows.reduce((t, { l }) => { for (const k in l) t[k] = (t[k] || 0) + l[k]; return t; }, {});
-      const r = l => `<td>${Math.round(l.min)}</td><td><b>${l.pts}</b></td><td>${l.orb + l.drb}</td><td>${l.ast}</td><td>${l.stl}</td><td>${l.blk}</td><td>${l.tov}</td><td>${l.fgm}-${l.fga}</td><td>${l.tpm}-${l.tpa}</td><td>${l.ftm}-${l.fta}</td><td>${l.pf}</td><td class="${l.pm >= 0 ? 'good' : 'bad'}">${l.pm > 0 ? '+' : ''}${l.pm}</td>`;
-      return `<div class="row">${U.logo(team, 26)}<h3>${esc(team.city)} ${esc(team.name)}</h3></div>
-        <div class="table-wrap"><table class="t"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>FG</th><th>3P</th><th>FT</th><th>PF</th><th>+/-</th></tr></thead><tbody>
-        ${rows.map(({ p, l }) => `<tr><td class="l"><div class="pl" data-player="${p.id}">${U.avatar(p, 26, team)}<span class="nm">${esc(p.name)}${l.gs ? ' <span class="dim tiny">S</span>' : ''}</span></div></td>${r(l)}</tr>`).join('')}
-        <tr><td class="l"><b>Totals</b></td><td></td><td><b>${tot.pts}</b></td><td>${tot.orb + tot.drb}</td><td>${tot.ast}</td><td>${tot.stl}</td><td>${tot.blk}</td><td>${tot.tov}</td><td>${tot.fgm}-${tot.fga}</td><td>${tot.tpm}-${tot.tpa}</td><td>${tot.ftm}-${tot.fta}</td><td>${tot.pf}</td><td></td></tr>
-        </tbody></table></div>`;
+      const cells = l => `<td>${Math.round(l.min)}</td><td class="hi">${l.pts}</td><td>${l.orb + l.drb}</td><td>${l.ast}</td><td>${l.stl}</td><td>${l.blk}</td><td>${l.tov}</td><td>${l.fgm}-${l.fga}</td><td>${l.tpm}-${l.tpa}</td><td>${l.ftm}-${l.fta}</td><td>${l.pf}</td><td class="${l.pm >= 0 ? 'win' : 'loss'}">${l.pm > 0 ? '+' : ''}${l.pm}</td>`;
+      return `<section class="block"><header>${U.logo(team, 24)}<h3>${esc(team.city)} ${esc(team.name)}</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>Min</th><th>Pts</th><th>Reb</th><th>Ast</th><th>Stl</th><th>Blk</th><th>TO</th><th>FG</th><th>3P</th><th>FT</th><th>PF</th><th>+/-</th></tr></thead><tbody>
+        ${rows.map(({ p, l }, i) => `<tr class="${i === 4 ? 'line' : ''}"><td class="l">${who(p, 26, l.gs ? 'Starter' : p.pos)}</td>${cells(l)}</tr>`).join('')}</tbody>
+        <tfoot><tr><td class="l">Team</td><td></td><td>${tot.pts}</td><td>${tot.orb + tot.drb}</td><td>${tot.ast}</td><td>${tot.stl}</td><td>${tot.blk}</td><td>${tot.tov}</td><td>${tot.fgm}-${tot.fga}</td><td>${tot.tpm}-${tot.tpa}</td><td>${tot.ftm}-${tot.fta}</td><td>${tot.pf}</td><td></td></tr></tfoot></table></div></div></section>`;
     };
-    const m = U.modal('<h3>Box score</h3>', `
-      <div class="scoreboard" style="--ca:${A.color};--ch:${H.color}">
-        <div class="side">${U.logo(A, 64)}<div><div class="tn">${esc(A.name)}</div><div class="muted small">${esc(A.city)}</div></div><div class="score ${as > hs ? 'win' : 'loss'}" style="margin-left:auto">${as}</div></div>
-        <div class="mid"><b>FINAL${b.ot ? (b.ot > 1 ? ' / ' + b.ot + 'OT' : ' / OT') : ''}</b><div>${esc(H.arena)}</div></div>
-        <div class="side home"><div class="score ${hs > as ? 'win' : 'loss'}" style="margin-right:auto">${hs}</div><div><div class="tn">${esc(H.name)}</div><div class="muted small">${esc(H.city)}</div></div>${U.logo(H, 64)}</div>
+    const qLabel = i => i < 4 ? `Q${i + 1}` : `OT${i - 3 > 1 ? i - 3 : ''}`;
+    const m = U.sheet('<h3>Box score</h3>', `
+      <div class="bug">
+        <div class="tm away" style="--c:${U.teamAccent(A).c}">${U.logo(A, 48)}<div><div class="abbr">${esc(A.abbr)}</div><div class="rec">${esc(A.name)}</div></div><div class="sc ${as < hs ? 'lost' : ''}">${as}</div></div>
+        <div class="mid"><b>Final${b.ot ? (b.ot > 1 ? ' · ' + b.ot + 'OT' : ' · OT') : ''}</b><span>${esc(H.arena)}</span></div>
+        <div class="tm home" style="--c:${U.teamAccent(H).c}">${U.logo(H, 48)}<div><div class="abbr">${esc(H.abbr)}</div><div class="rec">${esc(H.name)}</div></div><div class="sc ${hs < as ? 'lost' : ''}">${hs}</div></div>
       </div>
-      <div class="table-wrap quarters"><table class="t"><thead><tr><th class="l">Team</th>${b.home.quarters.map((_, i) => `<th>${i < 4 ? 'Q' + (i + 1) : 'OT' + (i - 3 > 1 ? i - 3 : '')}</th>`).join('')}<th>T</th></tr></thead><tbody>
-        <tr><td class="l">${esc(A.abbr)}</td>${b.away.quarters.map(q => `<td>${q}</td>`).join('')}<td><b>${as}</b></td></tr>
-        <tr><td class="l">${esc(H.abbr)}</td>${b.home.quarters.map(q => `<td>${q}</td>`).join('')}<td><b>${hs}</b></td></tr></tbody></table></div>
-      <div class="tabs"><button class="tab active" data-tab="box">Box score</button>${b.pbp ? '<button class="tab" data-tab="pbp">Play-by-play</button>' : ''}</div>
-      <div data-pane="box" class="col">${side(b.away, A)}${side(b.home, H)}</div>
-      ${b.pbp ? `<div data-pane="pbp" class="hidden"><div class="table-wrap" style="max-height:60vh;overflow-y:auto"><table class="t"><thead><tr><th class="l">Q</th><th class="l">Time</th><th class="l">Team</th><th class="l">Play</th><th>Score</th></tr></thead><tbody>
-        ${b.pbp.map(e => `<tr><td class="l">${e.q > 4 ? 'OT' + (e.q - 4) : 'Q' + e.q}</td><td class="l mono">${e.t}</td><td class="l">${e.team ? esc(e.team) : ''}</td><td class="l" style="white-space:normal">${esc(e.txt)}</td><td class="mono">${e.as}-${e.hs}</td></tr>`).join('')}
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Team</th>${b.home.quarters.map((_, i) => `<th>${qLabel(i)}</th>`).join('')}<th>Final</th></tr></thead><tbody>
+        <tr><td class="l">${esc(A.abbr)}</td>${b.away.quarters.map(q => `<td>${q}</td>`).join('')}<td class="hi">${as}</td></tr>
+        <tr><td class="l">${esc(H.abbr)}</td>${b.home.quarters.map(q => `<td>${q}</td>`).join('')}<td class="hi">${hs}</td></tr></tbody></table></div>
+      <div class="tabs"><button class="on" data-tab="box">Box score</button>${b.pbp ? '<button data-tab="pbp">Play-by-play</button>' : ''}</div>
+      <div data-pane="box" class="stack">${side(b.away, A)}${side(b.home, H)}</div>
+      ${b.pbp ? `<div data-pane="pbp" class="hidden"><div class="tbl-wrap" style="max-height:62vh;overflow-y:auto"><table class="tbl"><thead><tr><th class="l">Per</th><th class="l">Clock</th><th class="l">Team</th><th class="l">Play</th><th>${esc(A.abbr)}</th><th>${esc(H.abbr)}</th></tr></thead><tbody>
+        ${b.pbp.map(e => `<tr><td class="l t3">${e.q > 4 ? 'OT' + (e.q - 4) : 'Q' + e.q}</td><td class="l num">${e.t}</td><td class="l t2">${e.team ? esc(e.team) : ''}</td><td class="l" style="white-space:normal">${esc(e.txt)}</td><td>${e.as}</td><td>${e.hs}</td></tr>`).join('')}
       </tbody></table></div></div>` : ''}
     `);
     bindCommon(m);
     m.querySelectorAll('[data-tab]').forEach(tb => tb.onclick = () => {
-      m.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('active', x === tb));
+      m.querySelectorAll('[data-tab]').forEach(x => x.classList.toggle('on', x === tb));
       m.querySelectorAll('[data-pane]').forEach(x => x.classList.toggle('hidden', x.dataset.pane !== tb.dataset.tab));
     });
   }
 
-  return { setup, open, render, playerCard, boxScore };
+  return { setup, open, render, playerSheet, boxScore };
 })();

@@ -23,9 +23,9 @@ HL.Media = (function () {
 
   // Fragment pools. Keep adding: every new entry multiplies the possible outputs.
   const P = {
-    beat: ['beat', 'took down', 'handled', 'got past', 'outlasted', 'knocked off', 'dispatched', 'took care of', 'edged', 'held off', 'topped', 'downed', 'outdueled', 'put away', 'survived'],
-    crush: ['crushed', 'demolished', 'routed', 'embarrassed', 'steamrolled', 'blew out', 'dismantled', 'humiliated', 'ran past', 'pummeled', 'buried', 'flattened', 'torched', 'overwhelmed'],
-    edge: ['edged', 'escaped', 'squeaked past', 'survived', 'held on against', 'snuck past', 'outlasted', 'clipped', 'nipped', 'got by'],
+    beat: ['beat', 'take down', 'handle', 'get past', 'outlast', 'knock off', 'dispatch', 'take care of', 'hold off', 'top', 'down', 'outduel', 'put away', 'turn back', 'get the better of'],
+    crush: ['crush', 'demolish', 'rout', 'embarrass', 'steamroll', 'blow out', 'dismantle', 'humiliate', 'run past', 'pummel', 'bury', 'flatten', 'torch', 'overwhelm', 'run away from'],
+    edge: ['edge', 'escape', 'squeak past', 'survive', 'hold on against', 'sneak past', 'outlast', 'clip', 'nip', 'get by', 'slip past'],
     big: ['monster', 'massive', 'huge', 'ridiculous', 'absurd', 'vintage', 'stat-sheet-stuffing', 'career-type', 'video-game', 'jaw-dropping', 'scorching', 'nuclear', 'surgical', 'heroic', 'outrageous'],
     scored: ['dropped', 'poured in', 'piled up', 'put up', 'erupted for', 'exploded for', 'racked up', 'hung', 'went off for', 'torched them for', 'unloaded', 'tallied', 'carved out', 'cooked them for'],
     night: ['night', 'performance', 'outing', 'showing', 'game', 'evening', 'display', 'masterclass', 'clinic', 'eruption'],

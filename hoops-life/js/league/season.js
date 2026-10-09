@@ -457,10 +457,12 @@ HL.League = {};
         HL.applyProgression(p, delta);
         p.potential = Math.max(p.ovr, p.potential - (p.age > 25 ? 2 : 0));
       }
-      const retireP = p.age >= 40 ? 0.9 : p.age >= 37 ? 0.45 + (80 - p.ovr) * 0.03 : p.age >= 34 ? (75 - p.ovr) * 0.04 : p.ovr < 58 && p.age >= 28 ? 0.3 : 0;
+      const retireP = retireChance(p);
       if (!isNew && R.chance(HL.clamp(retireP, 0, 0.98))) {
         p.retired = season; p.teamId = null;
-        HL.News && HL.News.retire && HL.News.retire(L, p);
+        // Young fringe players usually keep playing abroad rather than retire.
+        if (p.age < 30) p.leftFor = R.pick(['EuroLeague', 'the Chinese Basketball Association', 'the Australian NBL', 'Japan\'s B.League', 'the Turkish BSL', 'the Spanish ACB']);
+        else HL.News && HL.News.retire && HL.News.retire(L, p);
       }
     }
     for (const p of Object.values(L.players)) if (p.hardship) { p.hardship = false; p.teamId = null; }
@@ -497,6 +499,16 @@ HL.League = {};
     L.nextPid = HL.nextPlayerId();
     HL.News && HL.News.seasonStart && HL.News.seasonStart(L);
   };
+
+  // Good players keep playing into their late 30s; fringe veterans get pushed out earlier.
+  function retireChance(p) {
+    const a = p.age, o = p.ovr;
+    if (a >= 42) return 0.95;
+    if (o >= 82) return a >= 40 ? 0.55 : a >= 39 ? 0.3 : a >= 38 ? 0.15 : a >= 36 ? 0.04 : 0;
+    if (o >= 74) return a >= 39 ? 0.75 : a >= 37 ? 0.4 : a >= 35 ? 0.18 : a >= 33 ? 0.05 : 0;
+    if (o >= 66) return a >= 37 ? 0.7 : a >= 35 ? 0.35 : a >= 33 ? 0.12 : a >= 31 ? 0.03 : 0;
+    return a >= 33 ? 0.8 : a >= 30 ? 0.4 : a >= 27 ? 0.15 : 0.03;
+  }
 
   function draftOrder() {
     const all = HL.League.standings().slice().reverse(); // worst first

@@ -3,80 +3,62 @@ window.HL = window.HL || {};
 
 HL.App = (function () {
   const U = HL.UI;
+  const esc = U.esc;
 
-  function setAccent(color, color2) {
-    document.documentElement.style.setProperty('--accent', color || '#ff6b1a');
-    document.documentElement.style.setProperty('--accent2', color2 && color2.toLowerCase() !== '#ffffff' && color2.toLowerCase() !== '#000000' ? color2 : '#ffd23f');
-  }
+  const MODES = [
+    { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over a real NBA team. Rotations, game plans, the full 82, the playoffs and the media. MyNBA-style, and you can change every rule.' },
+    { id: 'career', name: 'Player Career', desc: 'Live a whole life, from a kid with a ball to a Hall of Fame speech (or not). MyCareer meets BitLife, in any era.' },
+    { id: '820', name: '82-0 Challenge', desc: 'Spin a franchise and a decade, draft one real player per spot, and see if your five can run the table.' },
+    { id: 'skill', name: 'Skill Draft Career', desc: 'Build one player from real players\' skills, sim the whole career, and get the verdict.' },
+  ];
 
   function title() {
-    setAccent();
+    U.applyTeamTheme(null);
+    U.setEra('modern');
     U.app().innerHTML = `
-    <div class="title-screen">
-      <div class="title-bg"><div class="court"></div></div>
-      <div class="title-card">
-        <div class="logo-mark">Hoops<span>Life</span></div>
-        <div class="tagline">Basketball career &amp; franchise simulator · real players · any era · your story</div>
-        <div class="mode-grid">
-          <button class="mode-card" data-go="franchise">
-            <div class="icon">🏟️</div>
-            <div class="chip accent">Franchise · MyNBA-style</div>
-            <h2 style="margin-top:10px">Detailed Franchise</h2>
-            <p>Take over any NBA team with real rosters. Rotations, strategy, the full season, playoffs, awards and media. Customize everything.</p>
-            <div class="sub"><span class="chip good">Playable</span><span class="chip soon">Any era · Fantasy draft · Trades soon</span></div>
-          </button>
-          <button class="mode-card disabled" data-soon="Player Career (MyCareer + BitLife)">
-            <div class="icon">⛹️</div>
-            <div class="chip accent">Career · MyCareer + BitLife</div>
-            <h2 style="margin-top:10px">Player Career</h2>
-            <p>Live a whole life: build your player, high school to the league, every choice has consequences. Any era, so stop the GOAT before he's the GOAT.</p>
-            <div class="sub"><span class="chip soon">In development</span></div>
-          </button>
-          <button class="mode-card disabled" data-soon="82-0 Challenge">
-            <div class="icon">🎰</div>
-            <div class="chip accent">Quick play</div>
-            <h2 style="margin-top:10px">82-0 Challenge</h2>
-            <p>Spin a team and decade, draft one real player per slot, and see if your all-time five can run the table.</p>
-            <div class="sub"><span class="chip soon">In development</span></div>
-          </button>
-          <button class="mode-card disabled" data-soon="Skill Draft Career">
-            <div class="icon">🧬</div>
-            <div class="chip accent">Quick play</div>
-            <h2 style="margin-top:10px">Skill Draft Career</h2>
-            <p>Build one player out of real players' skills, sim the whole career and get the verdict: GOAT, all-time great, role player… or broken.</p>
-            <div class="sub"><span class="chip soon">In development</span></div>
-          </button>
+    <div class="title">
+      <div class="stage">
+        <div>
+          <div class="mark">Hoops<span>Life</span></div>
+          <p class="lede">A basketball simulator built on the real league. Real rosters, a possession-by-possession sim calibrated to NBA numbers, and a story that remembers everything you do.</p>
         </div>
-        <div class="row" style="margin-top:18px">
-          <button class="btn" data-go="load">📂 Load game</button>
-          <span class="muted small right">Rosters: ${U.esc(HL.ROSTER_META.label)}</span>
+        <div class="modes">
+          ${MODES.map((m, i) => `<button class="mode ${m.live ? '' : 'off'}" data-mode="${m.id}">
+            <span class="ix">0${i + 1}</span>
+            <div><h3>${esc(m.name)}</h3><p>${esc(m.desc)}</p></div>
+            <span class="st ${m.live ? 'live' : ''}">${m.live ? 'Play' : 'In development'}</span>
+          </button>`).join('')}
         </div>
       </div>
+      <footer>
+        <button class="btn" data-load>${U.icon('load')} Load game</button>
+        <span class="t3 sm ml-auto">Rosters: ${esc(HL.ROSTER_META.label)}</span>
+      </footer>
     </div>`;
-    U.app().querySelectorAll('[data-go]').forEach(b => b.onclick = () => {
-      if (b.dataset.go === 'franchise') HL.Franchise.setup();
-      if (b.dataset.go === 'load') loadScreen();
+    U.app().querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+      if (b.dataset.mode === 'franchise') return HL.Franchise.setup();
+      const m = MODES.find(x => x.id === b.dataset.mode);
+      U.toast(`<b>${esc(m.name)}</b> is in development and is coming in an upcoming milestone.`);
     });
-    U.app().querySelectorAll('[data-soon]').forEach(b => b.onclick = () => U.toast(`<b>${U.esc(b.dataset.soon)}</b> is being built in an upcoming milestone.`));
+    U.app().querySelector('[data-load]').onclick = loadScreen;
   }
 
   async function loadScreen() {
     let saves = [];
-    try { saves = await HL.Saves.list(); } catch (e) { U.toast('Could not open saves: ' + U.esc(e.message)); }
-    const body = saves.length ? saves.map(s => {
+    try { saves = await HL.Saves.list(); } catch (e) { U.toast('Could not open saves: ' + esc(e.message)); }
+    const rows = saves.map(s => {
       const t = s.teamAbbr ? HL.TEAMS.find(x => x.abbr === s.teamAbbr) : null;
-      return `<div class="game-row" data-load="${s.id}">
-        ${t ? U.logo(t, 38) : ''}
-        <div class="grow"><b>${U.esc(s.label)}</b><div class="muted small">${s.phase} · ${s.record} · saved ${new Date(s.savedAt).toLocaleString()}</div></div>
-        <button class="btn sm" data-load="${s.id}">Load</button>
-        <button class="btn sm ghost" data-del="${s.id}" title="Delete">🗑️</button>
-      </div>`;
-    }).join('') : '<div class="empty">No saved games yet.</div>';
-    const m = U.modal('<h3>Load game</h3>', `<div class="col">${body}<label class="btn sm" style="align-self:flex-start">Import save file<input type="file" accept=".json" hidden data-import></label></div>`, { width: 640 });
+      return `<tr><td class="l"><div class="who" data-load="${esc(s.id)}">${t ? U.logo(t, 32) : ''}<div><div class="nm">${esc(s.label)}</div><div class="meta">${esc(s.phase)} · ${esc(s.record)}</div></div></div></td>
+        <td class="t3 sm">${new Date(s.savedAt).toLocaleString()}</td>
+        <td><button class="btn small" data-load="${esc(s.id)}">Load</button> <button class="btn small quiet" data-del="${esc(s.id)}" aria-label="Delete">${U.icon('trash')}</button></td></tr>`;
+    }).join('');
+    const m = U.sheet('<h3>Load game</h3>', `
+      ${saves.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Save</th><th>Last played</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : '<div class="empty">No saved games yet.</div>'}
+      <label class="btn" style="align-self:flex-start">${U.icon('download')} Import save file<input type="file" accept=".json" hidden data-import></label>`, { width: 720 });
     m.querySelectorAll('[data-load]').forEach(el => el.onclick = async (e) => {
       e.stopPropagation();
       const L = await HL.Saves.load(el.dataset.load);
-      U.closeModal();
+      U.closeSheet();
       if (L) HL.Franchise.open();
     });
     m.querySelectorAll('[data-del]').forEach(el => el.onclick = async (e) => {
@@ -93,13 +75,13 @@ HL.App = (function () {
         L.saveId = null;
         HL.League.set(L);
         HL.RNG.setSeed(L.rngSeed || Date.now());
-        U.closeModal();
+        U.closeSheet();
         HL.Franchise.open();
       } catch (err) { U.toast('That file is not a valid save.'); }
     };
   }
 
-  return { title, setAccent, loadScreen };
+  return { title, loadScreen };
 })();
 
 window.addEventListener('DOMContentLoaded', () => HL.App.title());
