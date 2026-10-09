@@ -19,16 +19,23 @@ HL.Franchise = (function () {
   const go = (sec, pg, state = {}) => { section = sec; page = pg; pageState = state; render(); window.scrollTo(0, 0); };
 
   // ---------------- SETUP ----------------
+  const QUICK = [
+    [2025, 'Latest season'], [2015, '73-9 Warriors'], [2012, 'Heat repeat'], [2007, 'Big Three Celtics'], [2003, 'LeBron arrives'],
+    [1995, '72-10 Bulls'], [1990, 'Jordan\'s first ring'], [1984, 'Jordan\'s rookie year'], [1979, 'Bird & Magic'], [1964, 'Celtics dynasty'],
+  ];
   function setup() {
     U.applyTeamTheme(null);
-    const st = { team: null, difficulty: 'pro', depth: 'detailed', role: 'gm' };
-    const teams = HL.TEAMS.slice().sort((a, b) => a.city.localeCompare(b.city));
-    const strengths = {};
-    for (const t of teams) {
-      const ovrs = HL.ROSTERS_2025[t.abbr].trim().split('\n').map(l => +l.split('|')[4]).sort((a, b) => b - a).slice(0, 8);
-      strengths[t.id] = Math.round(ovrs.reduce((s, v, i) => s + v * [1.4, 1.3, 1.2, 1.1, 1, .7, .6, .5][i], 0) / 7.8);
-    }
+    U.setEra('modern');
+    const st = { season: HL.LATEST_SEASON, team: null, difficulty: 'pro', depth: 'detailed', role: 'gm', history: 'real', loading: false };
+    const seasons = HL.HISTORY.seasons.filter(k => !k.includes('-')).map(Number).sort((a, b) => b - a);
+    const strengthOf = (S, abbr) => {
+      const ovrs = S.players.filter(r => r[1][0] && r[1][0][0] === abbr).map(r => r[14]).sort((a, b) => b - a).slice(0, 8);
+      return Math.round(ovrs.reduce((s, v, i) => s + v * [1.4, 1.3, 1.2, 1.1, 1, .7, .6, .5][i], 0) / 7.8);
+    };
     const render = () => {
+      const S = HL.HISTORY_SEASONS[String(st.season)];
+      const teams = S ? S.teams.map(t => ({ meta: HL.History.teamMeta(t[0], t[1], st.season), w: t[2], l: t[3], abbr: t[0], str: strengthOf(S, t[0]) })).sort((a, b) => a.meta.city.localeCompare(b.meta.city)) : [];
+      const label = `${st.season}-${String(st.season + 1).slice(2)}`;
       U.app().innerHTML = `
       <div class="frame">
         <div class="masthead"><div class="bar">
@@ -36,49 +43,66 @@ HL.Franchise = (function () {
           <div class="mainnav"><button class="on">New Franchise</button></div>
         </div></div>
         <div class="page">
-          <div class="page-title"><h2>New Franchise</h2><span class="t2">${esc(HL.ROSTER_META.label)}</span></div>
+          <div class="page-title"><h2>New Franchise</h2><span class="t2">Real rosters, ratings and records from Basketball-Reference</span></div>
+          <section class="block"><header><h3>Season</h3><span class="t3 sm">Start in any season. History is simulated from there, so it can go differently.</span></header><div class="body stack">
+            <div class="row wrap">
+              <select data-season style="min-width:160px">${seasons.map(y => `<option value="${y}" ${y === st.season ? 'selected' : ''}>${y}-${String(y + 1).slice(2)}</option>`).join('')}</select>
+              ${QUICK.map(([y, t]) => `<button class="btn small ${y === st.season ? 'go' : ''}" data-quick="${y}">${y}-${String(y + 1).slice(2)} · ${t}</button>`).join('')}
+            </div>
+          </div></section>
           <div class="cols c3">
-            <section class="block"><header><h3>Start</h3></header><div class="body">
-              <div class="setting"><div class="grow"><b>Current season</b><div class="d">Real 2025-26 rosters, ratings and contracts</div></div><span class="tag team">Selected</span></div>
-              <div class="setting"><div class="grow t3"><b>Any era</b><div class="d">Start in 1965, 1984, 1996… and rewrite history</div></div><span class="tag new">Soon</span></div>
-              <div class="setting"><div class="grow t3"><b>Fantasy draft</b><div class="d">Draft from any era's player pool</div></div><span class="tag new">Soon</span></div>
-            </div></section>
             <section class="block"><header><h3>Your role</h3></header><div class="body stack">
               ${U.seg('role', [['coach', 'Coach'], ['gm', 'GM'], ['owner', 'Owner']], st.role)}
               <div class="t2 sm">${{ coach: 'Rotations, game plans and player relationships. The front office makes the roster moves.', gm: 'Coach plus front office: roster, contracts, trades and the draft.', owner: 'Everything, including the business side and the rulebook.' }[st.role]}</div>
             </div></section>
+            <section class="block"><header><h3>History</h3></header><div class="body stack">
+              ${U.seg('history', [['real', 'Real careers'], ['random', 'Fictional future']], st.history)}
+              <div class="t2 sm">${st.history === 'real' ? 'Real players follow their real careers, and real draft classes arrive each year (Jordan in 1984, LeBron in 2003…). Results are simulated, so history can change.' : 'From your start season on, careers develop randomly and future draft classes are fictional.'}</div>
+            </div></section>
             <section class="block"><header><h3>Difficulty & depth</h3></header><div class="body stack">
               ${U.seg('difficulty', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['hof', 'Hall of Fame']], st.difficulty)}
               ${U.seg('depth', [['simple', 'Simple'], ['detailed', 'Detailed']], st.depth)}
-              <div class="t2 sm">Simple lets the AI handle the details. Detailed hands you every system. You can change this any time.</div>
             </div></section>
           </div>
-          <section class="block"><header><h3>Choose a team</h3><span class="t3 sm ml-auto">Team strength = top-8 weighted OVR</span></header>
-            <div class="body flush"><div class="picker" style="border:0;border-radius:0">
-              ${teams.map(t => `<button class="pick ${st.team === t.id ? 'on' : ''}" style="--c:${U.teamAccent(t).c}" data-team="${t.id}">
-                ${U.logo(t, 40)}<div><div class="cty">${esc(t.city)}</div><div class="nm">${esc(t.name)}</div></div>
-                <div class="str"><div class="num" style="font-size:22px">${strengths[t.id]}</div><div class="caps" style="font-size:10px">${t.conf}</div></div>
+          <section class="block"><header><h3>Choose a team · ${label}</h3><span class="t3 sm ml-auto">${S ? `${teams.length} teams · real record shown · strength = top-8 weighted OVR` : ''}</span></header>
+            <div class="body flush">${st.loading || !S ? '<div class="empty">Loading season…</div>' : `<div class="picker" style="border:0;border-radius:0">
+              ${teams.map(t => `<button class="pick ${st.team === t.abbr ? 'on' : ''}" style="--c:${U.teamAccent(t.meta).c}" data-team="${t.abbr}">
+                ${U.logo(t.meta, 40)}<div><div class="cty">${esc(t.meta.city)}</div><div class="nm">${esc(t.meta.name)}</div></div>
+                <div class="str"><div class="num" style="font-size:22px">${t.str}</div><div class="caps" style="font-size:10px">${t.w}-${t.l}</div></div>
               </button>`).join('')}
-            </div></div>
+            </div>`}</div>
           </section>
           <div class="row"><button class="btn quiet" data-back>${U.icon('back')} Back</button>
-            <button class="btn go big ml-auto" data-start ${st.team == null ? 'disabled' : ''}>${st.team != null ? `Start as the ${esc(HL.TEAMS[st.team].name)}` : 'Pick a team'}</button></div>
+            <button class="btn go big ml-auto" data-start ${st.team == null ? 'disabled' : ''}>${st.team != null && S ? `Start as the ${label} ${esc(teams.find(t => t.abbr === st.team).meta.name)}` : 'Pick a team'}</button></div>
         </div>
       </div>`;
       const root = U.app();
       root.querySelector('[data-back]').onclick = () => HL.App.title();
       root.querySelector('[data-home]').onclick = () => HL.App.title();
-      root.querySelectorAll('[data-team]').forEach(el => el.onclick = () => { st.team = +el.dataset.team; U.applyTeamTheme(HL.TEAMS[st.team]); render(); });
+      const pickSeason = (y) => { st.season = y; st.team = null; U.applyTeamTheme(null); loadSeason(); };
+      root.querySelector('[data-season]').onchange = (e) => pickSeason(+e.target.value);
+      root.querySelectorAll('[data-quick]').forEach(b => b.onclick = () => pickSeason(+b.dataset.quick));
+      root.querySelectorAll('[data-team]').forEach(el => el.onclick = () => {
+        st.team = el.dataset.team;
+        const t = teams.find(x => x.abbr === st.team);
+        U.applyTeamTheme(t.meta);
+        render();
+      });
       root.querySelectorAll('[data-seg]').forEach(sg => sg.querySelectorAll('button').forEach(b => b.onclick = () => { st[sg.dataset.seg] = b.dataset.v; render(); }));
       root.querySelector('[data-start]').onclick = () => {
-        HL.League.create({ userTeamId: st.team, settings: { difficulty: st.difficulty, depth: st.depth, role: st.role } });
+        if (st.team == null) return;
+        HL.League.createFromSeason({ seasonKey: String(st.season), userAbbr: st.team, settings: { difficulty: st.difficulty, depth: st.depth, role: st.role, history: st.history } });
         L().mode = 'franchise';
         section = 'home'; page = 'overview'; pageState = {};
         open();
         autosave();
       };
     };
-    render();
+    const loadSeason = () => {
+      st.loading = true; render();
+      HL.History.load(String(st.season)).then(() => { st.loading = false; render(); }).catch(e => { st.loading = false; U.toast(esc(e.message)); render(); });
+    };
+    loadSeason();
   }
 
   // ---------------- FRAME ----------------
@@ -89,6 +113,7 @@ HL.Franchise = (function () {
   }
 
   function render() {
+    U.setEra(L().settings.eraTheme && L().settings.eraTheme !== 'auto' ? L().settings.eraTheme : HL.eraForSeason(L().season));
     const sec = SECTIONS.find(s => s[0] === section);
     U.app().innerHTML = `
     <div class="frame">
@@ -128,6 +153,11 @@ HL.Franchise = (function () {
     const Lg = L();
     const uid = Lg.userTeamId;
     if (kind === 'advance') {
+      const nextKey = String(Lg.season + 1);
+      if (Lg.settings.history === 'real' && HL.HISTORY.seasons.includes(nextKey) && !HL.HISTORY_SEASONS[nextKey]) {
+        HL.History.load(nextKey).then(() => sim('advance')).catch(e => U.toast(esc(e.message)));
+        return;
+      }
       HL.League.advanceToNextSeason();
       U.toast(`The ${Lg.season}-${String(Lg.season + 1).slice(2)} season is here. The draft, player progression, retirements and free agency are complete.`);
       go('home', 'overview');
@@ -398,10 +428,11 @@ HL.Franchise = (function () {
     },
 
     standings() {
-      return `<div class="page-title"><h2>Standings</h2><span class="t2">1-6 clinch a playoff spot · 7-10 play-in</span></div><div class="cols c2">${['East', 'West'].map(conf => {
+      const fmt = HL.playoffFormat(L().season);
+      return `<div class="page-title"><h2>Standings</h2><span class="t2">${fmt.playIn ? '1-6 clinch a playoff spot · 7-10 play-in' : `Top ${fmt.perConf} per ${L().season < 1970 ? 'division' : 'conference'} make the playoffs`}</span></div><div class="cols c2">${HL.League.conferences().map(conf => {
         const st = HL.League.standings(conf);
-        return `<section class="block"><header><h3>${conf}ern Conference</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Team</th><th>W</th><th>L</th><th>Pct</th><th>GB</th><th>Home</th><th>Away</th><th>L10</th><th>Strk</th><th>Net</th></tr></thead><tbody>
-          ${st.map((t, i) => { const gp = t.w + t.l, net = gp ? (t.pf - t.pa) / gp : 0; return `<tr class="${t.id === L().userTeamId ? 'mine' : ''} ${i === 5 || i === 9 ? 'line' : ''}"><td class="rk">${i + 1}</td>
+        return `<section class="block"><header><h3>${conf}ern ${L().season < 1970 ? 'Division' : 'Conference'}</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">#</th><th class="l">Team</th><th>W</th><th>L</th><th>Pct</th><th>GB</th><th>Home</th><th>Away</th><th>L10</th><th>Strk</th><th>Net</th></tr></thead><tbody>
+          ${st.map((t, i) => { const gp = t.w + t.l, net = gp ? (t.pf - t.pa) / gp : 0; return `<tr class="${t.id === L().userTeamId ? 'mine' : ''} ${(fmt.playIn ? (i === 5 || i === 9) : i === fmt.perConf - 1) ? 'line' : ''}"><td class="rk">${i + 1}</td>
             <td class="l">${teamLink(t)}</td><td>${t.w}</td><td>${t.l}</td><td>${(t.w / Math.max(1, gp)).toFixed(3).replace(/^0/, '')}</td><td class="t3">${i ? HL.League.gamesBack(t, st[0]).toFixed(1) : '—'}</td>
             <td>${t.homeW}-${t.homeL}</td><td>${t.awayW}-${t.awayL}</td><td>${t.last10.filter(x => x).length}-${t.last10.filter(x => !x).length}</td>
             <td class="${t.streak > 0 ? 'win' : t.streak < 0 ? 'loss' : ''}">${t.streak > 0 ? 'W' + t.streak : t.streak < 0 ? 'L' + (-t.streak) : '–'}</td>
@@ -427,25 +458,32 @@ HL.Franchise = (function () {
     playoffs() {
       const Lg = L(), P = Lg.playoffs;
       const T = id => Lg.teams[id];
+      const confs = HL.League.conferences();
+      const fmt = HL.playoffFormat(Lg.season);
       if (!P) {
-        return `<div class="page-title"><h2>Playoff picture</h2><span class="t2">If the season ended today</span></div><div class="cols c2">${['East', 'West'].map(c => `<section class="block"><header><h3>${c}</h3></header><div class="body flush"><table class="tbl"><tbody>${HL.League.standings(c).slice(0, 10).map((t, i) => `<tr class="${t.id === L().userTeamId ? 'mine' : ''} ${i === 5 ? 'line' : ''}"><td class="rk">${i + 1}</td><td class="l">${teamLink(t)}</td><td>${t.w}-${t.l}</td><td class="t3 l">${i < 6 ? 'Playoffs' : 'Play-in'}</td></tr>`).join('')}</tbody></table></div></section>`).join('')}</div>`;
+        const per = fmt.perConf, pin = fmt.playIn;
+        return `<div class="page-title"><h2>Playoff picture</h2><span class="t2">If the season ended today · ${per * confs.length} teams${pin ? ' plus the play-in' : ''}${fmt.byes ? ` · top ${fmt.byes} seeds get a bye` : ''}</span></div>
+          <div class="cols c2">${confs.map(c => `<section class="block"><header><h3>${c}</h3></header><div class="body flush"><table class="tbl"><tbody>${HL.League.standings(c).slice(0, pin ? 10 : per + 2).map((t, i) => `<tr class="${t.id === Lg.userTeamId ? 'mine' : ''} ${i === per - 1 || (pin && i === 5) ? 'line' : ''}"><td class="rk">${i + 1}</td><td class="l">${teamLink(t)}</td><td>${t.w}-${t.l}</td><td class="t3 l">${pin ? (i < 6 ? 'Playoffs' : 'Play-in') : i < per ? (fmt.byes && i < fmt.byes ? 'Bye' : 'Playoffs') : 'Out'}</td></tr>`).join('')}</tbody></table></div></section>`).join('')}</div>`;
       }
       const seriesBox = s => `<div class="series">${[[s.hi, s.wins[0], s.hiSeed], [s.lo, s.wins[1], s.loSeed]].map(([id, w, seed]) => `<div class="s ${s.winner != null ? (s.winner === id ? 'won' : 'out') : ''}">${U.logo(T(id), 18)}${seed ? `<span class="t3">${seed}</span>` : ''}<span>${esc(T(id).abbr)}</span><span class="w">${w}</span></div>`).join('')}</div>`;
-      const r = P.rounds;
-      const col = (round, conf) => r[round] ? r[round].filter(s => s.conf === conf).map(seriesBox).join('') : '';
-      const pin = c => {
+      const rounds = P.rounds;
+      const confRounds = rounds.map(r => r.filter(x => x.conf !== 'Finals')).filter(r => r.length);
+      const finals = rounds.flat().filter(x => x.conf === 'Finals');
+      const roundTitle = (i, n) => i === n - 1 ? (Lg.season < 1970 ? 'Division finals' : 'Conference finals') : i === n - 2 ? 'Semifinals' : 'First round';
+      const nConfRounds = Math.ceil(Math.log2(Math.max(2, fmt.perConf)));
+      const pinBlock = c => {
+        if (!P.playin) return '';
         const pi = P.playin[c];
         return `<section class="block"><header><h3>${c} play-in</h3></header><div class="body flush"><table class="tbl"><tbody>${pi.games.map((g, i) => g.a != null ? `<tr><td class="l t3">${['7 vs 8', '9 vs 10', 'For the 8 seed'][i]}</td><td class="l">${teamLink(T(g.a), 18)}</td><td class="l">${teamLink(T(g.b), 18)}</td><td class="l">${g.winner != null ? `<b>${esc(T(g.winner).abbr)}</b> wins` : '—'}</td></tr>` : '').join('')}</tbody></table></div></section>`;
       };
-      return `<div class="page-title"><h2>${Lg.season + 1} Playoffs</h2></div>
+      return `<div class="page-title"><h2>${Lg.season + 1} Playoffs</h2><span class="t2">${fmt.bestOf.map((b, i) => `${i === fmt.bestOf.length - 1 ? 'Finals' : 'R' + (i + 1)}: best of ${b}`).join(' · ')}</span></div>
         ${P.champion != null ? `<section class="block"><div class="body row" style="gap:16px">${U.logo(T(P.champion), 64)}<div><div class="caps">NBA Champions</div><h2 style="font-size:34px;margin-top:4px">${esc(T(P.champion).city)} ${esc(T(P.champion).name)}</h2></div></div></section>` : ''}
-        ${r.length ? `<section class="block"><header><h3>Bracket</h3></header><div class="bracket">
-          <div class="colh">West R1</div><div class="colh">West semis</div><div class="colh">West finals</div><div class="colh">Finals</div><div class="colh">East finals</div><div class="colh">East semis</div><div class="colh">East R1</div>
-          <div class="stack" style="gap:8px">${col(0, 'West')}</div><div class="stack" style="gap:8px">${col(1, 'West')}</div><div class="stack">${col(2, 'West')}</div>
-          <div class="stack">${r[3] ? r[3].map(seriesBox).join('') : '<div class="series"><div class="s t3">TBD</div></div>'}</div>
-          <div class="stack">${col(2, 'East')}</div><div class="stack" style="gap:8px">${col(1, 'East')}</div><div class="stack" style="gap:8px">${col(0, 'East')}</div>
-        </div></section>` : ''}
-        <div class="cols c2">${pin('East')}${pin('West')}</div>`;
+        ${finals.length ? `<section class="block"><header><h3>NBA Finals</h3></header><div class="body" style="max-width:320px">${finals.map(seriesBox).join('')}</div></section>` : ''}
+        <div class="cols c2">${confs.map(c => `<section class="block"><header><h3>${c}</h3></header><div class="body"><div class="row" style="align-items:flex-start;gap:12px;overflow-x:auto">
+          ${Array.from({ length: nConfRounds }, (_, i) => { const r = confRounds[i] ? confRounds[i].filter(x => x.conf === c) : []; return `<div class="stack" style="gap:8px;min-width:130px"><div class="caps">${roundTitle(i, nConfRounds)}</div>${r.length ? r.map(seriesBox).join('') : '<div class="series"><div class="s t3">TBD</div></div>'}</div>`; }).join('')}
+          ${P.byes && P.byes[c] && P.byes[c].length ? `<div class="stack" style="gap:6px;min-width:120px"><div class="caps">Byes</div>${P.byes[c].map(id => `<div class="row sm">${U.logo(T(id), 18)} ${esc(T(id).abbr)}</div>`).join('')}</div>` : ''}
+        </div></div></section>`).join('')}</div>
+        ${P.playin ? `<div class="cols c2">${confs.map(pinBlock).join('')}</div>` : ''}`;
     },
 
     players() {

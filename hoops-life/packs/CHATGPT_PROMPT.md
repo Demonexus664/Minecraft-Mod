@@ -106,6 +106,15 @@ PRESS CONFERENCE QUOTES — what the player/coach SAYS, by tone, then media reac
 LEAGUE OFFICE ({team} {rule} {season} {player} as noted)
 - rules.change.react.hype / .stats / .oldhead / .meme ({rule} = description of the rule change)
 - league.superteam_outrage ({team} {stars}), league.investigation ({team}), league.fine ({team} {amount}), league.lockout ({season}), league.named_rule ({player} {rule}) e.g. "the {plast} Rule", league.tanking ({team} {rec})
+MEDIA DAY — preseason takes on how players look and sound ({player} {plast} {team} {age} {oldteam} {change} = OVR change since last season, {weight} = weight change in lbs, {years} = years in league)
+- mediaday.looks_washed ★ (older player declining: "he looks washed"), mediaday.best_shape (claims best shape of his life), mediaday.looks_bigger (added muscle), mediaday.lost_weight, mediaday.new_team_jersey ★ (looks weird/great in the new uniform: {oldteam}), mediaday.contract_year, mediaday.rookie_hype, mediaday.comeback_from_injury ({injury}), mediaday.quote_confident, mediaday.quote_humble, mediaday.quote_delusional (wildly overconfident quote), mediaday.react.slander, mediaday.react.respect
+SOCIAL FORMATS — short platform-native posts (modern era only), write them like real captions/titles
+- tiktok.slander ★ ({player} {plast} {team} {stat} {fail} = e.g. "0-for-9 from three"), tiktok.hype_edit ★ ({player} {pts} {moment}), tiktok.pov ("POV: you're guarding {player}…"), tiktok.fan_cam, tiktok.reaction, tiktok.sound (fake sound names like "original sound – hoopsedits"), tiktok.comments (short top comments under a clip)
+- youtube.title ★ (clickbait video titles: "Is {player} WASHED? (The Truth)"), youtube.analysis_title, youtube.podcast_clip_title
+- ig.caption (team/player post captions), ig.comments
+- meme.caption ★ (top text / bottom text over a player image: {player} {team} {opp} {stat})
+- quote_tweet.ratio (replies that ratio a bad take), comment_section.toxic, comment_section.wholesome
+
 COACHING / FRONT OFFICE ({coach} {team} {rec} {gm} {owner})
 - coach.fired ★, coach.hired, coach.hot_seat, gm.fired, owner.meddling, team.chemistry_bad, team.chemistry_good, team.leak ({player} {team})
 

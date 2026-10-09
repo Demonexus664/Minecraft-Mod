@@ -54,8 +54,9 @@ HL.UI = (function () {
 
   function logo(team, size = 40) {
     if (!team) return '';
-    const src = asset('logo.' + team.abbr) || HL.teamLogoUrl(team);
-    return `<span class="logo" style="width:${size}px;height:${size}px;font-size:${size}px;--c:${teamAccent(team).c}"><b>${esc(team.abbr)}</b><img src="${src}" alt="${esc(team.name)}" loading="lazy" onload="this.parentNode.classList.add('loaded')" onerror="this.remove()"></span>`;
+    const src = asset('logo.' + (team.bref || team.abbr)) || asset('logo.' + team.abbr) || HL.teamLogoUrl(team);
+    const img = src ? `<img src="${src}" alt="${esc(team.name)}" loading="lazy" onload="this.parentNode.classList.add('loaded')" onerror="this.remove()">` : '';
+    return `<span class="logo" style="width:${size}px;height:${size}px;font-size:${size}px;--c:${teamAccent(team).c}"><b>${esc(team.abbr)}</b>${img}</span>`;
   }
 
   function hashStr(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }

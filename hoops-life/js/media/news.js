@@ -291,15 +291,22 @@ HL.News = (function () {
   }
 
   function retire(L, p) {
-    const rings = p.careerAwards.filter(a => a.award === 'Champion').length;
-    const mvps = p.careerAwards.filter(a => a.award === 'MVP').length;
-    if (!p.real && p.ovr < 76 && !rings && !mvps) return;
-    if (p.ovr < 68 && !rings && !mvps) return;
-    const c = { player: p.name, plast: last(p), rings, mvps, age: p.age };
-    const hl = rings || mvps
-      ? `${p.name} announces retirement${rings ? ` after ${rings} championship${rings > 1 ? 's' : ''}` : ''}${mvps ? `${rings ? ' and' : ' after'} ${mvps} MVP${mvps > 1 ? 's' : ''}` : ''}`
-      : headline(L, 'retire', c, ['{player} announces retirement at {age}', '{player} calls it a career'], ['{player} Announces Retirement']);
-    push(L, { type: 'retire', importance: p.ovr >= 85 || mvps ? 3 : 1, playerIds: [p.id], headline: hl,
+    // Accolades: this league's plus the real ones from before the save started.
+    const mine = p.careerAwards || [];
+    const real = (p.hid && HL.HISTORY && HL.HISTORY.awards[p.hid]) ? HL.HISTORY.awards[p.hid].filter(a => a[0] < (L.startSeason || L.season)) : [];
+    const count = (name) => mine.filter(a => a.award === name).length + real.filter(a => a[1] === name || (name === 'MVP' && a[1] === 'nba mvp')).length;
+    const rings = mine.filter(a => a.award === 'Champion').length;
+    const mvps = count('MVP');
+    const allstars = count('All-Star');
+    const hof = !!p.hof;
+    if (!(hof || mvps || rings >= 2 || allstars >= 2 || p.ovr >= 82)) return;
+    const c = { player: p.name, plast: last(p), rings, mvps, age: p.age, allstars };
+    const bits = [];
+    if (mvps) bits.push(`${mvps} MVP${mvps > 1 ? 's' : ''}`);
+    if (rings) bits.push(`${rings} championship${rings > 1 ? 's' : ''}`);
+    if (allstars >= 2) bits.push(`${allstars} All-Star selections`);
+    const hl = bits.length ? `${p.name} announces retirement after ${bits.slice(0, 2).join(' and ')}` : headline(L, 'retire', c, ['{player} announces retirement at {age}', '{player} calls it a career'], ['{player} Announces Retirement']);
+    push(L, { type: 'retire', importance: hof || mvps ? 3 : 2, playerIds: [p.id], headline: hl,
       reactions: [react(L, 'oldhead', 'retire.react', c, ['One of the good ones. Salute to {plast}.', 'They do not make them like {plast} anymore.', 'Enjoy retirement, {plast}. You earned it.'], null)].filter(Boolean) });
   }
 

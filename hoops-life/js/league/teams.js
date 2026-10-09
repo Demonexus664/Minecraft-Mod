@@ -40,5 +40,5 @@ HL.TEAMS = [
   market: ({ NYK: 10, LAL: 10, GSW: 9, LAC: 8, CHI: 9, BOS: 8, BKN: 8, MIA: 8, PHI: 7, DAL: 7, HOU: 7, TOR: 7, PHX: 6, ATL: 6, WAS: 6, DEN: 5, POR: 4, SAC: 4, MIN: 5, CLE: 4, DET: 5, ORL: 5, CHA: 4, IND: 4, MIL: 4, OKC: 3, SAS: 4, MEM: 3, NOP: 3, UTA: 3 })[t[0]],
 }));
 
-HL.teamLogoUrl = (team) => `https://a.espncdn.com/i/teamlogos/nba/500/${team.espn}.png`;
+HL.teamLogoUrl = (team) => team.espn ? `https://a.espncdn.com/i/teamlogos/nba/500/${team.espn}.png` : null;
 HL.teamFull = (team) => `${team.city} ${team.name}`;

@@ -6,7 +6,7 @@ HL.App = (function () {
   const esc = U.esc;
 
   const MODES = [
-    { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over a real NBA team. Rotations, game plans, the full 82, the playoffs and the media. MyNBA-style, and you can change every rule.' },
+    { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over any real NBA team from any season since 1946. Real rosters and ratings, the full schedule, era playoffs and media. Rewrite history, and change every rule.' },
     { id: 'career', name: 'Player Career', desc: 'Live a whole life, from a kid with a ball to a Hall of Fame speech (or not). MyCareer meets BitLife, in any era.' },
     { id: '820', name: '82-0 Challenge', desc: 'Spin a franchise and a decade, draft one real player per spot, and see if your five can run the table.' },
     { id: 'skill', name: 'Skill Draft Career', desc: 'Build one player from real players\' skills, sim the whole career, and get the verdict.' },
@@ -32,7 +32,7 @@ HL.App = (function () {
       </div>
       <footer>
         <button class="btn" data-load>${U.icon('load')} Load game</button>
-        <span class="t3 sm ml-auto">Rosters: ${esc(HL.ROSTER_META.label)}</span>
+        <span class="t3 sm ml-auto">Real NBA data · every season 1946-47 to 2025-26</span>
       </footer>
     </div>`;
     U.app().querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {

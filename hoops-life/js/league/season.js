@@ -116,7 +116,7 @@ HL.League = {};
       userTeamId: null,
       teams: S.teams.map((t, i) => Object.assign(HL.History.teamMeta(t[0], t[1], season), {
         id: i, strategy: HL.DEFAULT_STRATEGY(), real: { w: t[2], l: t[3], srs: t[4], playoffs: !!t[8] },
-      }, blankRecord())),
+      }, t[9] && t[9] !== 'NA' ? { arena: t[9] } : {}, blankRecord())),
       players: {}, schedule: [], boxScores: {}, playoffs: null, awards: {}, history: [], news: [], transactions: [],
     };
     L = league;
