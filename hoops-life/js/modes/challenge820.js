@@ -254,5 +254,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, franchisesIn, loadDecade, posOk };
 })();
