@@ -243,7 +243,7 @@ HL.DEFAULT_RULES = () => ({
         }
 
         const clutch = (quarter >= 4) && clock <= 300 && Math.abs(H.score - A.score) <= 5;
-        const result = runPossession(offense, D, rules, transition, clutch, log);
+        const result = runPossession(offense, D, rules, transition, clutch, log, offense.score - D.score);
         transition = result.transition;
 
         // Injuries: per player-second risk, driven by durability, fatigue, age and rules.
@@ -275,15 +275,15 @@ HL.DEFAULT_RULES = () => ({
       A.quarters.push(A.score - qStartA);
     };
 
-    function runPossession(O, D, rules, transition, clutch, log) {
+    function runPossession(O, D, rules, transition, clutch, log, lead) {
       const strat = O.strat, dstrat = D.strat;
       const lineup = O.onCourt, dline = D.onCourt;
-      const homeBoost = O.home ? 0.007 * (rules.homeCourt ?? 1) : 0;
+      const homeBoost = O.home ? 0.011 * (rules.homeCourt ?? 1) : 0;
 
       // Usage: who initiates.
       const focusStar = strat.focus === 'star';
       const initiator = pickBy(lineup, p => {
-        let w = Math.pow(p.tend.usage / 50, 1.3) * Math.pow(p.ovr / 75, 2.6);
+        let w = Math.pow(p.tend.usage / 50, 1.0) * Math.pow(p.ovr / 75, 2.3);
         if (focusStar) w *= Math.pow(p.ovr / 75, 3);
         return w;
       });
@@ -299,7 +299,7 @@ HL.DEFAULT_RULES = () => ({
       if (transition) pTO += 0.01;
       if (R.chance(HL.clamp(pTO, 0.06, 0.25))) {
         O.st[initiator.id].line.tov++;
-        const stealP = 0.5 + (dSteal - 62) * 0.01;
+        const stealP = 0.56 + (dSteal - 62) * 0.008;
         if (R.chance(HL.clamp(stealP, 0.3, 0.7))) {
           const thief = pickBy(dline, p => Math.pow(p.attrs.steal, 3) * (0.6 + p.tend.gamble / 100));
           D.st[thief.id].line.stl++;
@@ -339,6 +339,10 @@ HL.DEFAULT_RULES = () => ({
       if (transition && R.chance(0.45)) type = 'rim';
 
       let makeP, value = 2, blockP = 0, foulP = 0, label;
+      // Team context: five-man defense and floor spacing affect every shot.
+      const teamD = dline.reduce((sum, p) => sum + (eff(D, p, 'perD') + eff(D, p, 'intD') + p.attrs.iq) / 3, 0) / dline.length;
+      const spacing = lineup.filter(p => p !== shooter).reduce((sum, p) => sum + p.attrs.three, 0) / Math.max(1, lineup.length - 1);
+      const teamIQ = lineup.reduce((sum, p) => sum + p.attrs.iq, 0) / lineup.length;
       const contest = (key) => eff(D, sDef, key);
       if (type === 'rim') {
         const isPost = shooter.tend.post > 25 && R.chance(shooter.tend.post / 100);
@@ -346,21 +350,21 @@ HL.DEFAULT_RULES = () => ({
           ? (eff(O, shooter, 'post') * 0.6 + eff(O, shooter, 'close') * 0.4)
           : Math.max(eff(O, shooter, 'layup'), eff(O, shooter, 'dunk') * 0.92 + shooter.attrs.vert * 0.08, eff(O, shooter, 'close') * 0.97);
         const help = (eff(D, helper, 'intD') + eff(D, helper, 'block')) / 2;
-        makeP = 0.632 + (finish - 70) * 0.0062 - (help - 70) * 0.0033 - (contest('intD') - 65) * 0.0015;
+        makeP = 0.642 + (finish - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013;
         if (transition) makeP += 0.07;
         if (dstrat.defense === 'drop') makeP -= 0.015;
-        blockP = 0.06 + (helper.attrs.block - 65) * 0.0022;
-        foulP = 0.20 + (shooter.attrs.str + finish - 140) * 0.0012;
+        blockP = 0.068 + (helper.attrs.block - 65) * 0.0022;
+        foulP = 0.215 + (shooter.attrs.str + finish - 140) * 0.0012;
         label = isPost ? 'post' : (shooter.attrs.dunk > 70 && R.chance(0.35) ? 'dunk' : 'layup');
       } else if (type === 'mid') {
-        makeP = 0.418 + (eff(O, shooter, 'mid') - 70) * 0.0052 - (contest('perD') - 65) * 0.0026;
+        makeP = 0.418 + (eff(O, shooter, 'mid') - 70) * 0.0048 - (contest('perD') - 65) * 0.0024;
         if (dstrat.defense === 'drop') makeP += 0.02;
         blockP = 0.018; foulP = 0.055;
         label = 'jumper';
       } else {
         let deep = rules.fourPoint && R.chance(0.12);
         value = deep ? 4 : (rules.threeValue || 3);
-        makeP = 0.302 + (eff(O, shooter, 'three') - 70) * 0.0058 - (contest('perD') - 65) * 0.0016;
+        makeP = 0.307 + (eff(O, shooter, 'three') - 70) * 0.0055 - (contest('perD') - 65) * 0.0015;
         if (deep) makeP -= 0.09;
         if (passer) makeP += 0.018; else makeP -= 0.015;
         if (dstrat.defense === 'switch') makeP -= 0.008;
@@ -368,9 +372,14 @@ HL.DEFAULT_RULES = () => ({
         blockP = 0.008; foulP = 0.02;
         label = deep ? 'deep 4-pointer' : 'three';
       }
+      makeP -= (teamD - 66) * 0.0052;
+      makeP += (teamIQ - 68) * 0.0024;
+      if (type === 'rim') makeP += (spacing - 62) * 0.0018;
       if (rules.handCheck && type !== 'rim') makeP -= 0.012;
       if (clutch) makeP += (shooter.traits.clutch - 55) * 0.0012;
       makeP += homeBoost;
+      // Score effects: big leads breed complacency, trailing teams push harder.
+      makeP -= HL.clamp(lead, -18, 26) * 0.0016;
       if (rules.noFouls) foulP = 0;
       if (rules.tackling && type === 'rim') { makeP -= 0.06; }
       makeP = HL.clamp(makeP, 0.05, 0.9);
@@ -398,7 +407,7 @@ HL.DEFAULT_RULES = () => ({
         let astTxt = '';
         const assisted = passer ? R.chance(0.9) : R.chance(type === 'rim' ? 0.32 : 0.22);
         if (assisted) {
-          const ap = passer || pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass, 2));
+          const ap = passer || pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3.2));
           O.st[ap.id].line.ast++;
           astTxt = ` (${ap.name} assist)`;
         }
@@ -432,7 +441,7 @@ HL.DEFAULT_RULES = () => ({
       let made = 0;
       for (let i = 0; i < n; i++) {
         s.fta++;
-        if (R.chance(HL.clamp(0.17 + p.attrs.ft * 0.0075, 0.3, 0.94))) { s.ftm++; s.pts++; made++; }
+        if (R.chance(HL.clamp(0.235 + p.attrs.ft * 0.0072, 0.3, 0.94))) { s.ftm++; s.pts++; made++; }
       }
       T.score += made;
       addPM(T, made); addPM(T === H ? A : H, -made);
@@ -442,16 +451,16 @@ HL.DEFAULT_RULES = () => ({
     function rebound(O, D, rules, type, log) {
       const oStr = O.onCourt.reduce((s, p) => s + eff(O, p, 'oreb') * (0.75 + p.tend.crash / 200), 0) / 5;
       const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb'), 0) / 5;
-      let pOff = 0.255 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012;
+      let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012;
       if (type === 'three') pOff += 0.02;
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
-        const r = pickBy(O.onCourt, p => Math.pow(p.attrs.oreb, 3) * (0.5 + p.tend.crash / 100));
+        const r = pickBy(O.onCourt, p => Math.pow(p.attrs.oreb / 50, 1.7) * (0.5 + p.tend.crash / 100));
         O.st[r.id].line.orb++;
         log(`Offensive rebound ${r.name}.`, O);
         return { keep: true, transition: false };
       }
-      const r = pickBy(D.onCourt, p => Math.pow(p.attrs.dreb, 3));
+      const r = pickBy(D.onCourt, p => Math.pow(p.attrs.dreb / 50, 1.5));
       D.st[r.id].line.drb++;
       // Defensive rebounds sometimes lead to a fast break; fast teams run more.
       return { keep: false, transition: R.chance(0.13 + (D.strat.pace - 50) * 0.002) };
