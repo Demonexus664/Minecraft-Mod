@@ -12,9 +12,9 @@ HL.setNextPlayerId = (v) => { _pid = v; };
 // Tendencies drive how a player plays in the sim. MyCareer players can edit their own.
 HL.defaultTendencies = function (p) {
   const a = p.attrs;
-  const offSkill = (a.mid + a.three + a.layup + a.handle + a.close) / 5;
+  const offSkill = Math.max(a.layup, a.dunk, a.close, a.post) * 0.4 + Math.max(a.mid, a.three) * 0.35 + a.handle * 0.25;
   return {
-    usage: HL.clamp(Math.round(30 + (offSkill - 60) * 1.6 + (p.ovr - 70) * 0.8), 5, 100),
+    usage: HL.clamp(Math.round(32 + (offSkill - 60) * 1.25 + (p.ovr - 70) * 0.7), 5, 100),
     three: HL.clamp(Math.round(27 + (a.three - 55) * 1.6), 0, 100),
     mid: HL.clamp(Math.round(20 + (a.mid - 65) * 0.9), 0, 100),
     drive: HL.clamp(Math.round(25 + (a.layup + a.dunk + a.speed - 195) * 0.5), 0, 100),

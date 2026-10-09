@@ -35,7 +35,7 @@ Xavier Tillman|C|26|79|67|defbig
 Jordan Walsh|SF|21|78|67|3d
 Chris Boucher|PF|32|81|70|stretchbig`,
 
-  BKN: `Michael Porter Jr.|SF|27|82|82|scorer|38.3
+  BKN: `Michael Porter Jr.|SF|27|82|80|scorer|38.3
 Cam Thomas|SG|24|75|80|scorer|6.0
 Nic Claxton|C|26|83|79|defbig|25.4
 Noah Clowney|PF|21|82|72|stretchbig
@@ -81,7 +81,7 @@ Julian Phillips|SF|22|80|67|3d
 Dalen Terry|SG|23|79|65|defguard
 Noa Essengue|PF|18|82|67|slasher`,
 
-  CLE: `Donovan Mitchell|SG|29|73|92|scorer|46.4
+  CLE: `Donovan Mitchell|SG|29|73|89|scorer|46.4
 Darius Garland|PG|25|73|85|playmaker|39.4
 Evan Mobley|PF|24|84|88|unicorn|46.4
 Jarrett Allen|C|27|83|83|defbig|20.0
@@ -233,7 +233,7 @@ Jock Landale|C|29|83|67|rimbig
 John Konchar|SG|29|77|66|defguard`,
 
   MIA: `Bam Adebayo|C|28|81|86|defbig|37.1
-Tyler Herro|SG|25|77|85|scorer|31.0|25
+Tyler Herro|SG|25|77|84|scorer|31.0|25
 Norman Powell|SG|32|75|81|scorer|20.5
 Andrew Wiggins|SF|30|79|78|twoway|28.2
 Jaime Jaquez Jr.|SF|24|78|76|slasher
@@ -352,7 +352,7 @@ Eric Gordon|SG|36|75|67|sniper
 Kyle Lowry|PG|39|72|66|playmaker
 Trendon Watford|PF|25|81|70|pointfwd`,
 
-  PHX: `Devin Booker|SG|29|77|90|scorer|53.1
+  PHX: `Devin Booker|SG|29|77|88|scorer|53.1
 Jalen Green|SG|23|76|81|scorer|33.3
 Dillon Brooks|SF|29|78|77|3d|21.1
 Mark Williams|C|23|87|77|rimbig|6.3
@@ -383,7 +383,7 @@ Caleb Love|SG|24|76|64|scorer
 Sidy Cissoko|SF|21|79|65|defguard`,
 
   SAC: `Domantas Sabonis|C|29|85|87|pointcenter|42.3
-Zach LaVine|SG|30|77|84|scorer|47.5
+Zach LaVine|SG|30|77|83|scorer|47.5
 DeMar DeRozan|SF|36|78|82|scorer|25.0
 Russell Westbrook|PG|36|75|77|slasher
 Dennis Schröder|PG|32|73|75|playmaker|14.1

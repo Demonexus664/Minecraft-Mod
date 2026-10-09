@@ -96,7 +96,7 @@ HL.Franchise = (function () {
         <div class="bar">
           <div class="wordmark" data-quit title="Main menu">Hoops<i>Life</i></div>
           <nav class="mainnav">${SECTIONS.map(([id, label, pages]) => `<button class="${id === section ? 'on' : ''}" data-sec="${id}" data-first="${pages[0][0]}">${label}</button>`).join('')}</nav>
-          <div class="simbar">${simButtons()}</div>
+          <div class="simbar"><span class="t2 sm" style="margin-right:6px;white-space:nowrap">${HL.fmtDay(L().season, L().day, { weekday: 1 })}</span>${simButtons()}</div>
         </div>
         <nav class="subnav">${sec[2].map(([id, label, soon]) => `<button class="${id === page ? 'on' : ''}" data-page="${id}">${label}${soon ? '<span class="soon">SOON</span>' : ''}</button>`).join('')}</nav>
       </div>
@@ -218,14 +218,19 @@ HL.Franchise = (function () {
     const Lg = L();
     const home = g.home === tid;
     const opp = Lg.teams[home ? g.away : g.home];
-    if (!g.res) return `<div class="res-row future"><span class="wl t3">·</span><span class="d">Day ${g.day + 1}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.city)} ${esc(opp.name)}</span></div><span class="t3 sm">${opp.w}-${opp.l}</span></div>`;
+    if (!g.res) return `<div class="res-row future"><span class="wl t3">·</span><span class="d">${HL.fmtDay(Lg.season, g.day)}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.city)} ${esc(opp.name)}</span></div><span class="t3 sm">${opp.w}-${opp.l}</span></div>`;
     const my = home ? g.res.hs : g.res.as, their = home ? g.res.as : g.res.hs;
     const won = my > their;
-    return `<div class="res-row" data-box="${g.gid}"><span class="wl ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span><span class="d">Day ${g.day + 1}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.name)}</span></div><span class="num" style="font-size:17px">${my}-${their}${g.res.ot ? `<span class="t3 xs"> ${g.res.ot > 1 ? g.res.ot : ''}OT</span>` : ''}</span></div>`;
+    return `<div class="res-row" data-box="${g.gid}"><span class="wl ${won ? 'win' : 'loss'}">${won ? 'W' : 'L'}</span><span class="d">${HL.fmtDay(Lg.season, g.day)}</span><span class="t3">${home ? 'vs' : '@'}</span><div class="row">${U.logo(opp, 22)}<span>${esc(opp.name)}</span></div><span class="num" style="font-size:17px">${my}-${their}${g.res.ot ? `<span class="t3 xs"> ${g.res.ot > 1 ? g.res.ot : ''}OT</span>` : ''}</span></div>`;
   }
 
   const VOICE_COLORS = { debate: '#b42318', stats: '#1570ef', insider: '#067647', beat: '#6941c6', oldhead: '#93370d', memes: '#c11574', homer: 'var(--team)', hater: '#475467', odds: '#087443', pod: '#7a2e98', wire: '#344054' };
   function post(r) {
+    const fmt = r.format || 'social';
+    // Older eras: newspaper columns, wire copy and letters; radio/TV quotes; message-board posts.
+    if (fmt === 'print') return `<div class="quote print"><div class="src">${esc(r.voice.outlet)}${r.voice.handle ? ` · ${esc(r.voice.handle)}` : ''}</div><div class="tx">${esc(r.text)}</div></div>`;
+    if (fmt === 'broadcast') return `<div class="quote air"><div class="src"><span class="onair">On air</span> ${esc(r.voice.outlet)}</div><div class="tx">“${esc(r.text)}”</div></div>`;
+    if (fmt === 'forum') return `<div class="quote forum"><div class="src">${esc(r.voice.outlet)} · re: thread</div><div class="tx">${esc(r.text)}</div></div>`;
     const initials = r.voice.outlet.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
     const k = n => n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K' : n;
     return `<div class="post"><div class="av" style="--c:${VOICE_COLORS[r.voice.key] || '#444'}">${initials}</div>
@@ -234,7 +239,7 @@ HL.Franchise = (function () {
   }
   function kicker(n) {
     const types = { game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
-    return `${types[n.type] || n.type} · ${seasonLabel(n.season)} · ${n.phase === 'regular' ? 'Day ' + (n.day + 1) : n.phase}`;
+    return `${types[n.type] || n.type} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
   }
   function story(n, opts = {}) {
     const posts = (n.reactions || []).slice(0, opts.posts ?? 3);
@@ -280,7 +285,7 @@ HL.Franchise = (function () {
         const wp = winProb(t.id, ng.home === t.id ? ng.away : ng.home, ng.home === t.id);
         nextHtml = `<div class="bug">
           <div class="tm away" style="--c:${U.teamAccent(A).c}">${U.logo(A, 44)}<div><div class="abbr">${esc(A.abbr)}</div><div class="rec">${A.w}-${A.l}</div></div></div>
-          <div class="mid"><b>Day ${ng.day + 1}</b><span>${esc(H.arena)}</span></div>
+          <div class="mid"><b>${HL.fmtDay(Lg.season, ng.day, { weekday: 1 })}</b><span>${esc(H.arena)}</span></div>
           <div class="tm home" style="--c:${U.teamAccent(H).c}">${U.logo(H, 44)}<div><div class="abbr">${esc(H.abbr)}</div><div class="rec">${H.w}-${H.l}</div></div></div>
         </div>
         <div class="row sm" style="margin-top:10px"><span class="t2">Win probability</span><div class="grow" style="height:4px;background:var(--surface-3)"><div style="height:100%;width:${wp}%;background:var(--team)"></div></div><span class="num" style="font-size:17px">${wp}%</span></div>`;

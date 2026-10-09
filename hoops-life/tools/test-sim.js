@@ -14,7 +14,7 @@ for (let i = 0; i < N; i++) {
   for (const side of [r.home, r.away]) {
     tot.games++;
     for (const id in side.box) { const l = side.box[id]; for (const k in tot) if (k in l) tot[k] += l[k];
-      const ps = pstats[id] = pstats[id] || { g: 0, pts: 0, reb: 0, ast: 0, min: 0 }; ps.g++; ps.pts += l.pts; ps.reb += l.orb + l.drb; ps.ast += l.ast; ps.min += l.min; }
+      const ps = pstats[id] = pstats[id] || { g: 0, pts: 0, reb: 0, ast: 0, min: 0, fga: 0, fta: 0 }; ps.g++; ps.pts += l.pts; ps.fga += l.fga; ps.fta += l.fta; ps.reb += l.orb + l.drb; ps.ast += l.ast; ps.min += l.min; }
   }
 }
 const g = tot.games;
@@ -26,7 +26,7 @@ console.log(`FGA ${(tot.fga / g).toFixed(1)} 3PA ${(tot.tpa / g).toFixed(1)} FTA
 console.log(`ORB% ${(tot.orb / (tot.orb + tot.drb) * 100).toFixed(1)}  OT games ${(tot.ot / N * 100).toFixed(1)}%  injuries/team-game ${(tot.inj / g).toFixed(3)}`);
 const all = teams.flatMap(t => t.players);
 const top = Object.entries(pstats).map(([id, s]) => ({ p: all.find(x => x.id == id), ...s })).filter(x => x.g >= 8).sort((a, b) => b.pts / b.g - a.pts / a.g).slice(0, 15);
-for (const x of top) console.log(`${x.p.name.padEnd(26)} ${x.p.ovr} ${(x.min / x.g).toFixed(1)}m ${(x.pts / x.g).toFixed(1)}p ${(x.reb / x.g).toFixed(1)}r ${(x.ast / x.g).toFixed(1)}a`);
+for (const x of top) console.log(`${x.p.name.padEnd(26)} ${x.p.ovr} ${(x.min / x.g).toFixed(1)}m ${(x.pts / x.g).toFixed(1)}p ${(x.reb / x.g).toFixed(1)}r ${(x.ast / x.g).toFixed(1)}a TS ${(x.pts / (2 * (x.fga + 0.44 * x.fta)) * 100).toFixed(1)}`);
 // Distribution check vs real 2024-25 (min 15 games in sample, starters-ish)
 const qual = Object.entries(pstats).map(([id, s]) => ({ p: all.find(x => x.id == id), g: s.g, ppg: s.pts / s.g, rpg: s.reb / s.g, apg: s.ast / s.g, mpg: s.min / s.g })).filter(x => x.g >= 15 && x.mpg >= 20);
 const rank = (k, ns) => { const v = qual.map(x => x[k]).sort((a, b) => b - a); return ns.map(n => `#${n}:${(v[n - 1] || 0).toFixed(1)}`).join(' '); };

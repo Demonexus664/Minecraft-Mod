@@ -167,7 +167,6 @@ HL.UI = (function () {
     if (!era || era === 'modern') document.documentElement.removeAttribute('data-era');
     else document.documentElement.setAttribute('data-era', era);
   }
-  HL.eraForSeason = (season) => season < 1970 ? '60s' : season < 1980 ? '70s' : season < 1990 ? '80s' : season < 2000 ? '90s' : season < 2010 ? '00s' : 'modern';
 
   return { app, esc, icon, teamAccent, applyTeamTheme, logo, face, svgFace, rating, rtClass, money, pct, fx, ordinal, sheet, closeSheet, toast, runWithProgress, seg, asset, setEra };
 })();

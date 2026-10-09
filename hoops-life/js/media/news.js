@@ -1,35 +1,73 @@
-// Situational news + social reactions generated from league events.
+// Situational news + reactions generated from league events.
+// Every line has a situation key (see packs/CHATGPT_PROMPT.md) so content packs can add to it.
+// Placeholders: {name} from the context, {~pool} draws a fresh fragment (see engine.js).
 window.HL = window.HL || {};
 
 HL.News = (function () {
   const R = HL.RNG;
   const M = HL.Media;
-  const f = (L, n) => M.frag(L, n);
   const T = (L, id) => L.teams[id];
-  const full = t => `${t.city} ${t.name}`;
   const last = p => p.name.split(' ').slice(1).join(' ') || p.name;
   const poss = n => n.endsWith('s') ? n + "'" : n + "'s";
   const injName = n => n.split(' ').map(w => /^[A-Z]{2,}$/.test(w) ? w : w.toLowerCase()).join(' ');
-  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-  const aan = w => (/^[aeiou]/i.test(w) ? 'an ' : 'a ') + w;
+  // "an MCL sprain", "an ACL tear", "a hamstring strain"
+  const aan = w => ((/^[aeiou]/i.test(w) || /^[AEFHILMNORSX][A-Z]/.test(w)) ? 'an ' : 'a ') + w;
   const ord = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+  const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+  // ---------- era voices ----------
+  HL.mediaEra = (L) => (L.settings && L.settings.eraTheme && L.settings.eraTheme !== 'auto') ? L.settings.eraTheme : HL.eraForSeason(L.season);
+  // Role -> voice per era. Old eras have columnists, radio and letters instead of social media.
+  const ROLE_VOICE = {
+    modern: { hype: 'debate', stats: 'stats', insider: 'insider', beat: 'beat', oldhead: 'oldhead', meme: 'memes', homer: 'homer', hater: 'hater', odds: 'odds' },
+    '00s': { hype: 'tvshow', stats: 'blogstats', insider: 'insider', beat: 'beat', oldhead: 'oldhead', meme: 'forum', homer: 'forum', hater: 'forum', odds: 'odds' },
+    '90s': { hype: 'tvshow', stats: 'column', insider: 'wire', beat: 'beat', oldhead: 'oldtimer', meme: 'callin', homer: 'callin', hater: 'callin', odds: 'odds' },
+    '80s': { hype: 'column', stats: 'column', insider: 'wire', beat: 'beat', oldhead: 'oldtimer', meme: 'callin', homer: 'radio', hater: 'letter', odds: 'column' },
+    '70s': { hype: 'column', stats: 'column', insider: 'wire', beat: 'beat', oldhead: 'oldtimer', meme: 'letter', homer: 'radio', hater: 'letter', odds: 'column' },
+    '60s': { hype: 'column', stats: 'column', insider: 'wire', beat: 'beat', oldhead: 'oldtimer', meme: 'letter', homer: 'radio', hater: 'letter', odds: 'column' },
+  };
+  Object.assign(M.VOICES, {
+    tvshow: { outlet: 'Primetime Hoops', handle: 'TV', kind: 'tv', format: 'broadcast' },
+    blogstats: { outlet: 'The Numbers Blog', handle: 'blog', kind: 'blog', format: 'forum' },
+    forum: { outlet: 'Hoops Message Board', handle: 'thread', kind: 'forum', format: 'forum' },
+    callin: { outlet: 'Sports Talk 1050', handle: 'caller', kind: 'radio call-in', format: 'broadcast' },
+    column: { outlet: 'The Evening Herald', handle: 'Sports Desk', kind: 'column', format: 'print' },
+    wire: { outlet: 'Associated Wire', handle: 'AW', kind: 'wire', format: 'print' },
+    radio: { outlet: '{city} Radio', handle: 'play-by-play', kind: 'radio', format: 'broadcast' },
+    letter: { outlet: 'Letters to the Editor', handle: 'reader', kind: 'letter', format: 'print' },
+    oldtimer: { outlet: 'Radio color man, former player', handle: '', kind: 'radio', format: 'broadcast' },
+  });
 
   function push(L, item) {
     L.news = L.news || [];
     item.id = (L.newsSeq = (L.newsSeq || 0) + 1);
     item.season = L.season; item.day = L.day; item.phase = L.phase;
+    item.era = HL.mediaEra(L);
     L.news.push(item);
     if (L.news.length > 600) L.news.splice(0, L.news.length - 600);
     return item;
   }
-  function social(L, voiceKey, text, team, extra = {}) {
-    const v = M.voiceInfo(voiceKey, team);
+
+  // A reaction from a role ("hype", "stats", "homer"...), voiced for the era.
+  function react(L, role, situation, ctx, builtins, team, extra = {}) {
+    const era = HL.mediaEra(L);
+    const text = M.line(L, situation, { ...ctx, era, eraBuiltins: extra.eraBuiltins }, builtins);
+    if (!text) return null;
+    const vkey = (ROLE_VOICE[era] || ROLE_VOICE.modern)[role] || role;
+    const v = M.voiceInfo(vkey, team);
+    const isSocial = !v.format;
     return {
-      voice: v, text,
-      likes: Math.round(Math.pow(R.random(), 2) * 50000 * (extra.hype || 1)) + R.int(10, 400),
-      reposts: Math.round(Math.pow(R.random(), 2.5) * 8000 * (extra.hype || 1)),
+      voice: v, text, format: v.format || 'social',
+      likes: isSocial ? Math.round(Math.pow(R.random(), 2) * 50000 * (extra.hype || 1)) + R.int(10, 400) : 0,
+      reposts: isSocial ? Math.round(Math.pow(R.random(), 2.5) * 8000 * (extra.hype || 1)) : 0,
     };
   }
+  // A fixed text from a specific voice (used by other modules).
+  function social(L, voiceKey, text, team, extra = {}) {
+    const v = M.voiceInfo(voiceKey, team);
+    return { voice: v, text, format: v.format || 'social', likes: Math.round(Math.pow(R.random(), 2) * 50000 * (extra.hype || 1)) + R.int(10, 400), reposts: Math.round(Math.pow(R.random(), 2.5) * 8000 * (extra.hype || 1)) };
+  }
+  const headline = (L, situation, ctx, builtins, eraBuiltins) => M.line(L, situation, { ...ctx, era: HL.mediaEra(L), eraBuiltins }, builtins);
 
   // ---------- best performer in a box ----------
   function topLine(L, side) {
@@ -53,81 +91,122 @@ HL.News = (function () {
   const isTripleDouble = l => [l.pts, l.orb + l.drb, l.ast, l.stl, l.blk].filter(v => v >= 10).length >= 3;
 
   // ---------- GAME ----------
-  const gameTemplates = [
-    { id: 'g_blowout', when: c => c.margin >= 25, w: 2, h: (L, c) => `${c.W.name} ${f(L, 'crush')} ${c.Lo.name} by ${c.margin}` },
-    { id: 'g_blowout2', when: c => c.margin >= 25, w: 2, h: (L, c) => `${c.margin}-point ${R.pick(['beatdown', 'massacre', 'statement', 'clinic', 'disaster'])}: ${c.W.abbr} ${c.ws}, ${c.Lo.abbr} ${c.ls}` },
-    { id: 'g_ot', when: c => c.ot > 0, w: 3, h: (L, c) => `${c.ot > 1 ? (c.ot === 2 ? 'Double' : c.ot === 3 ? 'Triple' : c.ot + 'x') + '-overtime' : 'Overtime'} ${R.pick(['thriller', 'classic', 'marathon', 'instant classic', 'war'])}: ${c.W.name} ${f(L, 'edge')} ${c.Lo.name} ${c.ws}-${c.ls}` },
-    { id: 'g_close', when: c => c.margin <= 3 && !c.ot, w: 2, h: (L, c) => `${c.W.name} ${f(L, 'edge')} ${c.Lo.name} ${c.ws}-${c.ls} in a ${R.pick(['nail-biter', 'tight one', 'down-to-the-wire finish', 'heart-stopper', 'gut-check win'])}` },
-    { id: 'g_star', when: c => c.star && c.star.l.pts >= 40, w: 4, h: (L, c) => `${c.star.p.name} ${R.pick(['scores', 'pours in', 'erupts for', 'drops', 'goes for', 'hangs'])} ${c.star.l.pts} as ${c.starWon ? `${c.star.t.name} ${f(L, 'beat')} ${c.starOpp.name}` : `${c.star.t.name} still fall to ${c.starOpp.name}`}` },
-    { id: 'g_star2', when: c => c.star && c.star.l.pts >= 50, w: 6, h: (L, c) => `${c.star.l.pts}! ${c.star.p.name} has a ${f(L, 'big')} ${f(L, 'night')} ${c.starWon ? 'in the win' : 'in a losing effort'}` },
-    { id: 'g_td', when: c => c.star && isTripleDouble(c.star.l), w: 4, h: (L, c) => `Triple-double: ${c.star.p.name} posts ${statStr(c.star.l)} ${c.starWon ? 'in the win' : 'but ' + c.star.t.name + ' come up short'}` },
-    { id: 'g_streakW', when: c => c.W.streak >= 6, w: 3, h: (L, c) => `${c.W.name} ${R.pick(['stay', 'remain', 'keep rolling,'])} ${f(L, 'streak_w')}: ${c.W.streak} straight after beating ${c.Lo.name}` },
-    { id: 'g_streakL', when: c => c.Lo.streak <= -6, w: 3, h: (L, c) => `${c.Lo.name} ${f(L, 'streak_l')}: ${-c.Lo.streak} straight losses after falling to ${c.W.name}` },
-    { id: 'g_upset', when: c => c.upset, w: 3, h: (L, c) => `Upset alert: ${c.W.w - 1 <= c.W.l ? 'struggling ' : ''}${c.W.name} (${c.W.w}-${c.W.l}) ${f(L, 'beat')} ${c.Lo.name} (${c.Lo.w}-${c.Lo.l})` },
-    { id: 'g_plain', w: 1, h: (L, c) => `${c.W.name} ${f(L, 'beat')} ${c.Lo.name} ${c.ws}-${c.ls}${c.star ? (c.starWon ? `; ${last(c.star.p)} scores ${c.star.l.pts}` : ` despite ${poss(c.star.p.name)} ${c.star.l.pts}`) : ''}` },
-    { id: 'g_plain2', w: 1, when: c => !!c.star, h: (L, c) => c.starWon ? `${poss(c.star.p.name)} ${c.star.l.pts} ${R.pick(['powers', 'lifts', 'carries', 'propels'])} ${c.star.t.name} past ${c.starOpp.name}, ${c.ws}-${c.ls}` : `${poss(c.star.p.name)} ${c.star.l.pts} not enough as ${c.W.name} ${f(L, 'beat')} ${c.Lo.name}, ${c.ws}-${c.ls}` },
-  ];
-
-  function gameReactions(L, c) {
-    const out = [];
-    const s = c.star;
-    if (s && s.l.pts >= 35) {
-      out.push(social(L, 'debate', `${f(L, 'opener')} ${s.p.name} ${f(L, 'hype')}. ${s.l.pts} on ${s.l.fgm}-of-${s.l.fga}. ${f(L, 'emoji_hype')}`, s.t, { hype: 2 }));
-      out.push(social(L, 'stats', `${f(L, 'stat_open')} ${s.p.name} scored ${s.l.pts} on ${(s.l.pts / Math.max(1, 2 * (s.l.fga + 0.44 * s.l.fta)) * 100).toFixed(1)}% true shooting with ${s.l.tov} turnover${s.l.tov === 1 ? '' : 's'} in ${Math.round(s.l.min)} minutes.`, s.t));
-      if (s.l.fga >= 30 && s.l.pts / s.l.fga < 1.1) out.push(social(L, 'hater', `${s.l.fga} shots for ${s.l.pts}? Volume merchant behavior ${f(L, 'emoji_sad')}`, s.t));
-    }
-    if (c.margin >= 25) {
-      out.push(social(L, 'memes', `${c.Lo.name} fans after the first quarter: "it's a long game" ${f(L, 'emoji_sad')}`, c.Lo));
-      out.push(social(L, 'oldhead', `${f(L, 'old_open')} getting beat by ${c.margin} meant extra practice and no plane snacks. ${c.Lo.name} need to look in the mirror.`, c.Lo));
-    }
-    if (c.Lo.streak <= -5) out.push(social(L, 'beat', `Postgame in ${c.Lo.city}: ${f(L, 'team_mood_bad')}. That's ${-c.Lo.streak} straight.`, c.Lo));
-    if (c.W.streak >= 5) out.push(social(L, 'homer', `${c.W.streak} STRAIGHT. ${cap(f(L, 'team_mood_good'))}. ${f(L, 'emoji_hype')}`, c.W, { hype: 1.4 }));
-    if (c.ot) out.push(social(L, 'memes', `My heart cannot take ${c.ot > 1 ? c.ot + ' overtimes' : 'overtime'} on a ${R.pick(['Tuesday', 'Wednesday', 'Thursday', 'school night', 'work night'])} ${f(L, 'emoji_sad')}`, c.W));
-    return out;
-  }
+  const GAME_B = {
+    'game.star50.win': ['{pts}! {player} has a {~big} {~night} as the {team} {~beat} the {opp}', 'Fifty-plus: {player} goes for {pts} as the {team} {~beat} the {opp}', '{player} explodes for {pts} in a {team} win'],
+    'game.star50.loss': ['{pts} not enough: {pposs} {~big} {~night} wasted as the {winner} win', '{player} scores {pts}, but the {winner} still {~beat} the {loser}'],
+    'game.tripledouble.win': ['Triple-double: {player} posts {line} in a {team} win', '{player} fills the box score ({line}) as the {team} {~beat} the {opp}'],
+    'game.tripledouble.loss': ['{pposs} triple-double ({line}) not enough against the {winner}', '{player} posts {line}, but the {opp} win {ws}-{ls}'],
+    'game.star40.win': ['{player} scores {pts} as the {team} {~beat} the {opp}', '{pposs} {pts} {~carry} the {team} past the {opp}, {ws}-{ls}', '{pts} from {plast} lifts the {team} over the {opp}'],
+    'game.star40.loss': ['{pposs} {pts} not enough as the {winner} {~beat} the {loser}', '{player} scores {pts}, but the {team} still fall to the {opp}'],
+    'game.overtime': ['{Ots} {~thriller}: {winner} {~edge} {loser} {ws}-{ls}', '{winner} survive {ots} against the {loser}, {ws}-{ls}', 'Bonus basketball: {winner} outlast {loser} in {ots}'],
+    'game.blowout': ['{winner} {~crush} {loser} by {margin}', '{margin}-point {~beatdown}: {wabbr} {ws}, {labbr} {ls}', 'No contest: {winner} {~crush} {loser} {ws}-{ls}'],
+    'game.streak.win': ['{winner} stay {~streak_w}: {wstreak} straight after beating the {loser}', 'Make it {wstreak} in a row for the {winner}', '{winner} stretch their win streak to {wstreak}'],
+    'game.streak.loss': ['{loser} {~streak_l}: {lstreak} straight losses after falling to the {winner}', 'The skid reaches {lstreak} for the {loser}', '{lstreak} and counting: {loser} drop another, this time to the {winner}'],
+    'game.upset': ['Upset: the {wrec} {winner} {~beat} the {lrec} {loser}', 'The {winner} ({wrec}) stun the {loser} ({lrec})'],
+    'game.close': ['{winner} {~edge} {loser} {ws}-{ls} in a {~tight}', '{winner} hang on against the {loser}, {ws}-{ls}'],
+    'game.recap.starwin': ['{winner} {~beat} {loser} {ws}-{ls}; {plast} scores {pts}', '{pposs} {pts} {~carry} the {team} past the {opp}, {ws}-{ls}', '{winner} {~beat} the {loser} behind {pts} from {plast}'],
+    'game.recap.starloss': ['{winner} {~beat} {loser} {ws}-{ls} despite {pposs} {pts}', '{winner} hold off {loser} {ws}-{ls}; {plast} scores {pts} in defeat'],
+    'game.recap': ['{winner} {~beat} {loser} {ws}-{ls}'],
+  };
+  // Newspaper voice for the old eras.
+  const GAME_OLD = {
+    'game.star50.win': ['{player} Tallies {pts} as {winner} Best {loser}', 'Remarkable {pts}-Point Showing by {plast} Paces {winner}'],
+    'game.star40.win': ['{plast} Scores {pts}; {winner} Turn Back {loser}, {ws}-{ls}', '{winner} Down {loser} Behind {pts} by {plast}'],
+    'game.blowout': ['{winner} Rout {loser}, {ws}-{ls}', '{winner} Romp Past Hapless {loser}'],
+    'game.overtime': ['{winner} Outlast {loser} in Extra Session, {ws}-{ls}', 'Thriller Goes to Overtime; {winner} Prevail'],
+    'game.close': ['{winner} Edge {loser} in Thriller, {ws}-{ls}', '{winner} Nip {loser} at the Wire'],
+    'game.recap.starwin': ['{winner} Top {loser}, {ws}-{ls}; {plast} Paces Attack With {pts}', '{winner} Best {loser} as {plast} Pours In {pts}'],
+    'game.recap.starloss': ['{winner} Beat {loser}, {ws}-{ls}, Despite {pts} by {plast}'],
+    'game.recap': ['{winner} Defeat {loser}, {ws}-{ls}'],
+    'game.star50.loss': ['{plast} Pours In {pts}, but {winner} Prevail', 'Brilliant {pts} by {plast} Not Enough as {loser} Fall'],
+    'game.star40.loss': ['{winner} Withstand {pts}-Point Barrage by {plast}', '{plast} Tallies {pts} in Losing Cause'],
+    'game.tripledouble.win': ['{plast} Does It All as {winner} Win, {ws}-{ls}'],
+    'game.tripledouble.loss': ['All-Around Effort by {plast} Falls Short Against {winner}'],
+    'game.streak.win': ['{winner} Run Streak to {wstreak}', '{winner} Make It {wstreak} Straight'],
+    'game.streak.loss': ['{loser} Drop {lstreak}th Straight', 'Slump Deepens: {loser} Lose Again'],
+    'game.upset': ['Lowly {winner} Stun {loser}', '{winner} Pull Surprise Over {loser}'],
+  };
 
   function game(L, g, res, playoffs) {
-    if (playoffs) return; // playoff stories come from series events
+    if (playoffs) return;
     const hs = res.home.score, as = res.away.score;
     const homeWon = hs > as;
     const W = T(L, homeWon ? g.home : g.away), Lo = T(L, homeWon ? g.away : g.home);
-    const ws = Math.max(hs, as), ls = Math.min(hs, as);
     const hb = topLine(L, res.home), ab = topLine(L, res.away);
-    const starRaw = (hb && ab) ? (hb.gs >= ab.gs ? { ...hb, home: true } : { ...ab, home: false }) : null;
-    const star = starRaw ? { ...starRaw, t: T(L, starRaw.home ? g.home : g.away) } : null;
-    const c = {
-      W, Lo, ws, ls, margin: ws - ls, ot: res.ot, star,
-      starWon: star && (star.home === homeWon),
-      starOpp: star ? T(L, star.home ? g.away : g.home) : null,
-      upset: (W.w + W.l > 15) && (Lo.w / (Lo.w + Lo.l) - W.w / (W.w + W.l) > 0.3),
-    };
+    const sr = (hb && ab) ? (hb.gs >= ab.gs ? { ...hb, home: true } : { ...ab, home: false }) : null;
+    const star = sr ? { ...sr, t: T(L, sr.home ? g.home : g.away), opp: T(L, sr.home ? g.away : g.home), won: sr.home === homeWon } : null;
+    const margin = Math.max(hs, as) - Math.min(hs, as);
+    const upset = (W.w + W.l > 15) && (Lo.w / (Lo.w + Lo.l) - W.w / (W.w + W.l) > 0.3);
     const isUser = L.userTeamId != null && (g.home === L.userTeamId || g.away === L.userTeamId);
-    const notable = isUser || c.margin >= 30 || res.ot >= 2 || (star && (star.l.pts >= 45 || isTripleDouble(star.l) && star.l.pts >= 25)) || c.upset && R.chance(0.3) || W.streak === 10 || Lo.streak === -10;
+    const notable = isUser || margin >= 30 || res.ot >= 2 || (star && (star.l.pts >= 45 || (isTripleDouble(star.l) && star.l.pts >= 25))) || (upset && R.chance(0.3)) || W.streak === 10 || Lo.streak === -10;
     if (!notable) return;
-    const t = M.choose(L, gameTemplates, c);
-    push(L, {
-      type: 'game', gid: g.gid, headline: t.h(L, c), teamIds: [g.home, g.away], playerIds: star ? [star.p.id] : [],
-      importance: isUser ? 2 : 1, reactions: gameReactions(L, c),
+
+    const c = {
+      winner: W.name, loser: Lo.name, wcity: W.city, lcity: Lo.city, wabbr: W.abbr, labbr: Lo.abbr,
+      ws: Math.max(hs, as), ls: Math.min(hs, as), margin, wrec: `${W.w}-${W.l}`, lrec: `${Lo.w}-${Lo.l}`,
+      wstreak: W.streak, lstreak: -Lo.streak, arena: T(L, g.home).arena,
+      ots: res.ot > 1 ? `${res.ot} overtimes` : 'overtime', Ots: res.ot > 1 ? `${res.ot} overtimes` : 'Overtime',
+    };
+    if (star) Object.assign(c, {
+      player: star.p.name, plast: last(star.p), pposs: poss(star.p.name), team: star.t.name, opp: star.opp.name,
+      pts: star.l.pts, reb: star.l.orb + star.l.drb, ast: star.l.ast, fgm: star.l.fgm, fga: star.l.fga, tov: star.l.tov, min: Math.round(star.l.min),
+      line: statStr(star.l), ts: (star.l.pts / Math.max(1, 2 * (star.l.fga + 0.44 * star.l.fta)) * 100).toFixed(1),
     });
+
+    // Story angle, most newsworthy first.
+    let sit;
+    if (star && star.l.pts >= 50) sit = star.won ? 'game.star50.win' : 'game.star50.loss';
+    else if (star && isTripleDouble(star.l) && star.l.pts >= 20) sit = star.won ? 'game.tripledouble.win' : 'game.tripledouble.loss';
+    else if (star && star.l.pts >= 40) sit = star.won ? 'game.star40.win' : 'game.star40.loss';
+    else if (res.ot) sit = 'game.overtime';
+    else if (margin >= 25) sit = 'game.blowout';
+    else if (W.streak >= 6) sit = 'game.streak.win';
+    else if (Lo.streak <= -6) sit = 'game.streak.loss';
+    else if (upset) sit = 'game.upset';
+    else if (margin <= 3) sit = 'game.close';
+    else sit = star ? (star.won ? 'game.recap.starwin' : 'game.recap.starloss') : 'game.recap';
+    const hl = headline(L, sit, c, GAME_B[sit] || GAME_B['game.recap'], GAME_OLD[sit] || GAME_OLD['game.recap']) || headline(L, 'game.recap', c, GAME_B['game.recap'], GAME_OLD['game.recap']);
+
+    const rx = [];
+    if (star && star.l.pts >= 35) {
+      rx.push(react(L, 'hype', 'game.react.star_hype', c, ['{~opener} {player} {~hype}. {pts} on {fgm}-of-{fga}. {~emoji_hype}', '{player} {~hype}. {pts} tonight and it looked easy.'], star.t, { hype: 2, eraBuiltins: ['{player} was simply magnificent, collecting {pts} points with a shooting touch that bordered on the uncanny.'] }));
+      rx.push(react(L, 'stats', 'game.react.star_stats', c, ['{~stat_open} {player} scored {pts} on {ts}% true shooting with {tov} turnovers in {min} minutes.'], star.t, { eraBuiltins: ['The figures tell the tale: {pts} points for {plast}, on {fgm} field goals from {fga} attempts.'] }));
+      if (star.l.fga >= 30 && star.l.pts / star.l.fga < 1.1) rx.push(react(L, 'hater', 'game.react.volume_hater', c, ['{fga} shots for {pts}? Volume merchant behavior {~emoji_sad}', 'Took {fga} shots to get {pts}. Somebody count the passes.'], star.t, { eraBuiltins: ['Sir: {fga} shots for {pts} points is no feat. Pass the ball, young man.'] }));
+    }
+    if (margin >= 25) {
+      rx.push(react(L, 'meme', 'game.react.blowout_loser_meme', c, ['{loser} fans after the first quarter: "it\'s a long game" {~emoji_sad}', 'The {loser} lost by {margin}. The flight home is going to be quiet.'], Lo, { eraBuiltins: ['To the editor: I have followed the {loser} for twenty years and have never seen a sorrier display.'] }));
+      rx.push(react(L, 'oldhead', 'game.react.blowout_oldhead', c, ['{~old_open}, losing by {margin} meant extra practice and no plane snacks. The {loser} need to look in the mirror.'], Lo));
+    }
+    if (Lo.streak <= -5) rx.push(react(L, 'beat', 'game.react.losing_streak_beat', c, ['Postgame in {lcity}: {~team_mood_bad}. That is {lstreak} straight.'], Lo));
+    if (W.streak >= 5) rx.push(react(L, 'homer', 'game.react.win_streak_fan', c, ['{wstreak} STRAIGHT. {~team_mood_good} {~emoji_hype}', '{wstreak} in a row. Book the parade route.'], W, { hype: 1.4, eraBuiltins: ['...and that is {wstreak} in a row for your {winner}, folks! What a time to be a fan in {wcity}!'] }));
+    if (res.ot) rx.push(react(L, 'meme', 'game.react.ot_meme', c, ['My heart cannot take {ots} on a {~weeknight} {~emoji_sad}'], W));
+    push(L, { type: 'game', gid: g.gid, headline: hl, teamIds: [g.home, g.away], playerIds: star ? [star.p.id] : [], importance: isUser ? 2 : 1, reactions: rx.filter(Boolean) });
   }
 
   // ---------- INJURY ----------
   function injury(L, p, inj) {
     const t = T(L, p.teamId);
-    const weeks = Math.round(inj.games / 3.5);
-    const longTerm = inj.games >= 50;
-    const hl = M.choose(L, [
-      { id: 'i1', h: () => `${p.name} (${injName(inj.name)}) expected to miss ${weeks >= 2 ? `${weeks} weeks` : `${inj.games} games`}` },
-      { id: 'i2', h: () => `${f(L, 'injury_sad')} ${poss(t.name)} ${p.name} sidelined with ${aan(injName(inj.name))}` },
-      { id: 'i3', when: () => longTerm, w: 3, h: () => `${p.name} suffers ${aan(injName(inj.name))}; ${inj.games >= 82 ? 'season in jeopardy' : 'out for months'}` },
-      { id: 'i4', when: () => p.ovr >= 85, w: 2, h: () => `Major blow for ${t.name}: star ${p.name} out with ${aan(injName(inj.name))}` },
-    ], {}).h();
-    const reactions = [
-      social(L, 'insider', `${f(L, 'sources')} ${t.name} ${p.pos} ${p.name} has been diagnosed with ${aan(injName(inj.name))} and will be re-evaluated in ${Math.max(1, weeks)} week${weeks === 1 ? '' : 's'}.`, t, { hype: p.ovr >= 85 ? 3 : 1 }),
-    ];
-    if (p.ovr >= 85) reactions.push(social(L, 'odds', `${t.name} title odds move from +${R.int(6, 20) * 100} to +${R.int(21, 60) * 100} after the ${last(p)} news.`, t));
-    if (longTerm) reactions.push(social(L, 'homer', `Praying for ${last(p)}. Come back stronger. 🙏`, t));
-    push(L, { type: 'injury', headline: hl, teamIds: [t.id], playerIds: [p.id], importance: p.ovr >= 85 ? 2 : 1, reactions });
+    const weeks = Math.max(1, Math.round(inj.games / 3.5));
+    const c = { player: p.name, plast: last(p), team: t.name, tposs: poss(t.name), pos: p.pos, injury: injName(inj.name), ainjury: aan(injName(inj.name)), games: inj.games, weeks, weekstr: weeks === 1 ? '1 week' : `${weeks} weeks` };
+    const sit = inj.games >= 50 ? 'injury.long' : p.ovr >= 85 ? 'injury.star' : 'injury.headline';
+    const B = {
+      'injury.headline': ['{player} ({injury}) expected to miss {weekstr}', '{~injury_sad} {tposs} {player} sidelined with {ainjury}', '{team} without {player} for {weekstr} ({injury})'],
+      'injury.star': ['Major blow for the {team}: {player} out with {ainjury}', '{~injury_sad} {player} sidelined {weekstr} with {ainjury}', '{team} lose {player} to {ainjury}'],
+      'injury.long': ['{player} suffers {ainjury}; out for months', '{tposs} {player} faces long road back from {ainjury}', 'Season in doubt for {player} after {ainjury}'],
+    };
+    const OLD = { 'injury.headline': ['{player} Hurt; Will Miss {weekstr}', '{team} Star {plast} Out With {injury}'], 'injury.star': ['{plast} Injured; {team} Hopes Dim'], 'injury.long': ['{plast} Lost for Season With {injury}'] };
+    const rx = [react(L, 'insider', 'injury.react.insider', c, ['{~sources} {team} {pos} {player} has been diagnosed with {ainjury} and will be re-evaluated in {weekstr}.'], t, { hype: p.ovr >= 85 ? 3 : 1, eraBuiltins: ['{team} physicians announced that {player} has sustained {ainjury} and will be out of action for an estimated {weekstr}.'] })];
+    if (p.ovr >= 85) rx.push(react(L, 'odds', 'injury.react.odds', c, ['{team} title odds lengthen after the {plast} news.'], t));
+    if (inj.games >= 50) rx.push(react(L, 'homer', 'injury.react.fan', c, ['Praying for {plast}. Come back stronger.'], t));
+    push(L, { type: 'injury', headline: headline(L, sit, c, B[sit], OLD[sit]), teamIds: [t.id], playerIds: [p.id], importance: p.ovr >= 85 ? 2 : 1, reactions: rx.filter(Boolean) });
+  }
+
+  function hardship(L, t, p) {
+    const healthy = HL.League.teamPlayers(t.id).filter(x => !x.injury || x.injury.games <= 0).length - 1;
+    const c = { team: t.name, player: p.name, healthy };
+    push(L, { type: 'transaction', importance: 1, teamIds: [t.id], playerIds: [p.id],
+      headline: headline(L, 'transaction.hardship', c, ['{team} sign {player} via hardship exception', 'Injury-ravaged {team} add {player} on a hardship deal', 'Short-handed {team} turn to {player}'], ['{team} Sign {player} to Bolster Depleted Roster']),
+      reactions: [react(L, 'beat', 'transaction.hardship.beat', c, ['The {team} had {healthy} healthy bodies at shootaround. Next man up.', '{healthy} healthy players. The training room is fuller than the locker room.'], t)].filter(Boolean) });
   }
 
   // ---------- AWARDS / PHASES ----------
@@ -136,65 +215,71 @@ HL.News = (function () {
     const mvp = pn(a.mvp);
     if (mvp) {
       const s = HL.League.perGame(mvp, L.season);
-      const prev = mvp.careerAwards.filter(x => x.award === 'MVP').length;
+      const n = mvp.careerAwards.filter(x => x.award === 'MVP').length;
+      const t = T(L, mvp.teamId ?? mvp.stats[String(L.season)].teamId);
+      const c = { player: mvp.name, plast: last(mvp), team: t.name, nth: ord(n), season: `${L.season}-${String(L.season + 1).slice(2)}`, pts: s.pts.toFixed(1), reb: s.reb.toFixed(1), ast: s.ast.toFixed(1), rec: `${t.w}-${t.l}` };
+      const runner = a.mvpRace[1] != null ? pn(a.mvpRace[1]) : null;
+      if (runner) Object.assign(c, { runnerup: runner.name, rlast: last(runner) });
       push(L, {
-        type: 'award', importance: 3, playerIds: [mvp.id], teamIds: [mvp.teamId],
-        headline: prev > 1 ? `${mvp.name} wins ${ord(prev)} MVP` : `${mvp.name} is your ${L.season}-${String(L.season + 1).slice(2)} MVP`,
-        body: `${s.pts.toFixed(1)} PPG, ${s.reb.toFixed(1)} RPG, ${s.ast.toFixed(1)} APG for the ${T(L, mvp.teamId).w}-${T(L, mvp.teamId).l} ${T(L, mvp.teamId).name}.`,
+        type: 'award', importance: 3, playerIds: [mvp.id], teamIds: [t.id],
+        headline: headline(L, n > 1 ? 'award.mvp.repeat' : 'award.mvp', c, n > 1 ? ['{player} wins {nth} MVP', 'MVP No. {n}: {player} does it again'.replace('{n}', n)] : ['{player} is your {season} MVP', '{player} wins MVP after a {rec} season for the {team}'], ['{player} Named Most Valuable Player']),
+        body: `${c.pts} PPG, ${c.reb} RPG, ${c.ast} APG for the ${c.rec} ${t.name}.`,
         reactions: [
-          social(L, 'debate', `${f(L, 'opener')} the right man won. ${mvp.name} ${f(L, 'hype')}.`, T(L, mvp.teamId), { hype: 2 }),
-          a.mvpRace[1] != null ? social(L, 'hater', `${pn(a.mvpRace[1]).name} got ROBBED. Voters are a joke ${f(L, 'emoji_sad')}`, T(L, pn(a.mvpRace[1]).teamId)) : null,
+          react(L, 'hype', 'award.mvp.react', c, ['{~opener} the right man won. {player} {~hype}.'], t, { hype: 2 }),
+          runner ? react(L, 'hater', 'award.mvp.snub', c, ['{runnerup} got robbed. Voters are a joke {~emoji_sad}', 'Put some respect on {rlast}. Robbery.'], T(L, runner.teamId ?? t.id)) : null,
         ].filter(Boolean),
       });
     }
-    const line = (id, award) => id != null && push(L, { type: 'award', importance: 2, playerIds: [id], teamIds: [pn(id).teamId], headline: `${pn(id).name} named ${award}` });
-    line(a.dpoy, 'Defensive Player of the Year');
-    line(a.roy, 'Rookie of the Year');
-    line(a.smoy, 'Sixth Man of the Year');
+    const award = (id, key, label) => {
+      if (id == null) return;
+      const p = pn(id);
+      push(L, { type: 'award', importance: 2, playerIds: [id], teamIds: p.teamId != null ? [p.teamId] : [], headline: headline(L, key, { player: p.name, plast: last(p), label }, ['{player} named {label}', '{player} wins {label}'], ['{player} Named {label}']) });
+    };
+    award(a.dpoy, 'award.dpoy', 'Defensive Player of the Year');
+    award(a.roy, 'award.roy', 'Rookie of the Year');
+    award(a.smoy, 'award.smoy', 'Sixth Man of the Year');
   }
 
   function phase(L, ph) {
-    if (ph === 'playin') push(L, { type: 'phase', importance: 2, headline: `Regular season wraps up: ${HL.League.standings('East')[0].name} and ${HL.League.standings('West')[0].name} earn top seeds` });
-    if (ph === 'playoffs') push(L, { type: 'phase', importance: 2, headline: `Play-in set the field: the ${L.season + 1} Playoffs begin` });
+    if (ph === 'playin') push(L, { type: 'phase', importance: 2, headline: headline(L, 'phase.regular_end', { east: HL.League.standings('East')[0].name, west: HL.League.standings('West')[0].name }, ['Regular season wraps up: the {east} and {west} earn top seeds']) });
+    if (ph === 'playoffs') push(L, { type: 'phase', importance: 2, headline: headline(L, 'phase.playoffs_start', { year: L.season + 1 }, ['The play-in is done: the {year} Playoffs begin', 'Sixteen teams left: the {year} Playoffs are here']) });
   }
 
   function seriesEnd(L, s, roundNo) {
+    if (roundNo === 4) return;
     const W = T(L, s.winner), Lo = T(L, s.winner === s.hi ? s.lo : s.hi);
     const score = s.wins.slice().sort((a, b) => b - a).join('-');
-    const roundName = ['First Round', 'Conference Semifinals', 'Conference Finals', 'NBA Finals'][roundNo - 1];
-    if (roundNo === 4) return;
-    const sweep = score === '4-0', seven = score === '4-3';
+    const roundName = ['First Round', 'Conference Semifinals', 'Conference Finals'][roundNo - 1];
     const upset = s.winner === s.lo && s.hiSeed && s.loSeed - s.hiSeed >= 3;
-    const t = M.choose(L, [
-      { id: 's1', h: () => `${W.name} eliminate ${Lo.name} ${score} in the ${roundName}` },
-      { id: 's2', when: () => sweep, w: 3, h: () => `Brooms out: ${W.name} sweep ${Lo.name}` },
-      { id: 's3', when: () => seven, w: 3, h: () => `${W.name} survive Game 7, ${R.pick(['stun', 'outlast', 'break the hearts of', 'end the season of'])} ${Lo.name}` },
-      { id: 's4', when: () => upset, w: 4, h: () => `${s.loSeed}-seed ${W.name} ${R.pick(['shock', 'stun', 'topple', 'upset'])} ${s.hiSeed}-seed ${Lo.name}` },
-      { id: 's5', h: () => `${W.name} advance past ${Lo.name} (${score}); ${roundNo === 3 ? 'headed to the NBA Finals' : 'next up: ' + ['Conference Semifinals', 'Conference Finals'][roundNo - 1]}` },
-    ], {});
-    push(L, { type: 'playoffs', importance: roundNo >= 3 ? 3 : 2, teamIds: [W.id, Lo.id], headline: t.h(), reactions: [
-      social(L, 'homer', `${f(L, 'emoji_hype')} ${W.name.toUpperCase()} MOVING ON ${f(L, 'emoji_hype')}`, W, { hype: 1.5 }),
-      social(L, 'beat', `${poss(Lo.name)} season is over. ${R.pick(['Big questions this summer.', 'Change feels inevitable.', 'Plenty to process.', 'The front office has decisions to make.'])}`, Lo),
-    ] });
+    const c = { winner: W.name, loser: Lo.name, lposs: poss(Lo.name), score, round: roundName, next: roundNo === 3 ? 'the NBA Finals' : ['the Conference Semifinals', 'the Conference Finals'][roundNo - 1], wseed: s.winner === s.hi ? s.hiSeed : s.loSeed, lseed: s.winner === s.hi ? s.loSeed : s.hiSeed };
+    const sit = score === '4-0' ? 'series.sweep' : score === '4-3' ? 'series.game7' : upset ? 'series.upset' : 'series.end';
+    const B = {
+      'series.sweep': ['Brooms out: {winner} sweep {loser}', '{winner} sweep {loser}, advance to {next}'],
+      'series.game7': ['{winner} survive Game 7, {~eliminate} {loser}', 'Game 7 goes to the {winner}; {lposs} season is over'],
+      'series.upset': ['{wseed}-seed {winner} {~shock} {lseed}-seed {loser}', 'Upset complete: the {winner} knock out the {loser} {score}'],
+      'series.end': ['{winner} eliminate {loser} {score} in the {round}', '{winner} advance past {loser} ({score}); next up: {next}'],
+    };
+    push(L, { type: 'playoffs', importance: roundNo >= 3 ? 3 : 2, teamIds: [W.id, Lo.id], headline: headline(L, sit, c, B[sit], ['{winner} Eliminate {loser}, {score}']), reactions: [
+      react(L, 'homer', 'series.react.winner_fan', c, ['{~emoji_hype} {winner} MOVING ON {~emoji_hype}', 'On to {next}. Let us go.'], W, { hype: 1.5, eraBuiltins: ['The {winner} are moving on, ladies and gentlemen, and this building is shaking!'] }),
+      react(L, 'beat', 'series.react.loser_beat', c, ['{lposs} season is over. {~offseason_q}'], Lo),
+    ].filter(Boolean) });
   }
 
   function champion(L, champId, finals) {
     const W = T(L, champId), Lo = T(L, finals.winner === finals.hi ? finals.lo : finals.hi);
     const titles = L.history.filter(h => h.champion === champId).length;
-    const fm = L.awards[L.season].fmvp != null ? L.players[L.awards[L.season].fmvp] : null;
-    const score = finals.wins.slice().sort((a, b) => b - a).join('-');
+    const fmId = L.awards[L.season].fmvp;
+    const fm = fmId != null ? L.players[fmId] : null;
+    const c = { team: W.name, city: W.city, opp: Lo.name, oposs: poss(Lo.name), score: finals.wins.slice().sort((a, b) => b - a).join('-'), year: L.season + 1, n: titles };
+    if (fm) Object.assign(c, { fmvp: fm.name, flast: last(fm) });
     push(L, {
       type: 'champion', importance: 4, teamIds: [W.id, Lo.id], playerIds: fm ? [fm.id] : [],
-      headline: M.choose(L, [
-        { id: 'c1', h: () => `${full(W)} are ${L.season + 1} NBA Champions` },
-        { id: 'c2', h: () => `${W.name} win the title, beating ${Lo.name} ${score}` },
-        { id: 'c3', when: () => titles > 1, h: () => `Banner No. ${titles} for this era: ${W.name} beat ${Lo.name} for another championship` },
-      ], {}).h(),
+      headline: headline(L, titles > 1 ? 'champion.repeat' : 'champion', c, titles > 1 ? ['Title No. {n} in this league for the {team}', 'The {team} beat the {opp} for another championship'] : ['The {city} {team} are {year} NBA Champions', 'The {team} win the title, beating the {opp} {score}'], ['{team} Capture Championship!', '{city} Celebrates as {team} Win Crown']),
       body: fm ? `${fm.name} named Finals MVP.` : '',
       reactions: [
-        social(L, 'homer', `CHAMPIONS!!! ${f(L, 'emoji_hype')}${f(L, 'emoji_hype')}${f(L, 'emoji_hype')}`, W, { hype: 4 }),
-        fm ? social(L, 'debate', `${f(L, 'opener')} ${fm.name} just changed his legacy forever.`, W, { hype: 3 }) : null,
-        social(L, 'memes', `${Lo.name} fans logging off for the summer ${f(L, 'emoji_sad')}`, Lo, { hype: 2 }),
+        react(L, 'homer', 'champion.react.fan', c, ['CHAMPIONS!!! {~emoji_hype}{~emoji_hype}{~emoji_hype}', 'WE ARE THE CHAMPIONS. {city} is partying all night.'], W, { hype: 4, eraBuiltins: ['The {team} are champions of the world! Pandemonium here, absolute pandemonium!'] }),
+        fm ? react(L, 'hype', 'champion.react.fmvp', c, ['{~opener} {fmvp} just changed his legacy forever.', '{fmvp}. Finals MVP. Put some respect on that name.'], W, { hype: 3 }) : null,
+        react(L, 'meme', 'champion.react.loser', c, ['{opp} fans logging off for the summer {~emoji_sad}'], Lo, { hype: 2 }),
       ].filter(Boolean),
     });
   }
@@ -202,35 +287,28 @@ HL.News = (function () {
   function retire(L, p) {
     const rings = p.careerAwards.filter(a => a.award === 'Champion').length;
     const mvps = p.careerAwards.filter(a => a.award === 'MVP').length;
-    if (p.ovr < 76 && rings === 0 && mvps === 0) return;
-    push(L, { type: 'retire', importance: p.ovr >= 85 || mvps ? 3 : 1, playerIds: [p.id],
-      headline: `${p.name} announces retirement${rings ? ` after ${rings} championship${rings > 1 ? 's' : ''}` : ''}${mvps ? ` and ${mvps} MVP${mvps > 1 ? 's' : ''}` : ''}`,
-      reactions: [social(L, 'oldhead', `${R.pick(['One of the good ones.', 'Hall of Fame talent, Hall of Fame person.', 'They do not make them like that anymore.', 'Enjoy retirement, young fella.'])} Salute to ${last(p)}.`, null)] });
+    if (!p.real && p.ovr < 76 && !rings && !mvps) return;
+    if (p.ovr < 68 && !rings && !mvps) return;
+    const c = { player: p.name, plast: last(p), rings, mvps, age: p.age };
+    const hl = rings || mvps
+      ? `${p.name} announces retirement${rings ? ` after ${rings} championship${rings > 1 ? 's' : ''}` : ''}${mvps ? `${rings ? ' and' : ' after'} ${mvps} MVP${mvps > 1 ? 's' : ''}` : ''}`
+      : headline(L, 'retire', c, ['{player} announces retirement at {age}', '{player} calls it a career'], ['{player} Announces Retirement']);
+    push(L, { type: 'retire', importance: p.ovr >= 85 || mvps ? 3 : 1, playerIds: [p.id], headline: hl,
+      reactions: [react(L, 'oldhead', 'retire.react', c, ['One of the good ones. Salute to {plast}.', 'They do not make them like {plast} anymore.', 'Enjoy retirement, {plast}. You earned it.'], null)].filter(Boolean) });
   }
 
   function seasonStart(L) {
-    push(L, { type: 'phase', importance: 2, headline: `The ${L.season}-${String(L.season + 1).slice(2)} season tips off`, reactions: [
-      social(L, 'odds', `Title favorites entering the season: ${favorites(L).slice(0, 3).map(t => t.name).join(', ')}.`, null),
-    ] });
+    const favs = favorites(L).slice(0, 3).map(t => t.name);
+    push(L, { type: 'phase', importance: 2,
+      headline: headline(L, 'season.start', { season: `${L.season}-${String(L.season + 1).slice(2)}` }, ['The {season} season tips off', 'Opening night: the {season} season is here'], ['New Campaign Opens Tonight']),
+      reactions: [react(L, 'odds', 'season.react.favorites', { f1: favs[0], f2: favs[1], f3: favs[2] }, ['Title favorites entering the season: {f1}, {f2}, {f3}.'], null)].filter(Boolean) });
   }
 
-  function favorites(L) {
-    return L.teams.slice().sort((a, b) => teamStrength(L, b.id) - teamStrength(L, a.id));
-  }
+  function favorites(L) { return L.teams.slice().sort((a, b) => teamStrength(L, b.id) - teamStrength(L, a.id)); }
   function teamStrength(L, tid) {
     const ps = HL.League.teamPlayers(tid).filter(p => !p.injury || p.injury.games < 20).sort((a, b) => b.ovr - a.ovr).slice(0, 8);
     return ps.reduce((s, p, i) => s + p.ovr * [1.4, 1.3, 1.2, 1.1, 1, 0.7, 0.6, 0.5][i], 0);
   }
 
-  function hardship(L, t, p) {
-    push(L, { type: 'transaction', importance: 1, teamIds: [t.id], playerIds: [p.id],
-      headline: M.choose(L, [
-        { id: 'hs1', h: () => `${t.name} sign ${p.name} via hardship exception` },
-        { id: 'hs2', h: () => `Injury-ravaged ${t.name} add ${p.name} on a hardship deal` },
-        { id: 'hs3', h: () => `Short-handed ${t.name} turn to ${p.name}` },
-      ], {}).h(),
-      reactions: [social(L, 'beat', `${t.name} had ${HL.League.teamPlayers(t.id).filter(x => !x.injury || x.injury.games <= 0).length - 1} healthy bodies at shootaround. ${R.pick(['Desperate times.', 'Next man up.', 'The training room is fuller than the locker room.', 'Somebody check the water in that building.'])}`, t)] });
-  }
-
-  return { hardship, game, injury, awards, phase, seriesEnd, champion, retire, seasonStart, teamStrength, favorites, social, push };
+  return { hardship, game, injury, awards, phase, seriesEnd, champion, retire, seasonStart, teamStrength, favorites, social, react, push };
 })();

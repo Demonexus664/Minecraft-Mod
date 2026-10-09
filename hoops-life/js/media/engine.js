@@ -3,6 +3,8 @@
 // so the same line only reappears if the same thing happens again.
 window.HL = window.HL || {};
 
+HL.eraForSeason = (season) => season < 1970 ? '60s' : season < 1980 ? '70s' : season < 1990 ? '80s' : season < 2000 ? '90s' : season < 2010 ? '00s' : 'modern';
+
 HL.Media = (function () {
   const R = HL.RNG;
 
@@ -35,7 +37,7 @@ HL.Media = (function () {
     emoji_hype: ['🔥', '😤', '🐐', '👀', '🚨', '💯', '🤯', '🥶', '⚡', '🏀'],
     emoji_sad: ['💀', '😭', '🤡', '😬', '🫠', '📉', '🗑️', '🥴', '😴'],
     stat_open: ['The numbers do not lie:', 'Per our tracking,', 'Quick note:', 'Context matters here:', 'Worth flagging:', 'Interesting split:', 'Fun fact:', 'For the record,', 'Data point:', 'Under the hood,'],
-    old_open: ['Back in my day', 'When I played', 'In the 90s', 'Where I come from', 'Old school rules:', 'Let me tell you something, young fella:'],
+    old_open: ['Back in my day', 'When I played', 'Where I come from', 'In my playing days', 'Let me tell you something, young fella:', 'When I came up'],
     old_close: ['we would have put him on the floor.', 'that would not fly.', 'you earned your respect.', 'nobody got easy buckets.', 'you had to bleed for a bucket.', 'hand-checking would have fixed that.', 'that is a 12-point game, tops.'],
     sources: ['Sources:', 'Sources tell me:', 'League sources say', 'Per sources,', 'Story developing:', 'Breaking:', 'BREAKING:', 'Hearing that'],
     team_mood_good: ['the vibes are immaculate', 'the locker room is buzzing', 'confidence is sky-high', 'everybody is eating', 'this group believes'],
@@ -43,6 +45,15 @@ HL.Media = (function () {
     injury_sad: ['Brutal news.', 'Tough break.', 'Gut punch.', 'Awful timing.', 'Not what anybody wanted.', 'Devastating.', 'Bad news on the injury front.', 'Ugh.'],
     streak_w: ['rolling', 'red-hot', 'on a heater', 'scorching', 'unstoppable lately', 'surging', 'on a tear', 'cooking'],
     streak_l: ['in freefall', 'reeling', 'ice cold', 'spiraling', 'sinking', 'stuck in the mud', 'in crisis mode', 'collapsing'],
+    streak_w2: ['rolling', 'red-hot', 'on a heater', 'surging', 'on a tear', 'cooking', 'humming', 'flying'],
+    thriller: ['thriller', 'classic', 'marathon', 'instant classic', 'war', 'slugfest', 'heart-stopper'],
+    beatdown: ['beatdown', 'statement', 'clinic', 'massacre', 'rout', 'demolition', 'blowout'],
+    tight: ['nail-biter', 'tight one', 'down-to-the-wire finish', 'heart-stopper', 'gut-check win', 'grinder', 'one-possession game'],
+    carry: ['power', 'lift', 'carry', 'propel', 'push'],
+    eliminate: ['eliminate', 'knock out', 'send home', 'end the season of', 'break the hearts of'],
+    shock: ['shock', 'stun', 'topple', 'upset', 'knock off'],
+    weeknight: ['Tuesday', 'Wednesday', 'Thursday', 'school night', 'work night'],
+    offseason_q: ['Big questions this summer.', 'Change feels inevitable.', 'Plenty to process.', 'The front office has decisions to make.', 'A long summer awaits.', 'Expect changes.'],
   };
 
   // ---------- memory / anti-repeat ----------
@@ -60,7 +71,7 @@ HL.Media = (function () {
     while (recent.length > keep) recent.shift();
     return choice;
   }
-  function frag(L, name) { return pickFresh(L, name, P[name]); }
+  function frag(L, name) { mergePacks(); return pickFresh(L, name, P[name]); }
 
   // Choose a template among those whose condition matches, avoiding recently used ones.
   function choose(L, templates, c) {
@@ -81,8 +92,42 @@ HL.Media = (function () {
     return v;
   }
 
+  // ---------- content packs (e.g. generated with ChatGPT; see packs/README.md) ----------
+  // window.HL_PACKS = [{ name, lines: { 'situation.key': ['text with {placeholders}', ...] }, fragments: { pool: [...] } }]
+  const LINES = {};
+  let merged = 0;
+  function mergePacks() {
+    const packs = window.HL_PACKS || [];
+    for (; merged < packs.length; merged++) {
+      const pk = packs[merged];
+      for (const [k, arr] of Object.entries(pk.lines || {})) if (Array.isArray(arr)) LINES[k] = (LINES[k] || []).concat(arr.filter(x => typeof x === 'string' && x.trim()));
+      for (const [k, arr] of Object.entries(pk.fragments || {})) if (Array.isArray(arr)) P[k] = (P[k] || []).concat(arr.filter(x => typeof x === 'string'));
+    }
+  }
+  // {key} fills from context; {~pool} draws a fresh fragment from a pool (e.g. {~beat}).
+  function fill(text, ctx, L) {
+    return text
+      .replace(/\{~(\w+)\}/g, (m, k) => (k.startsWith('emoji') && ctx.era && ctx.era !== 'modern') ? '' : (P[k] && L ? frag(L, k) : m))
+      .replace(/\{(\w+)\}/g, (m, k) => (ctx[k] != null ? ctx[k] : m));
+  }
+  // A line for a situation: built-in options plus any pack lines, never repeating recently,
+  // and only using lines whose placeholders can all be filled from the context.
+  // Era-specific lines ("situation@60s") take over in older eras so modern slang never leaks into 1965.
+  function line(L, situation, ctx, builtins = []) {
+    mergePacks();
+    const era = ctx.era || 'modern';
+    let pool;
+    const eraLines = era !== 'modern' ? (LINES[situation + '@' + era] || []) : [];
+    if (eraLines.length || (era !== 'modern' && ctx.eraBuiltins)) pool = (ctx.eraBuiltins || []).concat(eraLines);
+    else pool = builtins.concat(LINES[situation] || []);
+    const fillable = t => !/\{(\w+)\}/.test(t.replace(/\{~\w+\}/g, '').replace(/\{(\w+)\}/g, (m, k) => ctx[k] != null ? '' : m));
+    const all = pool.filter(fillable);
+    if (!all.length) return null;
+    return fill(pickFresh(L, 'line:' + situation + '@' + era, all), ctx, L).replace(/\s+([.,!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  }
+
   return {
-    P, VOICES, frag, choose, voiceInfo, pickFresh,
+    P, VOICES, frag, choose, voiceInfo, pickFresh, line, fill, mergePacks, lineCount: () => { mergePacks(); return Object.values(LINES).reduce((s, a) => s + a.length, 0); },
     // Expose for adding content packs.
     addFragments(pool, items) { P[pool] = (P[pool] || []).concat(items); },
   };

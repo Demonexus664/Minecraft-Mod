@@ -3,6 +3,47 @@ window.HL = window.HL || {};
 
 HL.ROOKIES_2025 = new Set(['Cooper Flagg', 'Dylan Harper', 'VJ Edgecombe', 'Kon Knueppel', 'Ace Bailey', 'Tre Johnson', 'Jeremiah Fears', 'Egor Dëmin', 'Collin Murray-Boyles', 'Khaman Maluach', 'Cedric Coward', 'Noa Essengue', 'Derik Queen', 'Carter Bryant', 'Thomas Sorber', 'Yang Hansen', 'Joan Beringer', 'Walter Clayton Jr.', 'Nolan Traore', 'Kasparas Jakučionis', 'Will Riley', 'Drake Powell', 'Asa Newell', 'Nique Clifford', 'Jase Richardson', 'Ben Saraf', 'Danny Wolf', 'Hugo González', 'Liam McNeeley', 'Rasheer Fleming', 'Noah Penda', 'Sion James', 'Ryan Kalkbrenner', 'Adou Thiero', 'Chaz Lanier', 'Kam Jones', 'Micah Peavy', 'Maxime Raynaud', 'Tyrese Proctor', 'Kobe Sanders', 'Mohamed Diawara', 'Will Richard']);
 
+// ---------- Calendar ----------
+// Day 0 = opening night (the Tuesday between Oct 20-26). All-Star break around the third Sunday of February.
+HL.seasonStartDate = function (season) {
+  const d = new Date(Date.UTC(season, 9, 20));
+  while (d.getUTCDay() !== 2) d.setUTCDate(d.getUTCDate() + 1);
+  return d;
+};
+HL.dateOfDay = function (season, day) {
+  const d = HL.seasonStartDate(season);
+  d.setUTCDate(d.getUTCDate() + day);
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+};
+HL.seasonCalendar = function (season) {
+  const start = HL.seasonStartDate(season);
+  const dayOf = (y, m, dd) => Math.round((Date.UTC(y, m, dd) - start) / 86400000);
+  // Third Sunday of February.
+  const feb = new Date(Date.UTC(season + 1, 1, 1));
+  let sundays = 0;
+  while (true) { if (feb.getUTCDay() === 0 && ++sundays === 3) break; feb.setUTCDate(feb.getUTCDate() + 1); }
+  const asg = dayOf(feb.getUTCFullYear(), feb.getUTCMonth(), feb.getUTCDate());
+  const breakDays = new Set();
+  for (let d = asg - 2; d <= asg + 3; d++) breakDays.add(d);
+  // Thanksgiving (4th Thursday of November) and Christmas Eve are dark.
+  const nov = new Date(Date.UTC(season, 10, 1));
+  let thursdays = 0;
+  while (true) { if (nov.getUTCDay() === 4 && ++thursdays === 4) break; nov.setUTCDate(nov.getUTCDate() + 1); }
+  breakDays.add(dayOf(season, 10, nov.getUTCDate()));
+  breakDays.add(dayOf(season, 11, 24));
+  // Regular season ends on the second Sunday of April.
+  const apr = new Date(Date.UTC(season + 1, 3, 1));
+  let aprSun = 0;
+  while (true) { if (apr.getUTCDay() === 0 && ++aprSun === 2) break; apr.setUTCDate(apr.getUTCDate() + 1); }
+  return { allStarDay: asg, breakDays, lastRegularDay: dayOf(apr.getUTCFullYear(), 3, apr.getUTCDate()) };
+};
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+HL.fmtDay = function (season, day, opts = {}) {
+  const d = HL.dateOfDay(season, day);
+  return `${opts.weekday ? WEEKDAYS[d.getDay()] + ', ' : ''}${MONTHS[d.getMonth()]} ${d.getDate()}${opts.year ? ', ' + d.getFullYear() : ''}`;
+};
+
 HL.League = {};
 
 (function () {
@@ -52,7 +93,7 @@ HL.League = {};
         league.players[p.id] = p;
       }
     }
-    league.schedule = buildSchedule(league.teams);
+    league.schedule = buildSchedule(league.teams, season);
     league.nextPid = HL.nextPlayerId();
     L = league;
     HL.News && HL.News.seasonStart && HL.News.seasonStart(league);
@@ -60,7 +101,7 @@ HL.League = {};
   };
 
   // ---------- Schedule (82 games: 2 vs other conf, 3-4 vs own conf) ----------
-  function buildSchedule(teams) {
+  function buildSchedule(teams, season) {
     const games = [];
     const byConf = { East: teams.filter(t => t.conf === 'East'), West: teams.filter(t => t.conf === 'West') };
     for (const conf of ['East', 'West']) {
@@ -83,30 +124,55 @@ HL.League = {};
       games.push({ home: w.id, away: e.id });
     }
     R.shuffle(games);
-    // Assign to days: each team at most one game per day, avoid too many back-to-backs.
-    const days = [];
-    const lastDay = {};
+    // Real-calendar assignment: ~7 games a night from opening night to mid-April,
+    // nothing during the All-Star break, teams capped at one game a day and ~15 back-to-backs.
+    const cal = HL.seasonCalendar(season);
+    const playDays = [];
+    for (let d = 0; d <= cal.lastRegularDay; d++) if (!cal.breakDays.has(d)) playDays.push(d);
+    const left = {};
+    for (const t of teams) left[t.id] = 0;
+    for (const g of games) { left[g.home]++; left[g.away]++; }
+    const lastDay = {}, b2b = {};
     let remaining = games;
-    let day = 0;
-    while (remaining.length) {
-      const busy = new Set();
-      const today = [];
-      const next = [];
-      for (const g of remaining) {
-        const b2b = (lastDay[g.home] === day - 1) + (lastDay[g.away] === day - 1);
-        const cap = 15;
-        if (!busy.has(g.home) && !busy.has(g.away) && today.length < cap && (b2b === 0 || R.chance(0.35))) {
-          today.push(g); busy.add(g.home); busy.add(g.away);
-        } else next.push(g);
+    const days = [];
+    playDays.forEach((day, idx) => {
+      const daysLeft = playDays.length - idx;
+      const dow = HL.dateOfDay(season, day).getDay();
+      const weight = dow === 0 ? 0.9 : dow === 1 ? 0.75 : dow === 2 || dow === 5 || dow === 3 ? 1.1 : dow === 4 ? 0.8 : 1.15;
+      let quota = Math.round(remaining.length / daysLeft * weight + R.normal(0, 1.2));
+      quota = HL.clamp(quota, idx === 0 ? 2 : 3, 15);
+      if (daysLeft <= 3) quota = 15;
+      // Prioritize teams that are falling behind on games.
+      const isB2B = g => (lastDay[g.home] === day - 1) + (lastDay[g.away] === day - 1);
+      const urgency = g => (left[g.home] + left[g.away]) / (2 * daysLeft) + R.random() * 0.3 - isB2B(g) * 0.35;
+      const pool = remaining.slice().sort((a, b) => urgency(b) - urgency(a));
+      const busy = new Set(), today = [];
+      for (const g of pool) {
+        if (today.length >= quota) break;
+        if (busy.has(g.home) || busy.has(g.away)) continue;
+        if ([g.home, g.away].some(t => lastDay[t] === day - 1 && (b2b[t] || 0) >= 13) && daysLeft > 8) continue;
+        today.push(g); busy.add(g.home); busy.add(g.away);
       }
-      for (const g of today) { lastDay[g.home] = day; lastDay[g.away] = day; }
-      days.push(today);
-      remaining = next;
-      day++;
+      const set = new Set(today);
+      remaining = remaining.filter(g => !set.has(g));
+      for (const g of today) for (const t of [g.home, g.away]) {
+        if (lastDay[t] === day - 1) b2b[t] = (b2b[t] || 0) + 1;
+        lastDay[t] = day; left[t]--;
+      }
+      days.push([day, today]);
+    });
+    // Any leftovers (rare) get makeup dates right after the last scheduled day.
+    let extra = cal.lastRegularDay + 1;
+    while (remaining.length) {
+      const busy = new Set(), today = [];
+      for (const g of remaining) if (!busy.has(g.home) && !busy.has(g.away)) { today.push(g); busy.add(g.home); busy.add(g.away); }
+      const set = new Set(today);
+      remaining = remaining.filter(g => !set.has(g));
+      days.push([extra++, today]);
     }
     const out = [];
     let gid = 1;
-    days.forEach((dg, d) => dg.forEach(g => out.push({ gid: gid++, day: d, home: g.home, away: g.away, res: null })));
+    days.forEach(([d, dg]) => dg.forEach(g => out.push({ gid: gid++, day: d, home: g.home, away: g.away, res: null })));
     return out;
   }
 
@@ -223,8 +289,7 @@ HL.League = {};
       applyResult(g, res, false);
     }
     L.day++;
-    // Teams not playing today still heal a little (rest days count as 0.5 games).
-    if (L.day > HL.League.lastDay()) startPostseason();
+    if (L.day > HL.League.lastDay()) { L.day += 1; startPostseason(); }
     return games.length;
   };
 
@@ -326,7 +391,7 @@ HL.League = {};
         if (s.wins[1] === 4) s.winner = s.lo;
         if (s.winner != null) HL.News && HL.News.seriesEnd && HL.News.seriesEnd(L, s, po.rounds.length);
       }
-      L.day++;
+      L.day += 2; // playoff games are played every other day
       if (round.every(s => s.winner != null)) {
         if (round.length === 1) {
           po.champion = round[0].winner;
@@ -342,6 +407,7 @@ HL.League = {};
             next.push({ conf, hi, lo, wins: [0, 0], games: [], winner: null });
           }
           po.rounds.push(next);
+          L.day += round.length === 2 ? 4 : 2; // breaks between rounds (longer before the Finals)
         }
       }
       return round.length;
@@ -495,7 +561,7 @@ HL.League = {};
     L.phase = 'regular';
     L.playoffs = null;
     L.boxScores = {};
-    L.schedule = buildSchedule(L.teams);
+    L.schedule = buildSchedule(L.teams, L.season);
     L.nextPid = HL.nextPlayerId();
     HL.News && HL.News.seasonStart && HL.News.seasonStart(L);
   };
