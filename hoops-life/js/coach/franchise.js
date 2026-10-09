@@ -246,7 +246,7 @@ HL.Franchise = (function () {
         const t = p.teamId != null ? Lg.teams[p.teamId] : null;
         return HL.GFX.awardCard(p, t, 'Most Valuable Player', n.body || '');
       }
-      if (n.type === 'game' && n.playerIds && n.playerIds.length && n.teamIds) {
+      if ((n.type === 'game' || n.type === 'event') && n.playerIds && n.playerIds.length && n.teamIds && n.teamIds.length > 1) {
         const p = Lg.players[n.playerIds[0]];
         const A = Lg.teams[n.teamIds[1]], H = Lg.teams[n.teamIds[0]];
         if (!p) return '';
@@ -311,7 +311,9 @@ HL.Franchise = (function () {
   }
   function kicker(n) {
     const types = { game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
-    return `${types[n.type] || n.type} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
+    const events = { 'game.buzzer_beater': 'Buzzer-beater', 'game.game_winner': 'Game-winner', 'game.comeback': 'Comeback', 'record.single_game': 'Record book', 'record.single_game_tie': 'Record book', 'record.minutes_sixth_overtime': 'Record book', 'court.four_point_play': 'Four-point play', 'court.five_point_play': 'Five-point play', 'court.charge_triple': 'Defense', 'court.no_field_goals_quarter': 'Defense' };
+    const label = n.type === 'event' ? (events[n.key] || 'Rare feat') : (types[n.type] || n.type);
+    return `${label} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
   }
   function story(n, opts = {}) {
     const posts = (n.reactions || []).slice(0, opts.posts ?? 3);
@@ -555,8 +557,19 @@ HL.Franchise = (function () {
       const Lg = L();
       const pn = id => id != null ? `<span class="who" data-player="${id}" style="display:inline-flex"><span class="nm">${esc(Lg.players[id].name)}</span></span>` : '—';
       const cur = Lg.awards[Lg.season] && !Lg.history.find(h => h.season === Lg.season) ? Lg.awards[Lg.season] : null;
-      if (!Lg.history.length && !cur) return `<div class="page-title"><h2>History</h2></div><section class="block"><div class="empty">Your league's history begins after the first season. Real NBA history arrives with era mode.</div></section>`;
-      return `<div class="page-title"><h2>History</h2></div>
+      // League single-game record book: the real records standing when the save began, and any broken since.
+      const book = HL.Events ? HL.Events.recordBook(Lg).league : {};
+      const recRows = Object.entries(book).filter(([, r]) => r && r.known).map(([k, r]) => {
+        const inSave = r.pid != null;
+        const who = inSave && Lg.players[r.pid] ? pn(r.pid) : esc(r.name);
+        const prior = (r.history || []).slice(-1)[0];
+        const label = HL.Events.STAT_LABEL[k];
+        const possName = n => n.endsWith('s') ? n + "'" : n + "'s";
+        return `<tr><td class="l">${esc(label[0].toUpperCase() + label.slice(1))}</td><td class="hi">${r.v}</td><td class="l">${who}</td><td class="l t2">${esc(r.team || '')}</td><td class="l t3">${inSave ? `${seasonLabel(r.season)}${prior ? ` · broke ${esc(possName(prior.name))} ${prior.v}` : ''}` : esc(r.when || seasonLabel(r.season))}</td></tr>`;
+      }).join('');
+      const recordBlock = recRows ? `<section class="block"><header><h3>League record book</h3><span class="ml-auto t3 sm">Single game, regular season</span></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Record</th><th></th><th class="l">Holder</th><th class="l">Team</th><th class="l">Set</th></tr></thead><tbody>${recRows}</tbody></table></div></div></section>` : '';
+      if (!Lg.history.length && !cur) return `<div class="page-title"><h2>History</h2></div>${recordBlock}<section class="block"><div class="empty">Your league's champions and awards appear here after the first season.</div></section>`;
+      return `<div class="page-title"><h2>History</h2></div>${recordBlock}
         ${cur ? `<section class="block"><header><h3>${seasonLabel(Lg.season)} awards</h3></header><div class="body"><div class="cols c3">
           ${[['MVP', cur.mvp], ['Defensive Player', cur.dpoy], ['Rookie of the Year', cur.roy], ['Sixth Man', cur.smoy], ['Scoring title', cur.scoringChamp]].map(([k, id]) => `<div class="kv"><span>${k}</span><b>${pn(id)}</b></div>`).join('')}
           </div>${cur.allNba.map((tm, i) => `<div class="kv"><span>All-NBA ${['1st', '2nd', '3rd'][i]}</span><span>${tm.map(pn).join(', ')}</span></div>`).join('')}</div></section>` : ''}

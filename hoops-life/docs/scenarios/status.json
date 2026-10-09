@@ -1,0 +1,21 @@
+{
+  "_note": "Implementation status for scenarios-1.json (ChatGPT handoff) and claude-additions.json. Statuses: implemented, partial, blocked, not started (default). Regenerate LEDGER.md with: node tools/scenario-ledger.js",
+  "record.five_by_five": { "status": "implemented", "handler": "HL.Events.fromGame (js/league/events.js) -> HL.EventNews.story", "data": "box score", "evidence": "tools/test-events.js: 5x5 triggers / 4-block near miss" },
+  "record.quadruple_double": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score", "evidence": "tools/test-events.js: trigger + near miss" },
+  "record.perfect_high_volume": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score (FGA >= 10, FGM = FGA)", "evidence": "tools/test-events.js: 10-for-10 vs 9-for-9; seen in full-season run" },
+  "record.assist_turnover_clean": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "box score", "evidence": "tools/test-events.js: 20/0 vs 20/1" },
+  "record.team_zero_turnovers": { "status": "implemented", "handler": "HL.Events.fromGame", "data": "team box totals", "evidence": "tools/test-events.js" },
+  "record.minutes_sixth_overtime": { "status": "implemented", "handler": "HL.Events.fromGame + L.records.franchise[tid].min", "data": "franchise minutes record kept within the save", "evidence": "detection path; 6-overtime games are vanishingly rare in the sim", "note": "Franchise minute records start with the save (real franchise records are not in the dataset)." },
+  "record.career_free_throw_mark": { "status": "blocked", "note": "Needs each real player's career-to-date totals at the save's start season (build-history.py exports only full-career totals)." },
+  "record.oldest_debut": { "status": "blocked", "note": "Needs a debut-age record table and first-appearance tracking for generated/draft players." },
+  "record.one_point_scoring_record": { "status": "not started", "note": "Needs season FTM record book; box data exists." },
+  "record.shared_jersey_milestone": { "status": "not started", "note": "Needs career milestone tracking (career totals per player in the save)." },
+  "court.four_point_play": { "status": "implemented", "handler": "gamesim track.four -> HL.Events.fromGame", "data": "made three + shooting foul + made free throw", "evidence": "~40 per simulated season (real NBA ~40-60); test-events.js" },
+  "court.charge_triple": { "status": "implemented", "handler": "gamesim offensive fouls (charges drawn per defender) -> HL.Events.fromGame", "data": "charges drawn", "evidence": "~15 per season; test-events.js 3 vs 2 charges" },
+  "court.no_field_goals_quarter": { "status": "implemented", "handler": "gamesim per-quarter FG counts -> HL.Events.fromGame", "data": "field goals by quarter", "evidence": "test-events.js; does not occur in normal play (as in reality)" },
+  "court.self_rebound_putback": { "status": "partial", "handler": "gamesim marks putbacks (offensive rebounder scoring next)", "note": "Recorded on decisive shots only (as part of game-winner events); not published as its own story because it happens many times a game." },
+  "court.shot_clock_buzzer_make": { "status": "blocked", "note": "Needs a per-possession shot-clock model; the sim uses possession durations, and only period-ending shots are timed." },
+  "court.buzzer_review_reversal": { "status": "blocked", "note": "Needs an officiating/replay layer in the game sim." },
+  "court.backcourt_violation_decider": { "status": "blocked", "note": "Needs turnover types (violations) in the sim." },
+  "court.heave_team_record": { "status": "partial", "handler": "gamesim heaves (final < 2 seconds)", "note": "Heaves exist; shot distance is not modeled, so no distance record yet." }
+}

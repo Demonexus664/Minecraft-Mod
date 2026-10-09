@@ -296,7 +296,15 @@ HL.League = {};
         if (!isUser || keys.length > 400) delete L.boxScores[k];
       }
     }
-    HL.News && HL.News.game && HL.News.game(L, g, res, playoffs);
+    // Logged events (records, game-winners, comebacks...) become their own stories; a game with a
+    // headline event doesn't also get a generic recap.
+    const evs = HL.Events ? HL.Events.fromGame(L, g, res, playoffs) : [];
+    let covered = false;
+    for (const ev of evs) {
+      const item = HL.EventNews && HL.EventNews.story(L, ev);
+      if (item && ['game.buzzer_beater', 'game.game_winner', 'game.comeback', 'record.single_game'].includes(ev.key)) covered = true;
+    }
+    if (!covered) HL.News && HL.News.game && HL.News.game(L, g, res, playoffs);
   }
 
   function healPlayer(p) {

@@ -125,7 +125,7 @@ HL.DEFAULT_RULES = () => ({
 
   // ---------- Lineup selection ----------
   function chooseLineup(T, ctx) {
-    const { remaining, quarterStart, quarter, diff, clutchTime, garbage } = ctx;
+    const { remaining, quarterStart, quarter, diff, clutchTime, garbage, foulOut } = ctx;
     const cands = T.avail.filter(p => !T.st[p.id].out);
     const scored = cands.map(p => {
       const s = T.st[p.id];
@@ -142,6 +142,12 @@ HL.DEFAULT_RULES = () => ({
       }
       if (garbage && !(ironMan && Math.abs(diff) < 30)) score += T.starters.includes(p) ? -3 : 1 - (p.ovr - 70) * 0.03;
       if (s.energy < (ironMan ? 0.15 : 0.35)) score -= 2;
+      // Foul trouble: coaches sit a player who is one foul over the line for the quarter
+      // (2 in the 1st, 3 in the 2nd, 4 in the 3rd, 5 in the 4th) until crunch time.
+      if (foulOut > 0 && !(quarter >= 4 && remaining <= 300)) {
+        const allowed = foulOut - Math.max(1, 5 - Math.min(quarter, 4));
+        if (s.fouls >= allowed) score -= ironMan ? 2 : 5.5;
+      }
       return { p, score };
     }).sort((a, b) => b.score - a.score);
 
@@ -168,6 +174,8 @@ HL.DEFAULT_RULES = () => ({
   }
 
   // ---------- Helpers ----------
+  // Players in foul trouble defend more carefully (and foul less).
+  const caution = (T, p) => { const f = T.st[p.id].fouls; return f >= 5 ? 0.35 : f >= 4 ? 0.6 : 1; };
   const eff = (T, p, key) => {
     const e = T.st[p.id].energy;
     return p.attrs[key] * (0.86 + 0.14 * Math.min(1, e + 0.15));
@@ -198,7 +206,7 @@ HL.DEFAULT_RULES = () => ({
     return { three: Math.max(0, three), mid: Math.max(1, mid), rim: Math.max(1, rim) };
   }
 
-  let E = { pace: 99.4, efg: 0, tov: 0, orb: 0, ftr: 1 }; // era adjustments for the current game
+  let E = { pace: 99.4, efg: 0, tov: 0, orb: 0, ftr: 1, common: 0.068 }; // era adjustments for the current game
 
   // ---------- Main ----------
   HL.simGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
@@ -206,6 +214,9 @@ HL.DEFAULT_RULES = () => ({
     H.home = true;
     const pbp = opts.pbp ? [] : null;
     const injuries = [];
+    // Facts for the event log (records, game-winners, four-point plays...), kept for every game.
+    const track = { four: [], goAhead: null, last: null };
+    H.qfg = []; A.qfg = []; H.maxTrail = 0; A.maxTrail = 0;
     const teams = [H, A];
     for (const T of teams) for (const p of T.starters) T.st[p.id].line.gs = 1;
 
@@ -219,6 +230,8 @@ HL.DEFAULT_RULES = () => ({
       tov: prof ? ((prof.tov != null ? prof.tov : 16.5) - BASE.tov) / 100 * 0.55 : 0,
       orb: prof ? ((prof.orb != null ? prof.orb : 31) - BASE.orb) / 100 : 0,
       ftr: 1, // real players' foul drawing already reflects their era
+      // Non-shooting fouls follow the era's whistle (bonus free throws were a bigger share of scoring in the past).
+      common: 0.068 * (prof && prof.ftr ? HL.clamp(prof.ftr / BASE.ftr, 0.8, 1.6) : 1),
     };
     const paceAdj = ((H.strat.pace + A.strat.pace) / 2 - 50) * 0.12;
     const possPerTeam48 = E.pace * 1.045 + paceAdj + (opts.paceMod || 0);
@@ -235,6 +248,7 @@ HL.DEFAULT_RULES = () => ({
       quarter++;
       let clock = lenSec;
       const qStartH = H.score, qStartA = A.score;
+      H.qfg.push(0); A.qfg.push(0);
       H.teamFouls = 0; A.teamFouls = 0;
       let nextCheck = clock;
       const elapsedBefore = Math.min(regSeconds, (quarter - 1) * rules.quarterLen * 60);
@@ -253,6 +267,7 @@ HL.DEFAULT_RULES = () => ({
               diff,
               clutchTime: (late && Math.abs(diff) <= 10) || isOT,
               garbage: quarter >= 4 && clock <= 420 && Math.abs(diff) >= 20,
+              foulOut: rules.foulOut || 0,
             });
           }
           nextCheck = clock - R.range(150, 230);
@@ -260,8 +275,12 @@ HL.DEFAULT_RULES = () => ({
 
         const D = offense === H ? A : H;
         let dur = transition ? R.range(4, 9) : HL.clamp(R.normal(avgPossSec, 4.5), 5, rules.shotClock);
+        const lastShot = dur >= clock;
         dur = Math.min(dur, clock);
         clock -= dur;
+        // Last possession of a period: teams play for one shot but often get it off with a few seconds
+        // left, which leaves the other side a rushed try or a heave.
+        if (lastShot && dur >= 4 && R.chance(0.55)) clock = Math.min(R.range(0.4, 4.5), dur - 1);
         const mm = Math.floor(clock / 60), ss = Math.floor(clock % 60);
         clockStr = `${mm}:${String(ss).padStart(2, '0')}`;
 
@@ -281,8 +300,15 @@ HL.DEFAULT_RULES = () => ({
         }
 
         const clutch = (quarter >= 4) && clock <= 300 && Math.abs(H.score - A.score) <= 5;
-        const result = runPossession(offense, D, rules, transition, clutch, log, offense.score - D.score);
+        const before = offense.score - D.score;
+        track.last = null;
+        const result = runPossession(offense, D, rules, transition, clutch, log, before, dur);
         transition = result.transition;
+        const after = offense.score - D.score;
+        // Lead changes (the last one decides the game) and the biggest deficit each side faced.
+        if (before <= 0 && after > 0 && track.last) track.goAhead = { side: offense === H ? 'home' : 'away', pid: track.last.pid, label: track.last.label, value: track.last.value, putback: track.last.putback, assist: track.last.assist, period: quarter, clock: Math.round(clock * 10) / 10, before, after };
+        H.maxTrail = Math.max(H.maxTrail, A.score - H.score);
+        A.maxTrail = Math.max(A.maxTrail, H.score - A.score);
 
         // Injuries: per player-second risk, driven by durability, fatigue, age and rules.
         for (const T of teams) {
@@ -302,9 +328,10 @@ HL.DEFAULT_RULES = () => ({
             }
           }
         }
-        // Fouled-out or injured players must leave immediately.
+        // Fouled-out or injured players must leave immediately; foul trouble triggers a look at the bench.
         for (const T of teams) {
-          if (T.onCourt.some(p => T.st[p.id].out)) nextCheck = clock + 1;
+          if (T.onCourt.some(p => T.st[p.id].out) || T.recheck) nextCheck = clock + 1;
+          T.recheck = false;
         }
 
         if (!result.keep) offense = D;
@@ -313,9 +340,10 @@ HL.DEFAULT_RULES = () => ({
       A.quarters.push(A.score - qStartA);
     };
 
-    function runPossession(O, D, rules, transition, clutch, log, lead) {
+    function runPossession(O, D, rules, transition, clutch, log, lead, secs = 99) {
       const strat = O.strat, dstrat = D.strat;
       const lineup = O.onCourt, dline = D.onCourt;
+      const putbackBy = O.lastOreb; O.lastOreb = null;
       const homeBoost = O.home ? 0.011 * (rules.homeCourt ?? 1) : 0;
 
       // Usage: who initiates.
@@ -337,7 +365,7 @@ HL.DEFAULT_RULES = () => ({
       // Turnovers
       const toSkill = (eff(O, initiator, 'handle') + eff(O, initiator, 'pass') + eff(O, initiator, 'iq')) / 3;
       const dSteal = dline.reduce((s, p) => s + p.attrs.steal * (0.7 + p.tend.gamble / 166), 0) / 5;
-      let pTO = 0.128 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
+      let pTO = 0.125 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
       if (dstrat.defense === 'press') pTO += 0.025;
       if (strat.focus === 'motion') pTO += 0.008;
       if (transition) pTO += 0.01;
@@ -351,16 +379,26 @@ HL.DEFAULT_RULES = () => ({
           log(`${thief.name} steals it from ${initiator.name}.`, D);
           return { keep: false, transition: R.chance(0.55) };
         }
+        // About a fifth of live-ball-dead turnovers are offensive fouls: charges and illegal screens.
+        if (!rules.noFouls && R.chance(0.22)) {
+          const drawer = pickBy(dline, p => Math.pow((p.attrs.iq + p.attrs.perD) / 130, 4) * (0.6 + p.attrs.str / 150));
+          const ds = D.st[drawer.id];
+          ds.charges = (ds.charges || 0) + 1;
+          foul(O, initiator, rules, log, true);
+          log(`Offensive foul on ${initiator.name}. ${drawer.name} draws the charge.`, O);
+          return { keep: false, transition: false };
+        }
         log(`Turnover by ${initiator.name}.`, O);
         return { keep: false, transition: false };
       }
 
       // Non-shooting foul (common foul); in the bonus this sends the offense to the line.
-      if (!rules.noFouls && R.chance(0.1)) {
-        const fouler = pickBy(dline, p => Math.pow(p.tend.foulAggr / 50, 1.6));
+      if (!rules.noFouls && R.chance(E.common)) {
+        const fouler = pickBy(dline, p => Math.pow(p.tend.foulAggr / 50, 1.6) * caution(D, p));
         foul(D, fouler, rules, log);
         if (D.teamFouls > 4) {
-          shootFTs(O, initiator, 2, rules, log);
+          const ft = shootFTs(O, initiator, 2, rules, log);
+          if (ft) track.last = { pid: initiator.id, label: 'free throws', value: ft, putback: false, assist: null };
           return { keep: false, transition: false };
         }
       }
@@ -375,6 +413,9 @@ HL.DEFAULT_RULES = () => ({
 
       const w = shotWeights(O, shooter, rules, strat, dstrat.defense);
       let type = R.weighted(['three', 'mid', 'rim'], k => w[k]);
+      // Under two seconds there is only time for a catch-and-heave.
+      const heave = secs < 2 && !transition;
+      if (heave) type = rules.threePoint ? 'three' : 'mid';
       if (transition && R.chance(0.45)) type = 'rim';
       // Assisted or self-created: real NBA ~85% of made threes, ~55% at the rim, ~40% mid-range are assisted;
       // high-usage creators make their own shots far more often.
@@ -403,12 +444,12 @@ HL.DEFAULT_RULES = () => ({
         if (transition) makeP += 0.07;
         if (dstrat.defense === 'drop') makeP -= 0.015;
         blockP = 0.068 + (helper.attrs.block - 65) * 0.0022;
-        foulP = 0.29 + (shooter.attrs.str + finish - 140) * 0.0012;
+        foulP = 0.31 + (shooter.attrs.str + finish - 140) * 0.0012;
         label = isPost ? 'post' : (shooter.attrs.dunk > 70 && R.chance(0.35) ? 'dunk' : 'layup');
       } else if (type === 'mid') {
         makeP = 0.455 + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024;
         if (dstrat.defense === 'drop') makeP += 0.02;
-        blockP = 0.018; foulP = 0.055;
+        blockP = 0.018; foulP = 0.06;
         label = 'jumper';
       } else {
         let deep = rules.fourPoint && R.chance(0.12);
@@ -435,6 +476,8 @@ HL.DEFAULT_RULES = () => ({
       if (rules.noFouls) foulP = 0;
       if (rules.tackling && type === 'rim') { makeP -= 0.06; }
       makeP = HL.clamp(makeP, 0.05, 0.9);
+      if (heave) { makeP = 0.07; foulP = 0; label = 'heave'; }
+      else if (secs < 4 && !transition) makeP -= 0.1; // rushed
 
       const sl = O.st[shooter.id].line;
       // Block
@@ -447,17 +490,20 @@ HL.DEFAULT_RULES = () => ({
       }
       // Shooting foul
       const fouled = R.chance(HL.clamp(foulP, 0, 0.35));
-      const made = R.chance(fouled ? makeP * 0.55 : makeP);
+      // Contact rarely leaves a jumper intact; finishing through it at the rim is far more common.
+      const made = R.chance(fouled ? makeP * (type === 'rim' ? 0.55 : type === 'mid' ? 0.3 : 0.1) : makeP);
       if (fouled) {
         // Who gets whistled: mostly the man guarding the shooter, sometimes the help; scaled by each
         // player's real foul rate (Wilt never fouled out; some bigs live in foul trouble).
-        const fouler = pickBy(dline, p => (p === sDef ? 1.6 : p === helper && type === 'rim' ? 0.7 : 0.35) * Math.pow(p.tend.foulAggr / 50, 1.6));
+        const fouler = pickBy(dline, p => (p === sDef ? 1.6 : p === helper && type === 'rim' ? 0.7 : 0.35) * Math.pow(p.tend.foulAggr / 50, 1.6) * caution(D, p));
         foul(D, fouler, rules, log);
       }
       if (made) {
         sl.fga++; sl.fgm++; sl.pts += value;
         if (value >= 3) { sl.tpa++; sl.tpm++; }
         O.score += value; addPM(O, value); addPM(D, -value);
+        O.qfg[O.qfg.length - 1]++;
+        track.last = { pid: shooter.id, label, value, putback: putbackBy === shooter.id, assist: passer ? passer.id : null };
         let astTxt = '';
         if (passer) {
           O.st[passer.id].line.ast++;
@@ -466,12 +512,14 @@ HL.DEFAULT_RULES = () => ({
         log(`${shooter.name} makes ${value === 4 ? 'a ' : value === 3 ? 'a ' : 'a '}${label}${astTxt}.`, O);
         if (fouled) {
           log(`And one!`, O);
-          shootFTs(O, shooter, 1, rules, log);
+          const ft = shootFTs(O, shooter, 1, rules, log);
+          if (ft && value >= 3) track.four.push({ pid: shooter.id, side: O === H ? 'home' : 'away', period: quarter, total: value + 1 });
         }
         return { keep: false, transition: false };
       }
       if (fouled) {
-        shootFTs(O, shooter, Math.min(value, 3), rules, log);
+        const ft = shootFTs(O, shooter, Math.min(value, 3), rules, log);
+        if (ft) track.last = { pid: shooter.id, label: 'free throws', value: ft, putback: false, assist: null };
         return { keep: false, transition: false };
       }
       sl.fga++; if (value >= 3) sl.tpa++;
@@ -479,9 +527,11 @@ HL.DEFAULT_RULES = () => ({
       return rebound(O, D, rules, type, log);
     }
 
-    function foul(T, p, rules, log) {
+    function foul(T, p, rules, log, offensive) {
       const s = T.st[p.id];
-      s.line.pf++; s.fouls++; T.teamFouls++;
+      s.line.pf++; s.fouls++;
+      if (!offensive) T.teamFouls++; // offensive fouls are personal fouls, not team fouls
+      if (s.fouls >= 2) T.recheck = true;
       if (rules.foulOut > 0 && s.fouls >= rules.foulOut) {
         s.out = true;
         log(`${p.name} has fouled out.`, T);
@@ -498,6 +548,7 @@ HL.DEFAULT_RULES = () => ({
       T.score += made;
       addPM(T, made); addPM(T === H ? A : H, -made);
       log(`${p.name} makes ${made} of ${n} free throws.`, T);
+      return made;
     }
 
     function rebound(O, D, rules, type, log) {
@@ -509,6 +560,7 @@ HL.DEFAULT_RULES = () => ({
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
         const r = pickBy(O.onCourt, p => Math.pow(p.attrs.oreb / 50, 1.7) * (0.5 + p.tend.crash / 100));
         O.st[r.id].line.orb++;
+        O.lastOreb = r.id;
         log(`Offensive rebound ${r.name}.`, O);
         return { keep: true, transition: false };
       }
@@ -535,6 +587,11 @@ HL.DEFAULT_RULES = () => ({
       home: { teamId: homeTeam.id, score: H.score, quarters: H.quarters, box: box(H) },
       away: { teamId: awayTeam.id, score: A.score, quarters: A.quarters, box: box(A) },
       ot, pbp, injuries,
+      events: {
+        four: track.four, goAhead: track.goAhead, periods: 4 + ot,
+        qfg: { home: H.qfg, away: A.qfg }, trail: { home: H.maxTrail, away: A.maxTrail },
+        charges: Object.assign({}, ...[H, A].map(T => Object.fromEntries(Object.entries(T.st).filter(([, x]) => x.charges).map(([id, x]) => [id, x.charges])))),
+      },
     };
   };
 })();

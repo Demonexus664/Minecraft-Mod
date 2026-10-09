@@ -123,7 +123,22 @@ HL.Media = (function () {
     const fillable = t => !/\{(\w+)\}/.test(t.replace(/\{~\w+\}/g, '').replace(/\{(\w+)\}/g, (m, k) => ctx[k] != null ? '' : m));
     const all = pool.filter(fillable);
     if (!all.length) return null;
-    return fill(pickFresh(L, 'line:' + situation + '@' + era, all), ctx, L).replace(/\s+([.,!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+    return withArticles(fill(pickFresh(L, 'line:' + situation + '@' + era, all), ctx, L), ctx).replace(/\s+([.,!?])/g, '$1').replace(/\s{2,}/g, ' ').trim();
+  }
+  // Team nicknames take "the" mid-sentence ("against the Bulls"); pack lines sometimes leave it out.
+  const TEAM_KEYS = ['team', 'opp', 'winner', 'loser', 'rival'];
+  // Prepositions match in either case ("Against" in title-case headlines); team names match exactly,
+  // so ordinary words like "heat" or "magic" are left alone.
+  const PREP = 'against|for|to|over|past|by|with|from|at|vs\\.?|versus|beat|beats|beating|top|tops|defeat|defeats|stun|stuns|edge|edges|join|joins|joined|leave|leaves|left|face|faces|facing|hand|hands|than|of|on|into'
+    .split('|').map(w => `[${w[0]}${w[0].toUpperCase()}]${w.slice(1)}`).join('|');
+  function withArticles(text, ctx) {
+    for (const k of TEAM_KEYS) {
+      const name = ctx[k];
+      if (typeof name !== 'string' || !name || /^the /i.test(name)) continue;
+      const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      text = text.replace(new RegExp(`\\b(${PREP}) (${esc})\\b`, 'g'), (m, prep, n) => `${prep} the ${n}`);
+    }
+    return text;
   }
 
   return {
