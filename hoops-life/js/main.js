@@ -8,7 +8,7 @@ HL.App = (function () {
   const MODES = [
     { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over any real NBA team from any season since 1946. Real rosters and ratings, the full schedule, era playoffs and media. Rewrite history, and change every rule.' },
     { id: 'career', name: 'Player Career', desc: 'Live a whole life, from a kid with a ball to a Hall of Fame speech (or not). MyCareer meets BitLife, in any era.' },
-    { id: '820', name: '82-0 Challenge', desc: 'Spin a franchise and a decade, draft one real player per spot, and see if your five can run the table.' },
+    { id: '820', name: '82-0 Challenge', live: true, desc: 'Spin a franchise and a decade, draft one real player per spot, and see if your five can run the table.' },
     { id: 'skill', name: 'Skill Draft Career', desc: 'Build one player from real players\' skills, sim the whole career, and get the verdict.' },
   ];
 
@@ -37,6 +37,7 @@ HL.App = (function () {
     </div>`;
     U.app().querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
       if (b.dataset.mode === 'franchise') return HL.Franchise.setup();
+      if (b.dataset.mode === '820') return HL.Challenge.open();
       const m = MODES.find(x => x.id === b.dataset.mode);
       U.toast(`<b>${esc(m.name)}</b> is in development and is coming in an upcoming milestone.`);
     });

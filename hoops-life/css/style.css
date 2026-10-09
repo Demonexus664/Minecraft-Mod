@@ -425,3 +425,6 @@ html[data-era="00s"] .block > header { background: linear-gradient(#1f2633, #171
 .gfx-champ.wide .gfx-group { height: 96%; }
 .gfx-champ.wide .gfx-group .gfx-slot { width: 26%; } .gfx-champ.wide .gfx-group .g0 { left: 37%; } .gfx-champ.wide .gfx-group .g1 { left: 12%; width: 22%; } .gfx-champ.wide .gfx-group .g2 { right: 12%; width: 22%; }
 @media (max-width: 760px) { .gfx-poster.wide, .gfx-champ.wide { aspect-ratio: 16 / 9; } .gfx-poster.wide .gfx-title { width: 60%; } }
+
+.spinbox { display: grid; place-items: center; min-width: 72px; height: 72px; padding: 0 10px; border: 1px solid var(--rule-strong); border-radius: var(--r); background: var(--surface-2); animation: jiggle .12s linear infinite; }
+@keyframes jiggle { 50% { transform: translateY(-3px); } }

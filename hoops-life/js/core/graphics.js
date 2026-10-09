@@ -145,7 +145,7 @@ HL.GFX = (function () {
     return `<div class="gfx gfx-champ ${opts.wide ? 'wide' : ''}" style="--c:${c};--c2:${c2}">
       <div class="gfx-bg"></div>${rays('#ffd76a', 0.25)}${confetti([c, c2, '#ffd76a', '#ffffff'])}
       <div class="gfx-group">${stars.slice(0, 3).map((p, i) => `<div class="gfx-slot g${i}">${figure(p, team)}</div>`).join('')}</div>
-      <div class="gfx-champ-title"><div class="gfx-kicker">${year} NBA Champions</div><div class="gfx-headline">${esc(team.city)} ${esc(team.name)}</div>${opts.sub ? `<div class="gfx-status">${esc(opts.sub)}</div>` : ''}</div>
+      <div class="gfx-champ-title"><div class="gfx-kicker">${opts.kicker ? esc(opts.kicker) : `${year} NBA Champions`}</div><div class="gfx-headline">${esc(team.city)} ${esc(team.name)}</div>${opts.sub ? `<div class="gfx-status">${esc(opts.sub)}</div>` : ''}</div>
       <div class="gfx-champ-trophy">${trophy('champ')}</div>
     </div>`;
   }
