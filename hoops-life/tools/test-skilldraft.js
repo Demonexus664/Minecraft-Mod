@@ -1,6 +1,6 @@
 // Balance check for the Skill Draft Career: build players the way a person would (random spins,
 // then a random / good / best pick from each list), sim their careers, and count the verdicts.
-// Usage: node tools/test-skilldraft.js [runs] [style: random|good|best] [seed]
+// Usage: node tools/test-skilldraft.js [runs] [style: random|good|best|worst] [seed]
 const { load, ctx } = require('./load');
 const fs = require('fs');
 const path = require('path');
@@ -21,8 +21,8 @@ function draftPicks() {
     const team = R.pick(HL.Challenge.franchisesIn(dec));
     const val = c => id === 'body' ? HL.HISTORY.players[c.row.pid][3] : keys.reduce((s, k) => s + HL.History.unpack(c.row.attrs, HL.HISTORY.attrs)[k], 0) / keys.length;
     const list = HL.Challenge.candidates(team, dec).sort((a, b) => val(b) - val(a));
-    // "good": someone from the top three; "best": always the top value; "random": anyone.
-    const ix = style === 'best' ? 0 : style === 'good' ? R.int(0, Math.min(2, list.length - 1)) : R.int(0, list.length - 1);
+    // "good": someone from the top three; "best": always the top value; "worst": the bottom; "random": anyone.
+    const ix = style === 'worst' ? list.length - 1 : style === 'best' ? 0 : style === 'good' ? R.int(0, Math.min(2, list.length - 1)) : R.int(0, list.length - 1);
     picks[id] = list[ix];
   }
   return picks;
@@ -36,9 +36,10 @@ function draftPicks() {
     const [tier] = c.verdict;
     tiers[tier] = (tiers[tier] || 0) + 1;
     const peak = Math.max(...c.seasons.map(s => s.ovr), 0);
+    const minors = c.seasons.filter(s => s.minors).length;
     const best = c.seasons.slice().sort((a, b) => b.ppg - a.ppg)[0];
     const n = name => c.awards.filter(a => a.award === name).length;
-    console.log(`${String(i + 1).padStart(3)} ${c.debut} ${c.me.pos} ${HL.fmtHeight(c.me.height)} prime ${c.primeOvr} peak ${peak} | ${c.seasons.length} yrs, pick ${c.pick} | best ${best ? best.ppg.toFixed(1) : '-'} ppg | MVP ${n('MVP')} AS ${n('All-Star')} rings ${c.rings} | ${c.altered.length} changes | legacy ${c.legacy.score} #${c.legacy.rank} -> ${tier}`);
+    console.log(`${String(i + 1).padStart(3)} ${c.debut} ${c.me.pos} ${HL.fmtHeight(c.me.height)} prime ${c.primeOvr} peak ${peak} | ${c.seasons.length} yrs (${minors} minors), pick ${c.pick || "undrafted"} | best ${best ? best.ppg.toFixed(1) : '-'} ppg | MVP ${n('MVP')} AS ${n('All-Star')} rings ${c.rings} | ${c.altered.length} changes | legacy ${c.legacy.score} #${c.legacy.rank} -> ${tier}`);
   }
   console.log(`\n${runs} careers (${style}) in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   console.log(Object.entries(tiers).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${v}`).join(' | '));

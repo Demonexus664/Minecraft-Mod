@@ -118,8 +118,9 @@ HL.SkillDraft = (function () {
       if (age === 19) {
         // Draft: the slot follows the rookie's rating; the team holding it is the one with that record.
         const n = L.teams.length;
-        career.pick = HL.clamp(Math.round(31 - (me.ovr - 58) * 1.6 + R.normal(0, 3)), 1, n * 2);
-        team = byRecord[(career.pick - 1) % n];
+        const slot = Math.max(1, Math.round(31 - (me.ovr - 58) * 1.6 + R.normal(0, 3)));
+        career.pick = slot <= n * 2 ? slot : null; // two rounds; anyone lower goes undrafted
+        team = byRecord[((career.pick || R.int(1, n)) - 1) % n];
       } else {
         team = L.teams.find(t => fr(t) === franchise);
         // Free agency at 23 (end of the rookie deal), 27, 31 and 34: stars chase contenders, others take what they can get.
@@ -145,6 +146,12 @@ HL.SkillDraft = (function () {
       }
       // Retirement: out of the league, or calls it when the skills are gone.
       if (age > 19 && ((me.ovr < 64 && age >= 24) || (age >= 35 && me.ovr < 72 && R.chance(0.5)) || age >= 41)) break;
+      // Not good enough for an NBA roster yet: a season in the minor leagues or overseas.
+      if (me.ovr < 62) {
+        seasons.push({ age, yr, key, minors: true, ovr: me.ovr, g: 0, ppg: 0, rpg: 0, apg: 0, ts: 0, w: 0, l: 0, awards: [], altered: [] });
+        onProgress && onProgress(age);
+        continue;
+      }
       const res = simSeason(L, team, me, missed, yr);
       seasons.push({ age, yr, key, team: team.abbr, teamMeta: metaOf(team), ovr: me.ovr, ...res });
       career.totals.g += res.g; career.totals.pts += res.ppg * res.g; career.totals.reb += res.rpg * res.g; career.totals.ast += res.apg * res.g;
@@ -257,7 +264,8 @@ HL.SkillDraft = (function () {
         }
       }
     }
-    return { g, ppg, rpg, apg, ts, w, l, awards, altered, champion, playoffRound: round, made, rounds: fmt.bestOf.length, realChamp };
+    const rcT = realChamp && L.teams.find(t => t.bref === realChamp);
+    return { g, ppg, rpg, apg, ts, w, l, awards, altered, champion, playoffRound: round, made, rounds: fmt.bestOf.length, realChamp: rcT ? `${rcT.city} ${rcT.name}` : realChamp || null };
   }
 
   // Same formula as real careers in HL.HISTORY.legacy (tools/build-history.py).
@@ -274,18 +282,20 @@ HL.SkillDraft = (function () {
   }
 
   function verdict(c) {
-    const lg = c.legacy, n = c.seasons.length;
+    const lg = c.legacy, n = c.seasons.filter(s => !s.minors).length;
+    if (!n) return ['NEVER MADE IT', `${c.pick ? `Drafted #${c.pick}, but` : 'Undrafted, and'} never played an NBA game. ${c.seasons.length} season${c.seasons.length === 1 ? '' : 's'} in the minors and overseas.`];
     if (lg.score > lg.top.score * 1.35) return ['BROKEN', 'This is a cheat code. Nobody in history comes close, and the league is already drafting a rule with your name on it.'];
     if (lg.rank === 1) return ['THE GOAT', `Ahead of ${HL.HISTORY.players[lg.top.pid][0]}. The debate is over.`];
     if (lg.rank <= 10) return ['ALL-TIME GREAT', `#${lg.rank} all-time. Mount Rushmore conversations include you.`];
     if (lg.rank <= 75) return ['HALL OF FAMER', `#${lg.rank} all-time. First-ballot.`];
     if (lg.rank <= 160) return ['SUPERSTAR', `#${lg.rank} all-time. A borderline Hall of Fame career.`];
     if (lg.rank <= 350) return ['ALL-STAR', `#${lg.rank} all-time. A very good career.`];
-    if (n <= 3) return [c.pick <= 10 ? 'BUST' : 'OUT OF THE LEAGUE', c.pick <= 10 ? `A top-${c.pick} pick who was out of the league in ${n} seasons.` : `Out of the league after ${n} season${n === 1 ? '' : 's'}.`];
-    const avg = c.seasons.reduce((s, x) => s + x.ovr, 0) / n;
+    const top10 = c.pick && c.pick <= 10;
+    if (n <= 3) return [top10 ? 'BUST' : 'OUT OF THE LEAGUE', top10 ? `A top-${c.pick} pick who was out of the league in ${n} seasons.` : `Out of the league after ${n} season${n === 1 ? '' : 's'}.`];
+    const avg = c.seasons.filter(s => !s.minors).reduce((s, x) => s + x.ovr, 0) / n;
     if (avg >= 76) return ['STARTER', 'A long, solid career as a starter.'];
     if (avg >= 70) return ['ROLE PLAYER', 'Carved out a career doing the little things.'];
-    return [c.pick <= 10 ? 'BUST' : 'BENCH WARMER', c.pick <= 10 ? 'Never lived up to the draft slot.' : 'Waved the towel with pride.'];
+    return [top10 ? 'BUST' : 'BENCH WARMER', top10 ? 'Never lived up to the draft slot.' : 'Waved the towel with pride.'];
   }
 
   // ---------- UI ----------
@@ -298,8 +308,8 @@ HL.SkillDraft = (function () {
     U.applyTeamTheme(st.team && !done ? tm(st.team) : null);
     let main;
     if (st.career) main = resultView();
-    else if (st.simming) main = `<section class="block"><div class="body"><h3>Simulating your career…</h3><div class="t2 sm" style="margin-top:6px">Age ${st.simming}. Every season is played with the full sim.</div><div class="simcard" style="width:auto;border:0;padding:0"><div class="track"><i style="width:${Math.round((st.simming - 19) / 22 * 100)}%"></i></div></div></div></section>`;
-    else if (done) main = `<section class="block"><div class="body stack"><h3>Your player is built</h3><div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div><button class="btn go big" data-career>Sim the whole career</button></div></section>`;
+    else if (st.simming) main = `<section class="block"><div class="body"><h3>Simulating your career…</h3><div class="t2 sm" style="margin-top:6px">Age ${st.simming} · ${st.debut + st.simming - 19}-${String(st.debut + st.simming - 18).slice(2)}. Every season is played in that year's real league with the full sim.</div><div class="simcard" style="width:auto;border:0;padding:0"><div class="track"><i style="width:${Math.round((st.simming - 19) / 22 * 100)}%"></i></div></div></div></section>`;
+    else if (done) main = `<section class="block"><div class="body stack"><h3>Your player is built</h3><div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div><div class="setting"><div class="grow"><b>Draft class</b><div class="d">You enter the real league in this draft and play every season against the real rosters of that year.</div></div>${debutSelect()}</div><button class="btn go big" data-career>Sim the whole career</button></div></section>`;
     else main = draftView(hide);
     const prime = done ? buildPrime() : null;
     app.innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">Skill Draft Career</button></div>
@@ -326,29 +336,44 @@ HL.SkillDraft = (function () {
     </tbody></table></div></div></section>`;
   }
 
+  // Draft classes with the real players who came in that year (from the history database).
+  function debutSelect() {
+    const years = [];
+    for (let y = HL.LATEST_SEASON; y >= 1947; y--) years.push(y);
+    return `<select data-debut>${years.map(y => `<option value="${y}" ${y === st.debut ? 'selected' : ''}>${y} draft · ${y}-${String(y + 1).slice(2)} season${y > HL.LATEST_SEASON - 15 ? ' (later years replay ' + HL.LATEST_SEASON + '-' + String(HL.LATEST_SEASON + 1).slice(2) + ')' : ''}</option>`).join('')}</select>`;
+  }
+  const awardName = a => a.award || a;
+
   function resultView() {
     const c = st.career, me = c.me;
     const [tier, line] = verdict(c);
-    const lastTeam = HL.TEAMS.find(t => t.abbr === (c.seasons.length ? c.seasons[c.seasons.length - 1].team : c.teams[0]));
+    const nba = c.seasons.filter(s => !s.minors);
+    const lastTeam = nba.length ? nba[nba.length - 1].teamMeta : null;
     const count = name => c.awards.filter(a => a.award === name).length;
     const comp = HL.HISTORY.players[c.legacy.closest.pid][0];
     const T = c.totals;
     return `<div class="cols c2" style="align-items:stretch">
-        <div style="max-width:340px">${HL.GFX.playerCard(me, lastTeam, { sub: `${c.seasons.length} seasons · ${c.teams.length} team${c.teams.length > 1 ? 's' : ''}` })}</div>
+        <div style="max-width:340px">${HL.GFX.playerCard(Object.assign({}, me, { ovr: c.seasons.length ? Math.max(...c.seasons.map(s => s.ovr)) : me.ovr }), lastTeam, { sub: `Peak rating · ${c.seasons.length} seasons · ${c.teams.length} team${c.teams.length > 1 ? 's' : ''}` })}</div>
         <section class="block"><div class="body stack">
           <div class="caps">The verdict</div><h1 style="font-size:52px;line-height:.9">${tier}</h1><div class="t2">${esc(line)}</div>
-          <div class="kv"><span>All-time legacy rank</span><b>#${c.legacy.rank}</b></div>
+          <div class="kv"><span>All-time legacy rank</span><b>${c.legacy.rank > 1500 ? 'Outside the top 1,500' : '#' + c.legacy.rank}</b></div>
           <div class="kv"><span>Legacy score</span><b>${c.legacy.score}</b></div>
-          <div class="kv"><span>Most comparable career</span><b>${esc(comp)}</b></div>
-          <div class="kv"><span>Drafted</span><b>#${c.pick} overall</b></div>
+          ${c.legacy.score >= 2 ? `<div class="kv"><span>Most comparable career</span><b>${esc(comp)}</b></div>` : ''}
+          <div class="kv"><span>Drafted</span><b>${c.pick ? `#${c.pick} overall · ${c.debut}` : `Undrafted · ${c.debut}`}</b></div>
           <div class="kv"><span>Rings · MVPs · All-Star</span><b>${c.rings} · ${count('MVP')} · ${count('All-Star')}</b></div>
           <div class="kv"><span>Career</span><b>${T.g ? (T.pts / T.g).toFixed(1) : 0} PPG · ${T.g ? (T.reb / T.g).toFixed(1) : 0} RPG · ${T.g ? (T.ast / T.g).toFixed(1) : 0} APG</b></div>
           <div class="kv"><span>Totals</span><b>${Math.round(T.pts).toLocaleString()} pts · ${T.g} games</b></div>
           <button class="btn go" data-new>Build another</button>
         </div></section></div>
-      <section class="block"><header><h3>Career</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Season</th><th>Age</th><th class="l">Team</th><th>OVR</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>TS%</th><th>Record</th><th class="l">Honors</th></tr></thead><tbody>
-        ${c.seasons.map(s => { const t = HL.TEAMS.find(x => x.abbr === s.team); return `<tr><td class="l">${s.yr}-${String(s.yr + 1).slice(2)}</td><td>${s.age}</td><td class="l"><div class="row">${U.logo(t, 20)} ${esc(t.name)}</div></td><td>${U.rating(s.ovr)}</td><td>${s.g}</td><td class="hi">${s.ppg.toFixed(1)}</td><td>${s.rpg.toFixed(1)}</td><td>${s.apg.toFixed(1)}</td><td>${(s.ts * 100).toFixed(1)}</td><td>${s.w}-${s.l}</td><td class="l sm">${s.awards.map(a => `<span class="tag ${a === 'Champion' || a === 'MVP' ? 'team' : ''}">${esc(a)}</span>`).join(' ')}${s.playoffRound && !s.champion ? ` <span class="t3 xs">Playoffs R${s.playoffRound + 1}</span>` : ''}</td></tr>`; }).join('')}
+      ${c.altered.length ? `<section class="block"><header><h3>History you changed</h3><span class="ml-auto t3 sm">Real timeline vs yours</span></header><div class="body flush">${c.altered.map(a => `<div class="res-row" style="grid-template-columns:90px 1fr;cursor:default"><span class="t3">${a.season}-${String(a.season + 1).slice(2)}</span><span>${esc(a.text)}</span></div>`).join('')}</div></section>` : ''}
+      <section class="block"><header><h3>Career</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Season</th><th>Age</th><th class="l">Team</th><th>OVR</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>TS%</th><th>Record</th><th class="l">Honors</th><th class="l">Real champion</th></tr></thead><tbody>
+        ${c.seasons.map(s => { if (s.minors) return `<tr><td class="l">${s.yr}-${String(s.yr + 1).slice(2)}</td><td>${s.age}</td><td class="l t3">Minor leagues / overseas</td><td>${U.rating(s.ovr)}</td><td colspan="8"></td></tr>`; const t = s.teamMeta; return `<tr><td class="l">${s.yr}-${String(s.yr + 1).slice(2)}${s.key !== String(s.yr) ? ` <span class="t3 xs" title="Replays the ${s.key} league">*</span>` : ''}</td><td>${s.age}</td><td class="l"><div class="row">${U.logo(t, 20)} ${esc(t.name)}</div></td><td>${U.rating(s.ovr)}</td><td>${s.g}</td><td class="hi">${s.ppg.toFixed(1)}</td><td>${s.rpg.toFixed(1)}</td><td>${s.apg.toFixed(1)}</td><td>${(s.ts * 100).toFixed(1)}</td><td>${s.w}-${s.l}</td><td class="l sm">${s.awards.map(a => `<span class="tag ${['Champion', 'MVP'].includes(awardName(a)) ? 'team' : ''}" ${a.over ? `title="Over ${esc(a.over)}"` : ''}>${esc(awardName(a))}</span>`).join(' ')}${s.made && !s.champion ? ` <span class="t3 xs">${roundLabel(s)}</span>` : ''}${!s.made ? ' <span class="t3 xs">Missed playoffs</span>' : ''}</td><td class="l t3 sm">${s.key === String(s.yr) && s.realChamp ? esc(s.realChamp) : ''}</td></tr>`; }).join('')}
       </tbody></table></div></div></section>`;
+  }
+
+  function roundLabel(s) {
+    const left = s.rounds - s.playoffRound;
+    return left === 1 ? 'Lost in the Finals' : left === 2 ? 'Lost in the semifinals' : `Lost in round ${s.playoffRound + 1}`;
   }
 
   function bind() {
@@ -363,6 +388,7 @@ HL.SkillDraft = (function () {
       if (remaining().length) spin('all'); else { st.cat = null; render(); }
     });
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
+    const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const go = app.querySelector('[data-career]');
     if (go) go.onclick = async () => { st.simming = 19; render(); await simCareer(age => { st.simming = age; const bar = document.querySelector('.track i'); if (bar) bar.style.width = `${Math.round((age - 19) / 22 * 100)}%`; }); st.simming = null; render(); };
   }

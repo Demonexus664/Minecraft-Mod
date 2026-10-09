@@ -233,7 +233,11 @@ HL.News = (function () {
     const award = (id, key, label) => {
       if (id == null) return;
       const p = pn(id);
-      push(L, { type: 'award', importance: 2, playerIds: [id], teamIds: p.teamId != null ? [p.teamId] : [], headline: headline(L, key, { player: p.name, plast: last(p), label }, ['{player} named {label}', '{player} wins {label}'], ['{player} Named {label}']) });
+      const st = p.stats[String(L.season)];
+      const tid = p.teamId ?? (st && st.teamId);
+      const c = { player: p.name, plast: last(p), label, season: `${L.season}-${String(L.season + 1).slice(2)}` };
+      if (tid != null) c.team = T(L, tid).name;
+      push(L, { type: 'award', importance: 2, playerIds: [id], teamIds: tid != null ? [tid] : [], headline: headline(L, key, c, ['{player} named {label}', '{player} wins {label}'], ['{player} Named {label}']) });
     };
     award(a.dpoy, 'award.dpoy', 'Defensive Player of the Year');
     award(a.roy, 'award.roy', 'Rookie of the Year');
