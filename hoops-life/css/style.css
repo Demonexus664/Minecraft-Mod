@@ -319,8 +319,9 @@ html[data-era="60s"] {
   --win: #e8e6df; --loss: #8d8b84;
   --display: 'Old Standard TT', 'Times New Roman', serif; --body: 'Libre Baskerville', Georgia, serif;
 }
-html[data-era="60s"] body { filter: grayscale(1) contrast(1.05); }
-html[data-era="60s"] body::after { content: ''; position: fixed; inset: -50%; z-index: 999; pointer-events: none; opacity: .09; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); animation: static .35s steps(3) infinite; }
+/* Filters go on the root element: on <body> they would turn fixed overlays (static, sheets, toasts) into page-sized boxes. */
+html[data-era="60s"] { filter: grayscale(1) contrast(1.05); }
+html[data-era="60s"]::after { content: ''; position: fixed; inset: -50%; z-index: 999; pointer-events: none; opacity: .09; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); animation: static .35s steps(3) infinite; }
 @keyframes static { 0% { transform: translate(0, 0); } 33% { transform: translate(-6%, 4%); } 66% { transform: translate(5%, -7%); } 100% { transform: translate(-3%, 2%); } }
 html[data-era="60s"] h1, html[data-era="60s"] h2, html[data-era="60s"] h3, html[data-era="60s"] .mainnav button, html[data-era="60s"] .num { font-weight: 700; letter-spacing: 0; }
 html[data-era="60s"] .lead-story h2, html[data-era="60s"] .story h4 { font-family: var(--display); font-weight: 700; }
@@ -328,7 +329,7 @@ html[data-era="60s"] .face img, html[data-era="60s"] .logo img { filter: graysca
 
 /* 1970s: warm film broadcast */
 html[data-era="70s"] { --bg: #17110b; --surface: #20180f; --surface-2: #2a1f14; --surface-3: #35281a; --rule: #3c2e1e; --rule-strong: #54412a; --text: #f4e6cc; --text-2: #cdb994; --text-3: #9a8566; --display: 'Bebas Neue', 'Barlow Condensed', sans-serif; }
-html[data-era="70s"] body { filter: sepia(.25) saturate(1.1); }
+html[data-era="70s"] { filter: sepia(.25) saturate(1.1); }
 
 /* 1980s: CRT broadcast — scanlines, bold blocks */
 html[data-era="80s"] { --bg: #070a14; --surface: #0c1224; --surface-2: #121a33; --surface-3: #1a2447; --rule: #1f2a52; --rule-strong: #2c3a6e; --text: #eaf0ff; --text-2: #9fb0de; --text-3: #6a7bb0; }

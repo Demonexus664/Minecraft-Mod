@@ -1,11 +1,11 @@
 // 82-0 Challenge: spin a franchise + decade, draft one real player per position, then play
-// the full 82-game season against the real 2025-26 league with the actual sim.
+// a full season against the real league of any season you choose, with the actual sim.
 window.HL = window.HL || {};
 
 HL.Challenge = (function () {
   const U = HL.UI, esc = U.esc, R = HL.RNG;
   const SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'];
-  const OPP_SEASON = String(HL.LATEST_SEASON);
+  const yrLabel = y => `${y}-${String(+y + 1).slice(2)}`;
 
   // Every historical club -> the modern franchise it belongs to (official lineage).
   const LINEAGE = {
@@ -19,8 +19,8 @@ HL.Challenge = (function () {
 
   let st = null;
 
-  function newRun(mode, decades) {
-    st = { mode, decades, used: [], slots: { PG: null, SG: null, SF: null, PF: null, C: null }, team: null, decade: null, skips: { team: 1, era: 1 }, spinning: false, result: null };
+  function newRun(mode, decades, playSeason) {
+    st = { mode, decades, playSeason: playSeason || HL.LATEST_SEASON, used: [], slots: { PG: null, SG: null, SF: null, PF: null, C: null }, team: null, decade: null, skips: { team: 1, era: 1 }, spinning: false, result: null };
   }
 
   async function loadDecade(dec) {
@@ -67,8 +67,10 @@ HL.Challenge = (function () {
 
   // ---------- season sim against the real latest league ----------
   async function simSeason() {
-    await HL.History.load(OPP_SEASON);
-    const L = HL.League.createFromSeason({ seasonKey: OPP_SEASON, seed: Date.now() % 100000 });
+    const key = String(st.playSeason);
+    await HL.History.load(key);
+    const L = HL.League.createFromSeason({ seasonKey: key, seed: Date.now() % 100000 });
+    const games = L.games;
     const dream = { id: 999, abbr: 'YOU', city: 'Your', name: 'Five', color: '#c9a227', color2: '#111111', conf: 'East', strategy: HL.DEFAULT_STRATEGY() };
     const players = [];
     for (const slot of SLOTS) {
@@ -77,7 +79,7 @@ HL.Challenge = (function () {
       p.pos = slot;
       p.realMpg = 37;
       // Era translation: before the 3-point line, good shooters convert some mid-range shots to threes.
-      if (c.season < 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
+      if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
       p.ovr = HL.computeOvr(p.attrs, p.pos);
       players.push(p);
     }
@@ -97,7 +99,7 @@ HL.Challenge = (function () {
     const lines = {};
     for (const p of players) lines[p.id] = HL.blankStatLine();
     const log = [];
-    for (let g = 0; g < 82; g++) {
+    for (let g = 0; g < games; g++) {
       const opp = opps[g % opps.length];
       const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: HL.League.teamPlayers(opp.id) };
       for (const p of players) p.injury = null;
@@ -110,7 +112,7 @@ HL.Challenge = (function () {
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
       if (!won) log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 });
     }
-    st.result = { w, l, pf: pf / 82, pa: pa / 82, best, losses: log, lines, players };
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players };
     saveBest();
     render();
   }
@@ -118,19 +120,20 @@ HL.Challenge = (function () {
   function saveBest() {
     try {
       const all = JSON.parse(localStorage.getItem('hl-820') || '[]');
-      all.push({ w: st.result.w, l: st.result.l, at: Date.now(), mode: st.mode, five: SLOTS.map(s => `${HL.HISTORY.players[st.slots[s].row.pid][0]} (${st.slots[s].season})`) });
-      all.sort((a, b) => b.w - a.w);
+      all.push({ w: st.result.w, l: st.result.l, season: st.playSeason, at: Date.now(), mode: st.mode, five: SLOTS.map(s => `${HL.HISTORY.players[st.slots[s].row.pid][0]} (${st.slots[s].season})`) });
+      all.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l));
       localStorage.setItem('hl-820', JSON.stringify(all.slice(0, 20)));
     } catch (e) { /* storage unavailable */ }
   }
   function bestRuns() { try { return JSON.parse(localStorage.getItem('hl-820') || '[]'); } catch (e) { return []; } }
 
-  function verdict(w) {
-    if (w === 82) return ['PERFECT', '82-0. Immortal. They will never stop talking about this five.'];
-    if (w >= 75) return ['ALL-TIME TEAM', 'One of the greatest teams ever assembled.'];
-    if (w >= 66) return ['DYNASTY', 'Title favorites by a mile.'];
-    if (w >= 55) return ['CONTENDER', 'Real contender, but not a juggernaut.'];
-    if (w >= 42) return ['PLAYOFF TEAM', 'Good, not great. The fit matters.'];
+  function verdict(w, games = 82) {
+    const f = w / games;
+    if (w === games) return ['PERFECT', `${games}-0. Immortal. They will never stop talking about this five.`];
+    if (f >= 75 / 82) return ['ALL-TIME TEAM', 'One of the greatest teams ever assembled.'];
+    if (f >= 66 / 82) return ['DYNASTY', 'Title favorites by a mile.'];
+    if (f >= 55 / 82) return ['CONTENDER', 'Real contender, but not a juggernaut.'];
+    if (f >= 42 / 82) return ['PLAYOFF TEAM', 'Good, not great. The fit matters.'];
     return ['LOTTERY', 'History will not be kind to this five.'];
   }
 
@@ -142,12 +145,13 @@ HL.Challenge = (function () {
     const app = U.app();
     if (!st) return setupScreen();
     U.applyTeamTheme(st.team ? teamMeta(st.team) : null);
+    U.setEra(HL.eraForSeason(st.playSeason));
     const filled = SLOTS.filter(s => st.slots[s]).length;
     const done = filled === 5;
     const hide = st.mode === 'hoopiq';
     let body = '';
     if (st.result) body = resultView();
-    else if (done) body = `<section class="block"><div class="body row wrap" style="gap:14px"><div class="grow"><h3>Your five is set</h3><div class="t2 sm" style="margin-top:4px">They'll play all 82 games against the real ${OPP_SEASON}-${String(+OPP_SEASON + 1).slice(2)} league with the full possession sim.</div></div><button class="btn go big" data-sim>Play the season</button></div></section>`;
+    else if (done) body = `<section class="block"><div class="body row wrap" style="gap:14px"><div class="grow"><h3>Your five is set</h3><div class="t2 sm" style="margin-top:4px">They'll play the whole ${yrLabel(st.playSeason)} season against that year's real league, with its rules, with the full possession sim.</div></div><button class="btn go big" data-sim>Play the season</button></div></section>`;
     else body = draftView(hide);
     app.innerHTML = `
     <div class="frame">
@@ -195,12 +199,12 @@ HL.Challenge = (function () {
 
   function resultView() {
     const r = st.result;
-    const [tier, line] = verdict(r.w);
+    const [tier, line] = verdict(r.w, r.games);
     const five = SLOTS.map(s => st.slots[s]);
     const posterTeam = { abbr: 'YOU', city: 'The', name: 'Five', color: '#c9a227', color2: '#111111', espn: null };
     const starsFig = r.players.slice(0, 5);
     const rows = r.players.slice(0, 5).map((p, i) => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${five[i].season}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl / g).toFixed(1)}</td><td>${(l.blk / g).toFixed(1)}</td><td>${l.fga ? (l.fgm / l.fga * 100).toFixed(1) : '-'}</td></tr>`; }).join('');
-    return `${HL.GFX.championPoster(posterTeam, starsFig, '', { wide: true, kicker: `82-0 Challenge · ${r.w}-${r.l}`, sub: tier })}
+    return `${HL.GFX.championPoster(posterTeam, starsFig, '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
       <section class="block"><div class="body row wrap" style="gap:24px">
         <div><div class="caps">Final record</div><div class="num" style="font-size:64px;line-height:1">${r.w}-${r.l}</div></div>
         <div class="grow"><h2 style="font-size:28px">${tier}</h2><div class="t2" style="margin-top:6px">${esc(line)}</div>
@@ -225,23 +229,28 @@ HL.Challenge = (function () {
       else spin();
     });
     const sim = app.querySelector('[data-sim]');
-    if (sim) sim.onclick = () => { sim.disabled = true; sim.textContent = 'Playing 82 games…'; setTimeout(() => simSeason(), 30); };
+    if (sim) sim.onclick = () => { sim.disabled = true; sim.textContent = 'Playing the season…'; setTimeout(() => simSeason(), 30); };
   }
 
   function setupScreen() {
     U.applyTeamTheme(null);
     U.setEra('modern');
     const all = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
-    const cfg = { mode: 'classic', decades: all.slice(1) };
+    const cfg = { mode: 'classic', decades: all.slice(1), playSeason: HL.LATEST_SEASON };
+    const years = [];
+    for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
     const draw = () => {
       U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">82-0 Challenge</button></div></div></div>
       <div class="page" style="max-width:900px">
         <div class="page-title"><h2>82-0 Challenge</h2></div>
         <section class="block"><div class="body stack">
-          <p class="t2" style="margin:0">Spin a franchise and a decade, then draft one real player who played there into an open position he actually played. You get one team skip and one decade skip. When your five is set, they play all 82 games against the real 2025-26 league. Can they go 82-0?</p>
+          <p class="t2" style="margin:0">Spin a franchise and a decade, then draft one real player who played there into an open position he actually played. You get one team skip and one decade skip. When your five is set, they play a full season against the real league of the season you pick, with that year's rules and look. Can they go undefeated?</p>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Play the season in</b><div class="d">Your five joins that year's real league: its teams, rules (no three-point line before 1979-80), schedule length and era look.</div></div>
+            <select data-play>${years.map(y => `<option value="${y}" ${y === cfg.playSeason ? 'selected' : ''}>${yrLabel(y)}${y === HL.LATEST_SEASON ? ' (today)' : ''}</option>`).join('')}</select></div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides ratings and stats, so you draft from memory.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], cfg.mode)}</div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Decades in the spin</b><div class="d">Each pick uses a different decade while possible.</div></div>
             <div class="row wrap">${all.map(d => `<label class="row sm" style="gap:4px"><input type="checkbox" data-dec="${d}" ${cfg.decades.includes(d) ? 'checked' : ''}> ${d}s</label>`).join('')}</div></div>
+          <div class="t3 sm">Draft from every era, or tick one decade for an all-'90s five.</div>
           <div class="row"><button class="btn go big ml-auto" data-go>Start</button></div>
         </div></section>
       </div></div>`;
@@ -249,7 +258,9 @@ HL.Challenge = (function () {
       app.querySelector('[data-home]').onclick = () => HL.App.title();
       app.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.v; draw(); });
       app.querySelectorAll('[data-dec]').forEach(cb => cb.onchange = () => { const d = +cb.dataset.dec; cfg.decades = cb.checked ? [...cfg.decades, d] : cfg.decades.filter(x => x !== d); });
-      app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun(cfg.mode, cfg.decades.sort()); render(); };
+      const ps = app.querySelector('[data-play]');
+      ps.onchange = () => { cfg.playSeason = +ps.value; U.setEra(HL.eraForSeason(cfg.playSeason)); };
+      app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun(cfg.mode, cfg.decades.sort(), cfg.playSeason); render(); };
     };
     draw();
   }

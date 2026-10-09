@@ -8,7 +8,7 @@ HL.App = (function () {
   const MODES = [
     { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over any real NBA team from any season since 1946. Real rosters and ratings, the full schedule, era playoffs and media. Rewrite history, and change every rule.' },
     { id: 'career', name: 'Player Career', desc: 'Live a whole life, from a kid with a ball to a Hall of Fame speech (or not). MyCareer meets BitLife, in any era.' },
-    { id: '820', name: '82-0 Challenge', live: true, desc: 'Spin a franchise and a decade, draft one real player per spot, and see if your five can run the table.' },
+    { id: '820', name: '82-0 Challenge', live: true, desc: 'Spin a franchise and a decade, draft one real player per spot, then drop your five into any real season and see if they can run the table.' },
     { id: 'skill', name: 'Skill Draft Career', live: true, desc: 'Build one player from real players\' skills, drop him into any real draft class, sim the whole career against the real league, and get the verdict.' },
   ];
 
