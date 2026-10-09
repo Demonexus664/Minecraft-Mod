@@ -1,0 +1,4 @@
+# Personal image pack (generated locally, not committed)
+assets/*
+!assets/.gitkeep
+!assets/README.md
