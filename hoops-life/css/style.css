@@ -627,3 +627,21 @@ html[data-era="60s"] .court { background: linear-gradient(#8d8d8d, #6f6f6f); }
 .btn.spin.daily { background: linear-gradient(#7ad8ff, #1d8fe0); box-shadow: 0 6px 0 #0d5a9a, 0 10px 24px rgba(29,143,224,.35); color: #04121d; }
 @media (max-width: 760px) { .bench .slot { width: 64px; } }
 .gc-plate > * { flex: none; }
+.gfx-jcard .gfx-jbig { position: absolute; left: 6%; right: 6%; top: 18%; bottom: 24%; display: grid; place-items: end center; }
+.gfx-jcard .gfx-jbig .gfx-jersey { position: relative; left: auto; bottom: auto; width: 150%; height: auto; margin: 0 -25%; filter: drop-shadow(0 8px 18px rgba(0,0,0,.45)); }
+/* Skill Draft build board */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.tile { position: relative; padding: 8px 10px; border-radius: 10px; border: 2px dashed var(--rule-strong); min-height: 70px; display: flex; flex-direction: column; justify-content: space-between; background: var(--surface-2); }
+.tile .lab { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); }
+.tile .val { font-family: var(--display); font-weight: 900; font-size: 28px; line-height: 1; }
+.tile .who { font-size: 10.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.on { border-style: solid; color: #111; }
+.tile.on .lab, .tile.on .who { color: rgba(0,0,0,.7); }
+.tile.on.t-bronze { background: linear-gradient(160deg, #b0703a, #e0a46b); border-color: #e0a46b; }
+.tile.on.t-silver { background: linear-gradient(160deg, #9aa4b2, #eef2f7); border-color: #eef2f7; }
+.tile.on.t-gold { background: linear-gradient(160deg, #c99a2e, #ffe08a); border-color: #ffe08a; }
+.tile.on.t-diamond { background: linear-gradient(160deg, #1b8fbf, #a9ecff); border-color: #a9ecff; }
+.tile.on.t-legend { background: linear-gradient(135deg, #ff4fd8, #ffd84f 50%, #4fffb0); border-color: #fff; box-shadow: 0 0 16px rgba(255,79,216,.45); }
+.tile.next { border-color: #ffd84f; box-shadow: 0 0 0 3px rgba(255,216,79,.25); }
+.tile.pop { animation: fxland .45s cubic-bezier(.2,1.8,.4,1); }
+.reel-item.txt { font-size: 18px; padding: 0 8px; line-height: 1.1; }

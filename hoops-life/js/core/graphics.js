@@ -31,7 +31,7 @@ HL.GFX = (function () {
     const era = opts.era || 'modern';
     // Jersey wordmarks as teams actually wear them.
     const WORD = { Timberwolves: 'WOLVES', 'Trail Blazers': 'BLAZERS', Cavaliers: 'CAVS', Mavericks: 'MAVS', SuperSonics: 'SONICS', Grizzlies: 'GRIZZLIES', Pelicans: 'PELICANS', Clippers: 'CLIPPERS' };
-    const word = team ? (WORD[team.name] || (team.name.length > 10 ? team.city : team.name)).toUpperCase() : '';
+    const word = opts.word != null ? String(opts.word).toUpperCase() : team ? (WORD[team.name] || (team.name.length > 10 ? team.city : team.name)).toUpperCase() : '';
     const trim = c2.toLowerCase() === c.toLowerCase() ? '#ffffff' : c2;
     const gid = id('j');
     // Retro eras get thicker trim and tighter lettering.
@@ -151,6 +151,19 @@ HL.GFX = (function () {
     </div>`;
   }
 
+  // A created player's card: his jersey (name and number) in team colors, no face.
+  function jerseyCard(p, team, opts = {}) {
+    const { c, c2 } = teamColors(team);
+    const last = (p.name || '').split(' ').slice(-1)[0];
+    return `<div class="gfx gfx-card gfx-jcard" style="--c:${c};--c2:${c2}">
+      <div class="gfx-bg"></div>${rays('#ffffff', 0.12)}${stripes(c2)}
+      ${team ? `<div class="gfx-logo">${U.logo(team, 44)}</div>` : ''}
+      <div class="gfx-ovr">${U.rating(p.ovr)}</div>
+      <div class="gfx-jbig">${jersey(team, HL.jerseyNumber(p), { word: last.length > 9 ? last.slice(0, 9) : last })}</div>
+      <div class="gfx-nameplate"><div class="gfx-pos">${esc(p.pos)} · #${HL.jerseyNumber(p)}${p.height ? ' · ' + HL.fmtHeight(p.height) : ''}</div><div class="gfx-name">${esc(p.name)}</div>${opts.sub ? `<div class="gfx-sub">${esc(opts.sub)}</div>` : ''}</div>
+    </div>`;
+  }
+
   // ---------- media day & social (composed from the stored media-day pieces) ----------
   // A media-day portrait: backdrop, figure in the stored jersey and number, expression, framing and lighting.
   function portrait(p, comp, opts = {}) {
@@ -201,5 +214,5 @@ HL.GFX = (function () {
     </div>`;
   }
 
-  return { figure, jersey, playerCard, matchupPoster, awardCard, moveCard, championPoster, rays, trophy, portrait, shortVideo, thumbnail, quoteCard };
+  return { figure, jersey, playerCard, jerseyCard, matchupPoster, awardCard, moveCard, championPoster, rays, trophy, portrait, shortVideo, thumbnail, quoteCard };
 })();

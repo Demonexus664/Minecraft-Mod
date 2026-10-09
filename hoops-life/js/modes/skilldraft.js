@@ -3,7 +3,7 @@
 window.HL = window.HL || {};
 
 HL.SkillDraft = (function () {
-  const U = HL.UI, esc = U.esc, R = HL.RNG;
+  const U = HL.UI, esc = U.esc, R = HL.RNG, FX = HL.FX;
   const C = () => HL.Challenge;
   const CATS = [
     ['inside', 'Inside scoring', ['close', 'layup', 'dunk', 'post']],
@@ -27,19 +27,53 @@ HL.SkillDraft = (function () {
   // Debut: a real draft year. Random debuts leave room for a full career inside the real data.
   const randomDebut = () => R.int(1956, HL.LATEST_SEASON - 14);
   function newRun(mode, debut) {
-    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, skips: { team: 1, era: 1, stat: 1 }, spinning: false, career: null, name: 'Your Player' };
+    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 1, era: 1, stat: 1 }, career: null, name: 'Your Player' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
+  const SHORT = { inside: 'INSIDE', mid: 'MID', three: '3PT', ft: 'FT', pass: 'PASS', handle: 'HANDLE', perD: 'PER D', intD: 'RIM D', reb: 'REB', ath: 'ATH', iq: 'IQ', motor: 'MOTOR', body: 'BODY' };
+  // A card's value for the drawn skill (body cards are rated by overall, and show height and weight).
+  const skillValue = (c, cat) => cat[0] === 'body' ? c.row.ovr : avgOf(rowAttrs(c.row), cat[2]);
+
+  // Spin the three reels (team, decade, skill), deal a hand of five from that club and decade, flip it.
   async function spin(what = 'all') {
-    st.spinning = true; render();
+    st.phase = 'reeling';
     if (what === 'all' || what === 'stat') st.cat = R.pick(remaining().filter(c => c !== st.cat || remaining().length === 1));
     if (what === 'all' || what === 'era') st.decade = R.pick(decades.filter(d => d !== st.decade));
     await C().loadDecade(st.decade);
     const fr = C().franchisesIn(st.decade);
     if (what === 'all' || what === 'team' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
-    setTimeout(() => { st.spinning = false; render(); }, 600);
+    // The hand leans toward rotation players; the best player for the skill is rarely in it.
+    const pool = C().candidates(st.team, st.decade);
+    st.hand = [];
+    while (st.hand.length < 5 && pool.length) { const c = R.weighted(pool, x => (x.row.mpg || 10) + 6); st.hand.push(c); pool.splice(pool.indexOf(c), 1); }
+    render();
+    const host = document.querySelector('#reels');
+    const teams = HL.TEAMS.map(t => t.abbr);
+    const decs = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+    if (host) await FX.reels(host, [
+      { label: 'Franchise', items: teams.map(a => `<div>${U.logo(tm(a), 62)}</div>`), final: teams.indexOf(st.team) },
+      { label: 'Decade', items: decs.map(d => `<div>${d}s</div>`), final: decs.indexOf(st.decade) },
+      { label: 'Skill', items: CATS.map(c => `<div class="txt">${esc(c[1])}</div>`), final: CATS.findIndex(c => c[0] === st.cat) },
+    ], { colors: [U.teamAccent(tm(st.team)).c, '#ffd84f', '#fff'] });
+    st.phase = 'hand';
+    render(true);
+  }
+  function take(i) {
+    const c = st.hand[i];
+    if (!c || st.phase !== 'hand') return;
+    const cat = catOf(st.cat);
+    st.picks[st.cat] = c;
+    const v = skillValue(c, cat);
+    FX.sfx.pop(FX.tierIndex(v));
+    const id = st.cat;
+    st.hand = []; st.cat = null;
+    st.phase = remaining().length ? 'spin' : 'built';
+    render();
+    const tile = document.querySelector(`.tile[data-cat="${id}"]`);
+    if (tile) { tile.classList.add('pop'); FX.burst(tile, FX.tierOf(v).colors.concat('#fff'), FX.tierIndex(v) >= 3 ? 30 : 12, 0.6); }
+    if (!remaining().length) setTimeout(() => { const prime = buildPrime(); const ovr = HL.computeOvr(prime.attrs, prime.pos); FX.banner(`${ovr} OVR`, `Your ${prime.pos} is built: ${HL.fmtHeight(prime.height)}, ${prime.weight} lb.`, { tier: ovr >= 95 ? 4 : ovr >= 90 ? 3 : ovr >= 82 ? 2 : 1, kicker: 'Ceiling', ms: 2200 }); }, 350);
   }
 
   function rowAttrs(row) { return HL.History.unpack(row.attrs, HL.HISTORY.attrs); }
@@ -525,7 +559,7 @@ HL.SkillDraft = (function () {
   const awardName = a => a.award || a;
   const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
-  function render() {
+  function render(revealHand) {
     if (!st) return setupScreen();
     const c = st.career;
     const done = !remaining().length;
@@ -538,12 +572,13 @@ HL.SkillDraft = (function () {
     else if (c && c.stage === 'draft') main = draftNightView();
     else if (c) main = hubView();
     else if (done) main = builtView();
-    else main = draftView(hide);
+    else main = draftView(hide, revealHand);
     const side = c ? careerSide(c) : buildSide(done, hide);
     U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">Skill Draft Career</button></div>
-      <div class="simbar">${c ? `<span class="t2 sm">${c.done ? 'Career over' : `${yrLabel(c.yr)} · Age ${c.age}`}</span>` : `<span class="t2 sm">${CATS.length - remaining().length}/${CATS.length} skills</span>`}<button class="btn small" data-new>New run</button></div></div></div>
+      <div class="simbar">${c ? `<span class="t2 sm">${c.done ? 'Career over' : `${yrLabel(c.yr)} · Age ${c.age}`}</span>` : `<span class="t2 sm">${CATS.length - remaining().length}/${CATS.length} skills</span>`}${FX.soundToggle()}<button class="btn small" data-new>New run</button></div></div></div>
       <div class="page">${c && !c.done && c.stage !== 'draft' && !st.busy ? teamBand(c) : ''}<div class="cols c-main"><div class="stack" style="gap:16px">${main}</div><div class="stack" style="gap:16px">${side}</div></div></div></div>`;
     bind();
+    if (revealHand) FX.flipIn(document.querySelectorAll('.hand .gcard'));
   }
 
   function busyView() {
@@ -553,9 +588,15 @@ HL.SkillDraft = (function () {
 
   function buildSide(done, hide) {
     const prime = done ? buildPrime() : null;
-    return `<section class="block"><header><h3>Your build</h3>${prime ? `<span class="ml-auto">${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body flush">
-      ${CATS.map(([id, label, keys]) => { const pk = st.picks[id]; if (!pk) return `<div class="res-row future" style="grid-template-columns:1fr auto"><span>${label}</span><span class="t3">—</span></div>`; const nm = HL.HISTORY.players[pk.row.pid][0]; const val = id === 'body' ? HL.fmtHeight(HL.HISTORY.players[pk.row.pid][3]) : avgOf(rowAttrs(pk.row), keys); return `<div class="res-row" style="grid-template-columns:1fr auto;cursor:default"><div><div>${label}</div><div class="t3 xs">${esc(nm)} · ${yrLabel(pk.season)}</div></div><b class="num" style="font-size:18px">${hide ? '?' : val}</b></div>`; }).join('')}
-    </div></section>`;
+    const tiles = CATS.map(cat => {
+      const [id, label] = cat;
+      const pk = st.picks[id];
+      if (!pk) return `<div class="tile ${st.cat === id ? 'next' : ''}" data-cat="${id}"><span class="lab">${esc(label)}</span><span class="val t3">—</span><span class="who">${st.cat === id ? 'Drafting now' : ''}</span></div>`;
+      const bio = HL.HISTORY.players[pk.row.pid];
+      const v = skillValue(pk, cat);
+      return `<div class="tile on t-${FX.tierOf(v).key}" data-cat="${id}"><span class="lab">${esc(label)}</span><span class="val">${hide ? '?' : id === 'body' ? HL.fmtHeight(bio[3]) : v}</span><span class="who">${esc(bio[0])} · ${yrLabel(pk.season)}</span></div>`;
+    }).join('');
+    return `<section class="block"><header><h3>Your build</h3><span class="ml-auto t3 sm">${CATS.length - remaining().length}/${CATS.length}</span>${prime && !hide ? `<span>${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body"><div class="board">${tiles}</div></div></section>`;
   }
 
   function builtView() {
@@ -698,7 +739,7 @@ HL.SkillDraft = (function () {
   function careerSide(c) {
     const nba = c.seasons.filter(s => !s.minors);
     const peak = nba.length ? Math.max(...nba.map(s => s.ovr)) : c.me.ovr;
-    const card = HL.GFX.playerCard(Object.assign({}, c.me, c.done ? { ovr: peak } : {}), c.minors ? null : c.teamMeta, { sub: c.done ? `Peak rating · ${plural(nba.length, 'season')}` : `${c.minors ? 'Minor leagues' : fullName(c.teamMeta)}` });
+    const card = HL.GFX.jerseyCard(Object.assign({}, c.me, c.done ? { ovr: peak } : {}), c.minors ? null : c.teamMeta, { sub: c.done ? `Peak rating · ${plural(nba.length, 'season')}` : `${c.minors ? 'Minor leagues' : fullName(c.teamMeta)}` });
     const count = name => c.awards.filter(a => a.award === name).length;
     const cab = ['Champion', 'Finals MVP', 'MVP', 'DPOY', 'ROY', 'All-NBA 1st', 'All-NBA 2nd', 'All-NBA 3rd', 'All-Star', 'Scoring title', 'Rebounding title', 'Assists title'].map(k => [k === 'Champion' ? 'Championships' : k, count(k)]).filter(x => x[1]);
     const H = c.highs;
@@ -757,29 +798,35 @@ HL.SkillDraft = (function () {
     const app = U.app();
     app.querySelector('[data-home]').onclick = () => HL.App.title();
     app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => { st = null; cache = null; render(); });
-    const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => spin('all');
-    app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k]) return; st.skips[k]--; spin(k); });
-    app.querySelectorAll('[data-take]').forEach(b => b.onclick = () => {
-      const c = C().candidates(st.team, st.decade).find(x => x.row.pid === b.dataset.take);
-      st.picks[st.cat] = c;
-      if (remaining().length) spin('all'); else { st.cat = null; render(); }
-    });
+    FX.bindSound(app);
+    const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin('all'); };
+    app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; spin(k); });
+    app.querySelectorAll('.hand .gcard').forEach(card => card.onclick = () => { if (!card.classList.contains('down')) take(+card.dataset.hand); });
+    FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
-    app.querySelectorAll('[data-begin]').forEach(b => b.onclick = () => busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
-      st.career = newCareer();
-      await draft(st.career);
-      if (b.dataset.begin === 'auto') { st.career.stage = null; await runRest(); }
-    }));
-    const play = () => busy(`Playing the ${yrLabel(c.yr)} season`, c.minors ? 'In the minor leagues' : `With the ${fullName(c.teamMeta)}`, async () => {
-      if (c.pending) decide(c, { type: 'stay' });
-      c.stage = null;
-      await playSeason(c);
-      await offseason(c);
+    app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
+      await busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
+        st.career = newCareer();
+        await draft(st.career);
+        if (b.dataset.begin === 'auto') { st.career.stage = null; await runRest(); }
+      });
+      const cc = st.career;
+      if (cc.done) return verdictBanner(cc);
+      await FX.banner(cc.pick ? `#${cc.pick}` : 'UNDRAFTED', cc.minors ? 'Heading to the minor leagues.' : `${esc(fullName(cc.teamMeta))} select ${esc(cc.me.name)}.`, { tier: !cc.pick ? 0 : cc.pick <= 3 ? 4 : cc.pick <= 10 ? 3 : cc.pick <= 30 ? 2 : 1, kicker: `Draft night · ${cc.debut}`, ms: 2400 });
     });
+    const play = async () => {
+      await busy(`Playing the ${yrLabel(c.yr)} season`, c.minors ? 'In the minor leagues' : `With the ${fullName(c.teamMeta)}`, async () => {
+        if (c.pending) decide(c, { type: 'stay' });
+        c.stage = null;
+        await playSeason(c);
+        await offseason(c);
+      });
+      await celebrate(c);
+    };
     app.querySelectorAll('[data-play]').forEach(b => b.onclick = play);
-    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = () => busy('Simulating the rest of the career', '', async () => { c.stage = null; await runRest(); }));
+    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { await busy('Simulating the rest of the career', '', async () => { c.stage = null; await runRest(); }); if (st.career.done) verdictBanner(st.career); });
     app.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => { decide(c, { type: 'sign', i: +b.dataset.sign }); render(); });
     app.querySelectorAll('[data-trade]').forEach(b => b.onclick = () => { decide(c, { type: 'trade' }); U.toast(`${esc(c.log[c.log.length - 1].text)}.`); render(); });
     app.querySelectorAll('[data-minors]').forEach(b => b.onclick = () => { decide(c, { type: 'minors' }); render(); });
@@ -789,26 +836,56 @@ HL.SkillDraft = (function () {
       decide(c, { type: 'retire' }); render();
     });
   }
+  // The payoff after each season: numbers count up, big honors get their own moment.
+  async function celebrate(c) {
+    const s = c.seasons[c.seasons.length - 1];
+    if (s && !s.minors) {
+      document.querySelectorAll('.statstrip b').forEach(b => { const v = parseFloat(b.textContent); if (!isNaN(v)) { const dec = (b.textContent.split('.')[1] || '').length; FX.countUp(b, v, 900, x => x.toFixed(dec)); } });
+      const award = n => s.awards.find(a => awardName(a) === n);
+      const over = n => { const a = award(n); return a && a.over ? `Over ${esc(a.over)}` : ''; };
+      const firstAllStar = award('All-Star') && c.awards.filter(a => a.award === 'All-Star').length === 1;
+      const queue = [];
+      if (s.champion) queue.push(['CHAMPIONS', `${esc(fullName(s.team))} · ${yrLabel(s.yr)}`, 4]);
+      if (award('Finals MVP')) queue.push(['FINALS MVP', '', 4]);
+      if (award('MVP')) queue.push(['MVP', over('MVP'), 4]);
+      if (award('DPOY')) queue.push(['DEFENSIVE PLAYER OF THE YEAR', over('DPOY'), 3]);
+      if (award('ROY')) queue.push(['ROOKIE OF THE YEAR', over('ROY'), 3]);
+      if (award('Scoring title')) queue.push(['SCORING TITLE', over('Scoring title'), 3]);
+      if (award('All-NBA 1st') && !award('MVP')) queue.push(['ALL-NBA FIRST TEAM', '', 3]);
+      if (firstAllStar) queue.push(['ALL-STAR', 'First selection', 2]);
+      for (const [t, sub, tier] of queue.slice(0, 3)) await FX.banner(t, sub, { tier, kicker: yrLabel(s.yr), ms: 2200 });
+      if (!queue.length && s.injury && s.injury.games >= 30) FX.shake(document.querySelector('.page'), 0.6);
+    }
+    if (c.done) await verdictBanner(c);
+  }
+  function verdictBanner(c) {
+    const [tier, line] = verdict(c);
+    const t = ['BROKEN', 'THE GOAT'].includes(tier) ? 4 : ['ALL-TIME GREAT', 'HALL OF FAMER'].includes(tier) ? 3 : ['SUPERSTAR', 'ALL-STAR'].includes(tier) ? 2 : ['STARTER', 'ROLE PLAYER'].includes(tier) ? 1 : 0;
+    return FX.banner(tier, esc(line), { tier: t, kicker: 'The verdict', ms: 3600 });
+  }
   async function runRest() {
     const c = st.career;
     await simRest(c, cc => setPct(Math.min(100, Math.round((cc.age - 19) / 22 * 100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`));
   }
 
-  function draftView(hide) {
-    if (!st.cat) return `<section class="block"><div class="body row" style="gap:16px"><div class="grow"><h3>Spin for your first skill</h3><div class="t2 sm" style="margin-top:4px">Each spin gives a franchise, a decade and a skill. Take that skill from any player who played there.</div></div><button class="btn go big" data-spin>Spin</button></div></section>`;
-    const fm = tm(st.team), cat = catOf(st.cat);
-    const reel = `<section class="block"><div class="body row wrap" style="gap:18px">
-      ${st.spinning ? `<div class="row" style="gap:12px"><div class="spinbox">${U.logo(R.pick(HL.TEAMS), 60)}</div><div class="spinbox num" style="font-size:34px">${R.pick(decades)}s</div><div class="spinbox"><b>${esc(R.pick(CATS)[1])}</b></div></div>`
-        : `<div class="row" style="gap:14px">${U.logo(fm, 60)}<div><div class="caps">${esc(cat[1])}</div><h2 style="font-size:28px">${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</h2></div></div>`}
-      <div class="row ml-auto" style="gap:8px"><button class="btn small" data-skip="team" ${st.skips.team ? '' : 'disabled'}>Team skip (${st.skips.team})</button><button class="btn small" data-skip="era" ${st.skips.era ? '' : 'disabled'}>Era skip (${st.skips.era})</button><button class="btn small" data-skip="stat" ${st.skips.stat ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button></div></div></section>`;
-    if (st.spinning) return reel;
-    const cands = C().candidates(st.team, st.decade).map(c => ({ ...c, val: cat[0] === 'body' ? HL.HISTORY.players[c.row.pid][3] : avgOf(rowAttrs(c.row), cat[2]) }))
-      .sort((a, b) => b.val - a.val);
-    return reel + `<section class="block"><header><h3>Take ${esc(cat[1].toLowerCase())} from…</h3></header><div class="body flush"><div class="tbl-wrap" style="max-height:62vh;overflow-y:auto"><table class="tbl"><thead><tr><th class="l">Player</th><th>Season</th><th>${cat[0] === 'body' ? 'Height / weight' : esc(cat[1])}</th><th></th></tr></thead><tbody>
-      ${cands.slice(0, 40).map(c => { const bio = HL.HISTORY.players[c.row.pid]; return `<tr><td class="l"><div class="row">${U.face({ name: bio[0], nbaId: bio[1], real: true }, 28, fm)}<b>${esc(bio[0])}</b> <span class="t3 xs">${esc(bio[2])}</span></div></td><td>${c.season}-${String(c.season + 1).slice(2)}</td><td class="hi">${hide ? '?' : cat[0] === 'body' ? `${HL.fmtHeight(bio[3])} · ${bio[4]} lb` : c.val}</td><td><button class="btn small" data-take="${c.row.pid}">Take</button></td></tr>`; }).join('')}
-    </tbody></table></div></div></section>`;
+  function draftView(hide, reveal) {
+    const fm = st.team ? tm(st.team) : null, cat = st.cat ? catOf(st.cat) : null;
+    const show = fm && cat && st.phase === 'hand';
+    const reel = (label, inner) => `<div class="reel ${show ? 'landed' : ''}"><div class="reel-label">${label}</div><div class="reel-win"><div class="reel-item ${label === 'Skill' ? 'txt' : ''}" style="height:96px">${inner}</div></div></div>`;
+    const reels = `<div id="reels"><div class="reels">${reel('Franchise', show ? U.logo(fm, 62) : '?')}${reel('Decade', show ? `${st.decade}s` : '?')}${reel('Skill', show ? esc(cat[1]) : '?')}</div></div>`;
+    const controls = `<div class="row" style="justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap">
+        <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${Object.keys(st.picks).length ? `Spin skill ${Object.keys(st.picks).length + 1}` : 'Spin'}</button>
+        <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
+        <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button>
+        <button class="btn" data-skip="stat" ${st.skips.stat && st.phase === 'hand' ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button></div>
+      ${show ? `<div class="result">${esc(cat[1])} from the ${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
+    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Tap a card to take his ${esc(cat[1].toLowerCase())}.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
+      <div class="hand">${st.hand.map((c, i) => { const bio = HL.HISTORY.players[c.row.pid]; const r = c.row; const v = skillValue(c, cat);
+        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: cat[0] === 'body' ? 'OVR' : SHORT[cat[0]], meta: `${yrLabel(c.season)} · ${c.club}`,
+          stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
+    const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Thirteen skills build one player.</p>' : '';
+    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reels}${intro}${controls}${cards}</section>`;
   }
-
 
   function setupScreen() {
     U.applyTeamTheme(null); U.setEra('modern');
