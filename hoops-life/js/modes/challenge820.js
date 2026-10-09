@@ -1,10 +1,17 @@
-// 82-0 Challenge: spin a franchise + decade, draft one real player per position, then play
-// a full season against the real league of any season you choose, with the actual sim.
+// 82-0 Challenge, played as a card game: spin the reels for a franchise and a decade, get dealt a hand
+// of real player cards from that club and decade, drag one onto the court (any spot; playing out of
+// position costs rating) or the bench. Eight rounds: five starters, three backups. Then the whole season
+// plays out live against the real league of the season you pick.
 window.HL = window.HL || {};
 
 HL.Challenge = (function () {
-  const U = HL.UI, esc = U.esc, R = HL.RNG;
-  const SLOTS = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const U = HL.UI, esc = U.esc, R = HL.RNG, FX = HL.FX;
+  const STARTERS = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const BENCH = ['B1', 'B2', 'B3'];
+  const SLOTS = [...STARTERS, ...BENCH];
+  const POSI = { PG: 0, SG: 1, SF: 2, PF: 3, C: 4 };
+  const TYPICAL_HT = { PG: 75, SG: 77, SF: 79, PF: 81, C: 83 };
+  const HAND = 5;
   const yrLabel = y => `${y}-${String(+y + 1).slice(2)}`;
 
   // Every historical club -> the modern franchise it belongs to (official lineage).
@@ -16,19 +23,16 @@ HL.Challenge = (function () {
     CHP: 'WAS', CHZ: 'WAS', BAL: 'WAS', CAP: 'WAS', WSB: 'WAS', WAS: 'WAS',
   };
   const posOk = (posStr, slot) => posStr.split('-').some(p => p === slot || (p === 'G' && (slot === 'PG' || slot === 'SG')) || (p === 'F' && (slot === 'SF' || slot === 'PF')));
+  const teamMeta = fr => HL.TEAMS.find(t => t.abbr === fr);
 
   let st = null;
 
-  function newRun(mode, decades, playSeason) {
-    st = { mode, decades, playSeason: playSeason || HL.LATEST_SEASON, used: [], slots: { PG: null, SG: null, SF: null, PF: null, C: null }, team: null, decade: null, skips: { team: 1, era: 1 }, spinning: false, result: null };
-  }
-
+  // ---------- data ----------
   async function loadDecade(dec) {
     const keys = HL.HISTORY.seasons.filter(k => !k.includes('-') && Math.floor(+k / 10) * 10 === dec);
     await Promise.all(keys.map(k => HL.History.load(k)));
     return keys;
   }
-
   // Best season with this franchise in this decade, for every player (min 20 games there).
   function candidates(franchise, dec) {
     const best = new Map();
@@ -43,7 +47,6 @@ HL.Challenge = (function () {
     }
     return [...best.values()].sort((a, b) => b.row.ovr - a.row.ovr);
   }
-
   function franchisesIn(dec) {
     const set = new Set();
     for (const k of HL.HISTORY.seasons) {
@@ -53,52 +56,125 @@ HL.Challenge = (function () {
     return [...set];
   }
 
+  // Natural positions from the player's listed position ("G-F", "C", "PF"...).
+  function naturals(c) {
+    const bio = HL.HISTORY.players[c.row.pid];
+    const out = new Set();
+    for (const p of String(c.row.pos + '-' + (bio[2] || '')).split('-')) {
+      if (POSI[p] != null) out.add(POSI[p]);
+      if (p === 'G') { out.add(0); out.add(1); }
+      if (p === 'F') { out.add(2); out.add(3); }
+    }
+    return out.size ? [...out] : [2];
+  }
+  // Out-of-position cost in rating points: distance between spots, plus how far his size is from the spot's.
+  function penalty(c, slot) {
+    if (!STARTERS.includes(slot)) return 0;
+    const d = Math.min(...naturals(c).map(n => Math.abs(n - POSI[slot])));
+    const ht = HL.HISTORY.players[c.row.pid][3] || TYPICAL_HT[slot];
+    const size = Math.max(0, Math.abs(ht - TYPICAL_HT[slot]) - 4) * 0.8;
+    return Math.round([0, 2, 6, 11, 16][d] + (d ? size : 0));
+  }
+  const rating = c => c.row.ovr;
+  const effRating = (c, slot) => rating(c) - penalty(c, slot);
+
+  // ---------- run ----------
+  function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
+  const today = () => new Date().toISOString().slice(0, 10);
+  function newRun(cfg) {
+    st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
+      round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
+      skips: { team: 1, era: 1 }, usedSkips: 0, used: [], result: null, pulls: [] };
+    if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
+  }
+  const filled = () => SLOTS.filter(s => st.lineup[s]).length;
+
   async function spin(what = 'both') {
-    st.spinning = true;
-    render();
-    const openDecades = st.decades.filter(d => !st.used.includes(d) || st.decades.length < 5);
+    st.phase = 'reeling';
+    const openDecades = st.decades.filter(d => !st.used.includes(d) || st.used.length >= st.decades.length);
     if (what !== 'team') st.decade = R.pick(openDecades.filter(d => d !== st.decade || openDecades.length === 1));
     await loadDecade(st.decade);
     const fr = franchisesIn(st.decade);
     if (what !== 'era' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
-    // A little slot-machine theatre.
-    setTimeout(() => { st.spinning = false; render(); }, 650);
+    // Deal the hand now (seeded), reveal it after the reels land.
+    const taken = new Set(SLOTS.filter(s => st.lineup[s]).map(s => st.lineup[s].row.pid));
+    // A hand leans toward real rotation players (minutes played), so deep-bench names show up less often.
+    const pool = candidates(st.team, st.decade).filter(c => !taken.has(c.row.pid));
+    st.hand = [];
+    while (st.hand.length < HAND && pool.length) { const c = R.weighted(pool, x => (x.row.mpg || 10) + 6); st.hand.push(c); pool.splice(pool.indexOf(c), 1); }
+    st.hand = R.shuffle(st.hand);
+    render();
+    const host = document.querySelector('#reels');
+    const teams = HL.TEAMS.map(t => t.abbr);
+    const decs = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
+    await FX.reels(host, [
+      { label: 'Franchise', items: teams.map(a => `<div>${U.logo(teamMeta(a), 62)}</div>`), final: teams.indexOf(st.team) },
+      { label: 'Decade', items: decs.map(d => `<div>${d}s</div>`), final: decs.indexOf(st.decade) },
+    ], { colors: [U.teamAccent(teamMeta(st.team)).c, '#ffd84f', '#fff'] });
+    st.phase = 'hand';
+    for (const c of st.hand) if (rating(c) >= 95) st.pulls.push(c.row.pid);
+    render(true);
   }
 
-  // ---------- season sim against the real latest league ----------
-  async function simSeason() {
+  function place(handIdx, slot) {
+    const c = st.hand[handIdx];
+    if (!c || st.lineup[slot] || st.phase !== 'hand') return;
+    st.lineup[slot] = c;
+    st.used.push(st.decade);
+    st.hand = [];
+    st.round++;
+    const pen = penalty(c, slot);
+    FX.sfx.pop(Math.min(4, FX.tierIndex(rating(c))));
+    st.phase = filled() === SLOTS.length ? 'ready' : 'spin';
+    render();
+    const el = document.querySelector(`.slot-wrap[data-slot="${slot}"]`);
+    if (el) FX.burst(el, FX.tierOf(rating(c)).colors.concat('#fff'), FX.tierIndex(rating(c)) >= 3 ? 30 : 14, 0.6);
+    if (pen >= 10) U.toast(`<b>${esc(HL.HISTORY.players[c.row.pid][0])}</b> at ${slot}: −${pen} out of position.`);
+  }
+  function swap(a, b) { if (st.phase === 'season' || st.phase === 'result') return; const t = st.lineup[a]; st.lineup[a] = st.lineup[b]; st.lineup[b] = t; FX.sfx.flip(); render(); }
+
+  // ---------- the season, played live ----------
+  async function playSeason() {
+    st.phase = 'season';
+    render();
     const key = String(st.playSeason);
     await HL.History.load(key);
-    const L = HL.League.createFromSeason({ seasonKey: key, seed: Date.now() % 100000 });
+    const L = HL.League.createFromSeason({ seasonKey: key, seed: st.daily ? seedFor('820s-' + st.date) : Date.now() % 100000 });
     const games = L.games;
     const dream = { id: 999, abbr: 'YOU', city: 'Your', name: 'Five', color: '#c9a227', color2: '#111111', conf: 'East', strategy: HL.DEFAULT_STRATEGY() };
     const players = [];
+    const minutes = { PG: 34, SG: 34, SF: 34, PF: 33, C: 33, B1: 22, B2: 18, B3: 14 };
     for (const slot of SLOTS) {
-      const c = st.slots[slot];
+      const c = st.lineup[slot];
       const p = HL.History.makePlayer(c.row, c.season, 999);
-      p.pos = slot;
-      p.realMpg = 37;
-      // Era translation: before the 3-point line, good shooters convert some mid-range shots to threes.
+      if (STARTERS.includes(slot)) p.pos = slot;
+      // Out of position: every rating drops by the penalty (Shaq at the point is not Shaq).
+      const pen = penalty(c, slot);
+      if (pen) for (const k in p.attrs) p.attrs[k] = Math.max(25, p.attrs[k] - pen);
+      p.realMpg = minutes[slot];
       if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
       p.ovr = HL.computeOvr(p.attrs, p.pos);
+      p.slot = slot;
       players.push(p);
     }
-    // Replacement-level bench.
-    const archs = ['3d', 'defguard', 'rimbig', 'sniper', 'twoway', 'stretchbig', 'slasher', 'defbig'];
-    for (let i = 0; i < 8; i++) {
-      const pos = SLOTS[i % 5];
-      const b = HL.createPlayer({ name: `${R.pick(HL.NAMES.first)} ${R.pick(HL.NAMES.last)}`, pos, age: 27, height: { PG: 75, SG: 77, SF: 79, PF: 81, C: 83 }[pos], ovr: R.int(68, 73), arch: archs[i], real: false, season: 2025, teamId: 999 });
-      b.realMpg = i < 4 ? 12 : 4;
+    // Five replacement-level players fill out the roster for garbage time and emergencies.
+    const archs = ['3d', 'defguard', 'rimbig', 'sniper', 'twoway'];
+    for (let i = 0; i < 5; i++) {
+      const pos = STARTERS[i];
+      const b = HL.createPlayer({ name: `${R.pick(HL.NAMES.first)} ${R.pick(HL.NAMES.last)}`, pos, age: 27, height: TYPICAL_HT[pos], ovr: R.int(66, 71), arch: archs[i], real: false, season: 2025, teamId: 999 });
+      b.realMpg = 2;
       players.push(b);
     }
     dream.players = players;
     dream.strategy.starters = players.slice(0, 5).map(p => p.id);
     const opps = L.teams;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
-    let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0;
+    let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
     for (const p of players) lines[p.id] = HL.blankStatLine();
     const log = [];
+    const q = sel => document.querySelector(sel);
+    const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
       const opp = opps[g % opps.length];
       const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: HL.League.teamPlayers(opp.id) };
@@ -110,17 +186,51 @@ HL.Challenge = (function () {
       if (won) { w++; streak++; best = Math.max(best, streak); } else { l++; streak = 0; }
       pf += mine.score; pa += theirs.score;
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
-      if (!won) log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 });
+      if (!won) { log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 }); if (!firstLoss) firstLoss = { g: g + 1, opp }; }
+      // Live ticker.
+      const d = document.querySelectorAll('.ticker .dots i')[g];
+      if (d) d.className = won ? 'w' : 'l';
+      if (q('.ticker .rec')) q('.ticker .rec').textContent = `${w}-${l}`;
+      if (won) FX.sfx.win(); else FX.sfx.loss();
+      if (!won && l === 1) { const s = q('.ticker .status'); if (s) { s.textContent = `Perfect season over · game ${g + 1} vs the ${opp.name}`; s.classList.add('over'); } FX.shake(q('.ticker'), 0.8); }
+      if (q('.ticker .sub')) q('.ticker .sub').textContent = `${(pf / (g + 1)).toFixed(1)} PPG · ${(pa / (g + 1)).toFixed(1)} allowed · ${streak > 1 ? `${streak}-game win streak` : streak === 1 ? 'won the last one' : 'lost the last one'}`;
+      // Starts quick, and slows down when a perfect season is still alive late.
+      if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players };
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss };
+    st.result.unlocked = achievements();
     saveBest();
+    const [tier, line] = verdict(w, games);
+    const t = w === games ? 4 : w / games >= 75 / 82 ? 3 : w / games >= 55 / 82 ? 2 : w / games >= 42 / 82 ? 1 : 0;
+    await FX.banner(tier, `${w}-${l}. ${esc(line)}`, { tier: t, kicker: `${games}-0 Challenge · ${yrLabel(st.playSeason)}`, ms: 3200 });
+    st.phase = 'result';
     render();
+    for (const a of st.result.unlocked.filter(x => x.fresh)) { await FX.wait(250); U.toast(`Achievement unlocked: <b>${esc(a.name)}</b>`); FX.sfx.pop(3); }
   }
 
+  // ---------- achievements ----------
+  const ACH = [
+    ['perfect', 'Perfect season', r => r.w === r.games],
+    ['seventy', '70-win pace', r => r.w / r.games >= 70 / 82],
+    ['legend', 'Legend pull', () => st.pulls.length > 0],
+    ['allgold', 'All gold', () => SLOTS.every(s => rating(st.lineup[s]) >= 84)],
+    ['bargain', 'Bargain bin (no 90+ starter, 55-win pace)', r => STARTERS.every(s => rating(st.lineup[s]) < 90) && r.w / r.games >= 55 / 82],
+    ['oop', 'Out of position, still winning', r => STARTERS.some(s => penalty(st.lineup[s], s) >= 10) && r.w / r.games >= 50 / 82],
+    ['noskip', 'No skips, 60-win pace', r => !st.usedSkips && r.w / r.games >= 60 / 82],
+    ['oneera', 'One-decade team', () => new Set(SLOTS.map(s => Math.floor(st.lineup[s].season / 10))).size === 1],
+    ['daily', 'Daily challenge finished', () => st.daily],
+  ];
+  function achievements() {
+    let have = [];
+    try { have = JSON.parse(localStorage.getItem('hl-820-ach') || '[]'); } catch (e) { /* storage unavailable */ }
+    const out = ACH.map(([id, name, test]) => ({ id, name, got: !!test(st.result), had: have.includes(id) })).map(a => ({ ...a, fresh: a.got && !a.had }));
+    try { localStorage.setItem('hl-820-ach', JSON.stringify([...new Set([...have, ...out.filter(a => a.got).map(a => a.id)])])); } catch (e) { /* storage unavailable */ }
+    return out;
+  }
   function saveBest() {
     try {
       const all = JSON.parse(localStorage.getItem('hl-820') || '[]');
-      all.push({ w: st.result.w, l: st.result.l, season: st.playSeason, at: Date.now(), mode: st.mode, five: SLOTS.map(s => `${HL.HISTORY.players[st.slots[s].row.pid][0]} (${st.slots[s].season})`) });
+      all.push({ w: st.result.w, l: st.result.l, season: st.playSeason, daily: st.date, at: Date.now(), mode: st.mode, five: STARTERS.map(s => `${HL.HISTORY.players[st.lineup[s].row.pid][0]} (${st.lineup[s].season})`) });
       all.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l));
       localStorage.setItem('hl-820', JSON.stringify(all.slice(0, 20)));
     } catch (e) { /* storage unavailable */ }
@@ -129,141 +239,229 @@ HL.Challenge = (function () {
 
   function verdict(w, games = 82) {
     const f = w / games;
-    if (w === games) return ['PERFECT', `${games}-0. Immortal. They will never stop talking about this five.`];
+    if (w === games) return ['PERFECT', `${games}-0. Immortal. They will never stop talking about this team.`];
     if (f >= 75 / 82) return ['ALL-TIME TEAM', 'One of the greatest teams ever assembled.'];
     if (f >= 66 / 82) return ['DYNASTY', 'Title favorites by a mile.'];
     if (f >= 55 / 82) return ['CONTENDER', 'Real contender, but not a juggernaut.'];
     if (f >= 42 / 82) return ['PLAYOFF TEAM', 'Good, not great. The fit matters.'];
-    return ['LOTTERY', 'History will not be kind to this five.'];
+    return ['LOTTERY', 'History will not be kind to this team.'];
   }
 
   // ---------- UI ----------
-  function teamMeta(fr) { return HL.TEAMS.find(t => t.abbr === fr); }
-  const decLabel = d => `${d}s`;
-
-  function render() {
-    const app = U.app();
-    if (!st) return setupScreen();
-    U.applyTeamTheme(st.team ? teamMeta(st.team) : null);
-    U.setEra(HL.eraForSeason(st.playSeason));
-    const filled = SLOTS.filter(s => st.slots[s]).length;
-    const done = filled === 5;
-    const hide = st.mode === 'hoopiq';
-    let body = '';
-    if (st.result) body = resultView();
-    else if (done) body = `<section class="block"><div class="body row wrap" style="gap:14px"><div class="grow"><h3>Your five is set</h3><div class="t2 sm" style="margin-top:4px">They'll play the whole ${yrLabel(st.playSeason)} season against that year's real league, with its rules, with the full possession sim.</div></div><button class="btn go big" data-sim>Play the season</button></div></section>`;
-    else body = draftView(hide);
-    app.innerHTML = `
-    <div class="frame">
-      <div class="masthead"><div class="bar">
-        <div class="wordmark" data-home>Hoops<i>Life</i></div>
-        <div class="mainnav"><button class="on">82-0 Challenge</button></div>
-        <div class="simbar"><span class="t2 sm">${hide ? 'HoopIQ (stats hidden)' : 'Classic'} · ${filled}/5 picked</span><button class="btn small" data-new>New run</button></div>
-      </div></div>
-      <div class="page">
-        <div class="cols c-main">
-          <div class="stack" style="gap:16px">${body}</div>
-          <div class="stack" style="gap:16px">
-            <section class="block"><header><h3>Your five</h3></header><div class="body flush">
-              ${SLOTS.map(s => { const c = st.slots[s]; if (!c) return `<div class="res-row future" style="grid-template-columns:34px 1fr"><b class="caps">${s}</b><span class="t3">Open</span></div>`; const nm = HL.HISTORY.players[c.row.pid][0]; const fm = teamMeta(LINEAGE[c.club]); return `<div class="res-row" style="grid-template-columns:34px 1fr auto;cursor:default"><b class="caps">${s}</b><div class="row">${U.logo(fm, 22)}<div><div><b>${esc(nm)}</b></div><div class="t3 xs">${c.season}-${String(c.season + 1).slice(2)} · ${esc(c.club)}</div></div></div>${hide && !st.result ? '' : U.rating(c.row.ovr)}</div>`; }).join('')}
-            </div></section>
-            <section class="block"><header><h3>Best runs</h3></header><div class="body">${bestRuns().slice(0, 6).map(r => `<div class="kv"><span>${r.five.slice(0, 2).map(esc).join(', ')}…</span><b>${r.w}-${r.l}</b></div>`).join('') || '<div class="t3 sm">No runs yet.</div>'}</div></section>
-          </div>
-        </div>
-      </div>
-    </div>`;
-    bind();
+  function cardFor(c, opts = {}) {
+    const bio = HL.HISTORY.players[c.row.pid];
+    const team = teamMeta(LINEAGE[c.club]) || null;
+    const r = c.row;
+    return HL.Cards.card({
+      pid: c.row.pid, name: bio[0], nbaId: bio[1], team, pos: r.pos, rating: opts.rating != null ? opts.rating : rating(c),
+      meta: `${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
+      stat: [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: st.mode === 'hoopiq' && st.phase !== 'result', down: opts.down, cls: opts.cls || '', attrs: opts.attrs || '',
+    });
   }
 
-  function draftView(hide) {
-    if (!st.team) return `<section class="block"><div class="body row" style="gap:16px"><div class="grow"><h3>Spin for your first pick</h3><div class="t2 sm" style="margin-top:4px">You'll get a franchise and a decade. Pick one player who played there, into an open position he actually played.</div></div><button class="btn go big" data-spin>Spin</button></div></section>`;
-    const fm = teamMeta(st.team);
-    const reel = `<section class="block"><div class="body row wrap" style="gap:18px">
-      <div class="row" style="gap:14px">${st.spinning ? `<div class="spinbox">${U.logo(R.pick(HL.TEAMS), 64)}</div><div class="spinbox num" style="font-size:40px">${R.pick(st.decades)}s</div>` : `${U.logo(fm, 64)}<div><div class="caps">Spin result</div><h2 style="font-size:30px">${esc(fm.city)} ${esc(fm.name)} · ${decLabel(st.decade)}</h2></div>`}</div>
-      <div class="row ml-auto" style="gap:8px"><button class="btn" data-skip="team" ${st.skips.team ? '' : 'disabled'}>Team skip (${st.skips.team})</button><button class="btn" data-skip="era" ${st.skips.era ? '' : 'disabled'}>Era skip (${st.skips.era})</button></div>
-    </div></section>`;
-    if (st.spinning) return reel;
-    const open = SLOTS.filter(s => !st.slots[s]);
-    const cands = candidates(st.team, st.decade).filter(c => !SLOTS.some(s => st.slots[s] && st.slots[s].row.pid === c.row.pid));
-    const rows = cands.slice(0, 40).map(c => {
-      const bio = HL.HISTORY.players[c.row.pid];
-      const fits = open.filter(s => posOk(c.row.pos + '-' + bio[2], s));
-      const r = c.row;
-      return `<tr class="${fits.length ? '' : 't3'}"><td class="l"><div class="row">${U.face({ name: bio[0], nbaId: bio[1], real: true }, 30, fm)}<div><b>${esc(bio[0])}</b><div class="t3 xs">${esc(bio[2])} · ${c.season}-${String(c.season + 1).slice(2)}</div></div></div></td>
-        ${hide ? '' : `<td>${U.rating(r.ovr)}</td><td>${r.pts}</td><td>${r.trb}</td><td>${r.ast}</td><td>${c.season >= 1973 ? r.stl : '–'}</td><td>${c.season >= 1973 ? r.blk : '–'}</td>`}
-        <td class="l">${fits.length ? fits.map(s => `<button class="btn small" data-pick="${r.pid}" data-slot="${s}">${s}</button>`).join(' ') : '<span class="xs">No open position</span>'}</td></tr>`;
+  function courtView() {
+    const spots = { PG: [50, 80], SG: [83, 57], SF: [17, 57], PF: [71, 24], C: [29, 24] };
+    const hide = st.mode === 'hoopiq' && st.phase !== 'result';
+    const five = STARTERS.filter(s => st.lineup[s]).map(s => effRating(st.lineup[s], s));
+    const avg = five.length ? Math.round(five.reduce((a, b) => a + b, 0) / five.length) : null;
+    const spotHtml = s => {
+      const c = st.lineup[s];
+      const pen = c ? penalty(c, s) : 0;
+      return `<div class="spot slot-wrap" data-slot="${s}" style="left:${spots[s][0]}%;top:${spots[s][1]}%">
+        ${c ? cardFor(c, { cls: 'mini placed', attrs: `data-from="${s}"`, rating: hide ? rating(c) : effRating(c, s) }) : `<div class="slot" data-drop="${s}">${s}</div>`}
+        ${c ? `<span class="fit ${pen >= 6 ? 'bad' : pen ? '' : 'ok'}">${s}${pen ? ` −${pen}` : ' fit'}</span>` : ''}</div>`;
+    };
+    const bench = BENCH.map((s, i) => {
+      const c = st.lineup[s];
+      return `<div class="bench-spot slot-wrap" data-slot="${s}">${c ? cardFor(c, { cls: 'mini placed', attrs: `data-from="${s}"` }) : `<div class="slot" data-drop="${s}">${['6th', '7th', '8th'][i]}</div>`}<span class="t3 xs">${['Sixth man', 'Seventh man', 'Eighth man'][i]}</span></div>`;
     }).join('');
-    return reel + `<section class="block"><header><h3>${esc(fm.name)} · ${decLabel(st.decade)}</h3><span class="t3 sm">${cands.length} players · best season with the club that decade${st.decade < 1980 ? ' · steals/blocks were not tracked before 1973-74' : ''}</span></header>
-      <div class="body flush"><div class="tbl-wrap" style="max-height:62vh;overflow-y:auto"><table class="tbl"><thead><tr><th class="l">Player</th>${hide ? '' : '<th>OVR</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th>'}<th class="l">Pick for</th></tr></thead><tbody>${rows || '<tr><td class="l t3">No eligible players. Use a skip.</td></tr>'}</tbody></table></div></div></section>`;
+    return `<div class="court">
+      <svg class="lines" viewBox="0 0 500 410" preserveAspectRatio="none" aria-hidden="true">
+        <g fill="none" stroke="rgba(255,255,255,.75)" stroke-width="3">
+          <rect x="4" y="4" width="492" height="402"/><rect x="170" y="4" width="160" height="190"/>
+          <circle cx="250" cy="194" r="60"/><path d="M30 4 V140 A220 220 0 0 0 470 140 V4"/><path d="M190 410 A60 60 0 0 1 310 410"/>
+          <line x1="220" y1="40" x2="280" y2="40"/><circle cx="250" cy="55" r="9"/>
+        </g></svg>
+      ${STARTERS.map(spotHtml).join('')}
+    </div>
+    <div class="bench">${bench}</div>
+    ${avg != null && !hide ? `<div class="t2 sm" style="text-align:center">Starting five: <b>${avg}</b> average after position fit</div>` : ''}`;
+  }
+
+  function render(revealHand) {
+    if (!st) return setupScreen();
+    const fm = st.team ? teamMeta(st.team) : null;
+    U.applyTeamTheme(fm);
+    U.setEra(HL.eraForSeason(st.playSeason));
+    let main;
+    if (st.phase === 'result') main = resultView();
+    else if (st.phase === 'season') main = tickerView();
+    else main = machineView(revealHand);
+    U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar">
+        <div class="wordmark" data-home>Hoops<i>Life</i></div>
+        <div class="mainnav"><button class="on">82-0 Challenge${st.daily ? ' · Daily' : ''}</button></div>
+        <div class="simbar"><span class="t2 sm">${st.mode === 'hoopiq' ? 'HoopIQ' : 'Classic'} · ${yrLabel(st.playSeason)} · Pick ${Math.min(filled() + 1, SLOTS.length)}/${SLOTS.length}</span>${FX.soundToggle()}<button class="btn small" data-new>New run</button></div>
+      </div></div>
+      <div class="page"><div class="game820">${main}<div class="stack" style="gap:12px">${courtView()}
+        <section class="block"><header><h3>Best runs</h3></header><div class="body">${bestRuns().slice(0, 5).map(r => `<div class="kv"><span>${r.daily ? `<span class="tag">Daily ${esc(r.daily)}</span> ` : ''}${r.five.slice(0, 2).map(esc).join(', ')}…</span><b>${r.w}-${r.l}</b></div>`).join('') || '<div class="t3 sm">No runs yet.</div>'}</div></section>
+      </div></div></div></div>`;
+    bind();
+    if (revealHand) FX.flipIn(document.querySelectorAll('.hand .gcard'));
+  }
+
+  function machineView(reveal) {
+    const fm = st.team ? teamMeta(st.team) : null;
+    const done = st.phase === 'ready';
+    const reel = (label, inner, landed) => `<div class="reel ${landed ? 'landed' : ''}"><div class="reel-label">${label}</div><div class="reel-win"><div class="reel-item" style="height:96px">${inner}</div></div></div>`;
+    const showResult = fm && st.phase !== 'reeling' && st.phase !== 'spin';
+    const reelHost = `<div id="reels"><div class="reels">${reel('Franchise', showResult ? U.logo(fm, 62) : '?', showResult)}${reel('Decade', showResult ? `${st.decade}s` : '?', showResult)}</div></div>`;
+    const controls = done
+      ? `<div class="stack" style="align-items:center;gap:8px;margin-top:16px"><div class="result">Your team is set</div><div class="t2 sm">Drag cards between spots to fix the fit, then play the ${yrLabel(st.playSeason)} season.</div><button class="btn spin" data-play>Play the season</button></div>`
+      : `<div class="row" style="justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${st.round === 0 ? 'Spin' : `Spin pick ${st.round + 1}`}</button>
+          <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
+          <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button></div>
+        ${fm && st.phase === 'hand' ? `<div class="result">${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
+    const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
+        <div class="hand">${st.hand.map((c, i) => cardFor(c, { down: !!reveal, attrs: `data-hand="${i}"` })).join('')}</div></div>` : '';
+    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
+  }
+
+  function tickerView() {
+    const S = HL.HISTORY_SEASONS[String(st.playSeason)];
+    const games = S ? Math.max(...S.teams.map(t => t[2] + t[3])) : 82;
+    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div><div class="ticker">
+      <div class="caps">${yrLabel(st.playSeason)} season · live</div>
+      <div class="rec">0-0</div><div class="status">Perfect season alive</div>
+      <div class="dots" style="grid-template-columns:repeat(${Math.ceil(games / 2)},1fr)">${'<i></i>'.repeat(games)}</div>
+      <div class="sub">Tip-off…</div></div></section>`;
   }
 
   function resultView() {
     const r = st.result;
     const [tier, line] = verdict(r.w, r.games);
-    const five = SLOTS.map(s => st.slots[s]);
     const posterTeam = { abbr: 'YOU', city: 'The', name: 'Five', color: '#c9a227', color2: '#111111', espn: null };
-    const starsFig = r.players.slice(0, 5);
-    const rows = r.players.slice(0, 5).map((p, i) => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${five[i].season}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl / g).toFixed(1)}</td><td>${(l.blk / g).toFixed(1)}</td><td>${l.fga ? (l.fgm / l.fga * 100).toFixed(1) : '-'}</td></tr>`; }).join('');
-    return `${HL.GFX.championPoster(posterTeam, starsFig, '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
+    const rows = r.players.slice(0, SLOTS.length).map(p => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${p.slot.startsWith('B') ? 'Bench' : p.slot}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${l.fga ? (l.fgm / l.fga * 100).toFixed(1) : '-'}</td></tr>`; }).join('');
+    const k = Math.round(r.w / r.games * 10);
+    const share = `${r.games}-0 Challenge${st.daily ? ` · Daily ${st.date}` : ''} · ${yrLabel(st.playSeason)}\n${r.w}-${r.l} · ${tier}\n${'🟩'.repeat(k)}${'🟥'.repeat(10 - k)}\n${STARTERS.map(s => `${s} ${HL.HISTORY.players[st.lineup[s].row.pid][0]}`).join(' · ')}`;
+    return `<div class="stack" style="gap:14px">${HL.GFX.championPoster(posterTeam, r.players.slice(0, 5), '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
       <section class="block"><div class="body row wrap" style="gap:24px">
         <div><div class="caps">Final record</div><div class="num" style="font-size:64px;line-height:1">${r.w}-${r.l}</div></div>
         <div class="grow"><h2 style="font-size:28px">${tier}</h2><div class="t2" style="margin-top:6px">${esc(line)}</div>
-          <div class="t3 sm" style="margin-top:8px">${r.pf.toFixed(1)} PPG · ${r.pa.toFixed(1)} allowed · longest win streak ${r.best}</div></div>
-        <button class="btn go" data-new>Play again</button>
+          <div class="t3 sm" style="margin-top:8px">${r.pf.toFixed(1)} PPG · ${r.pa.toFixed(1)} allowed · longest win streak ${r.best}${r.firstLoss ? ` · first loss: game ${r.firstLoss.g} vs the ${esc(r.firstLoss.opp.name)}` : ''}</div></div>
+        <div class="stack" style="gap:8px"><button class="btn spin" data-new>Play again</button><button class="btn" data-share>Copy result</button></div>
       </div></section>
-      <section class="block"><header><h3>Season stats</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th></tr></thead><tbody>${rows}</tbody></table></div></div></section>
-      ${r.losses.length ? `<section class="block"><header><h3>The losses</h3></header><div class="body">${r.losses.slice(0, 12).map(x => `<div class="kv"><span>Game ${x.g} vs ${esc(x.opp.city)} ${esc(x.opp.name)}</span><b>${x.score}</b></div>`).join('')}</div></section>` : ''}`;
+      <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
+      <section class="block"><header><h3>Season stats</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th></tr></thead><tbody>${rows}</tbody></table></div></div></section>
+      <textarea hidden data-share-text>${esc(share)}</textarea></div>`;
+  }
+
+  // ---------- drag & drop (pointer events: mouse and touch), with tap-to-place ----------
+  let picked = null;
+  function bindDrag(app) {
+    const drop = (src, slot) => {
+      if (src.hand != null) place(src.hand, slot);
+      else if (src.from && src.from !== slot) swap(src.from, slot);
+    };
+    app.querySelectorAll('.hand .gcard, .gcard.placed').forEach(card => {
+      card.onpointerdown = (e) => {
+        if (st.phase === 'season' || st.phase === 'result' || card.classList.contains('down')) return;
+        e.preventDefault();
+        const src = card.dataset.hand != null ? { hand: +card.dataset.hand } : { from: card.dataset.from };
+        const start = { x: e.clientX, y: e.clientY };
+        let ghost = null, hot = null;
+        const move = (ev) => {
+          if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
+            ghost = card.cloneNode(true); ghost.classList.add('ghost'); ghost.classList.remove('picked');
+            ghost.style.width = card.getBoundingClientRect().width + 'px';
+            document.body.appendChild(ghost); card.classList.add('dragging');
+          }
+          if (!ghost) return;
+          ghost.style.left = (ev.clientX - ghost.offsetWidth / 2) + 'px'; ghost.style.top = (ev.clientY - ghost.offsetHeight / 2) + 'px';
+          const el = document.elementFromPoint(ev.clientX, ev.clientY);
+          const spot = el && el.closest('.slot-wrap');
+          const target = spot && (spot.querySelector('.slot') || spot.querySelector('.gcard'));
+          if (hot && hot !== target) hot.classList.remove('hot');
+          hot = target; if (hot) hot.classList.add('hot');
+        };
+        const up = (ev) => {
+          document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up);
+          card.classList.remove('dragging');
+          if (hot) hot.classList.remove('hot');
+          if (ghost) {
+            ghost.remove();
+            const el = document.elementFromPoint(ev.clientX, ev.clientY);
+            const spot = el && el.closest('.slot-wrap');
+            if (spot) drop(src, spot.dataset.slot);
+            return;
+          }
+          // A tap: select it (or, with a placed card already selected, swap the two spots).
+          if (picked && picked.from && src.from && picked.from !== src.from) { const p = picked; picked = null; drop(p, src.from); return; }
+          app.querySelectorAll('.gcard.picked').forEach(x => x.classList.remove('picked'));
+          picked = src; card.classList.add('picked');
+        };
+        document.addEventListener('pointermove', move); document.addEventListener('pointerup', up);
+      };
+    });
+    app.querySelectorAll('[data-drop]').forEach(s => s.onclick = () => { if (picked) { const p = picked; picked = null; drop(p, s.dataset.drop); } });
   }
 
   function bind() {
     const app = U.app();
+    picked = null;
     app.querySelector('[data-home]').onclick = () => HL.App.title();
     app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => { st = null; render(); });
-    const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => spin();
-    app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k]) return; st.skips[k]--; spin(k); });
-    app.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
-      const c = candidates(st.team, st.decade).find(x => x.row.pid === b.dataset.pick);
-      st.slots[b.dataset.slot] = c;
-      st.used.push(st.decade);
-      if (SLOTS.every(s => st.slots[s])) { st.team = null; render(); }
-      else spin();
-    });
-    const sim = app.querySelector('[data-sim]');
-    if (sim) sim.onclick = () => { sim.disabled = true; sim.textContent = 'Playing the season…'; setTimeout(() => simSeason(), 30); };
+    FX.bindSound(app);
+    const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin(); };
+    app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
+    const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
+    const sh = app.querySelector('[data-share]');
+    if (sh) sh.onclick = async () => { const t = app.querySelector('[data-share-text]').value; try { await navigator.clipboard.writeText(t); U.toast('Result copied. Paste it anywhere.'); } catch (e) { U.toast('Copy failed. Here it is:<br>' + esc(t).replace(/\n/g, '<br>')); } };
+    bindDrag(app);
+    FX.tilt(app);
   }
 
   function setupScreen() {
     U.applyTeamTheme(null);
     U.setEra('modern');
     const all = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
-    const cfg = { mode: 'classic', decades: all.slice(1), playSeason: HL.LATEST_SEASON };
+    const cfg = { mode: 'classic', decades: all.slice(1), playSeason: HL.LATEST_SEASON, daily: false };
     const years = [];
     for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
+    const dailyDone = bestRuns().find(r => r.daily === today());
     const draw = () => {
-      U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">82-0 Challenge</button></div></div></div>
-      <div class="page" style="max-width:900px">
-        <div class="page-title"><h2>82-0 Challenge</h2></div>
-        <section class="block"><div class="body stack">
-          <p class="t2" style="margin:0">Spin a franchise and a decade, then draft one real player who played there into an open position he actually played. You get one team skip and one decade skip. When your five is set, they play a full season against the real league of the season you pick, with that year's rules and look. Can they go undefeated?</p>
-          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Play the season in</b><div class="d">Your five joins that year's real league: its teams, rules (no three-point line before 1979-80), schedule length and era look.</div></div>
-            <select data-play>${years.map(y => `<option value="${y}" ${y === cfg.playSeason ? 'selected' : ''}>${yrLabel(y)}${y === HL.LATEST_SEASON ? ' (today)' : ''}</option>`).join('')}</select></div>
+      U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">82-0 Challenge</button></div><div class="simbar">${FX.soundToggle()}</div></div></div>
+      <div class="page" style="max-width:980px">
+        <section class="machine" style="text-align:center"><div class="lights">${'<i></i>'.repeat(14)}</div>
+          <div class="fxb-kicker" style="margin-top:14px">Spin · Draft · Go undefeated</div>
+          <h1 style="font-size:clamp(44px,8vw,86px);line-height:.9;margin:8px 0">82-0 Challenge</h1>
+          <p class="t2" style="max-width:60ch;margin:0 auto">Spin a franchise and a decade, get dealt five real players from that club, and drag one onto the court. Anyone can play any spot, but out of position he loses rating. Eight picks: five starters and three backups. Then watch the season play out live.</p>
+          <div class="row wrap" style="justify-content:center;gap:12px;margin-top:20px">
+            <button class="btn spin" data-go>Play</button>
+            <button class="btn spin daily" data-daily>Daily challenge</button>
+          </div>
+          <div class="t3 sm" style="margin-top:10px">${dailyDone ? `Today's daily: you went ${dailyDone.w}-${dailyDone.l}. Same spins for everyone, every day.` : 'Daily: the same spins and hands for everyone today, in the 2025-26 league.'}</div>
+        </section>
+        <section class="block"><header><h3>Options</h3></header><div class="body stack">
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides ratings and stats, so you draft from memory.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], cfg.mode)}</div>
-          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Decades in the spin</b><div class="d">Each pick uses a different decade while possible.</div></div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Play the season in</b><div class="d">Your team joins that year's real league: its teams, rules (no three-point line before 1979-80), schedule length and era look.</div></div>
+            <select data-play-season>${years.map(y => `<option value="${y}" ${y === cfg.playSeason ? 'selected' : ''}>${yrLabel(y)}${y === HL.LATEST_SEASON ? ' (today)' : ''}</option>`).join('')}</select></div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Decades in the spin</b><div class="d">Each pick uses a different decade while possible. Tick one decade for an all-'90s team.</div></div>
             <div class="row wrap">${all.map(d => `<label class="row sm" style="gap:4px"><input type="checkbox" data-dec="${d}" ${cfg.decades.includes(d) ? 'checked' : ''}> ${d}s</label>`).join('')}</div></div>
-          <div class="t3 sm">Draft from every era, or tick one decade for an all-'90s five.</div>
-          <div class="row"><button class="btn go big ml-auto" data-go>Start</button></div>
         </div></section>
       </div></div>`;
       const app = U.app();
       app.querySelector('[data-home]').onclick = () => HL.App.title();
+      FX.bindSound(app);
       app.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.v; draw(); });
       app.querySelectorAll('[data-dec]').forEach(cb => cb.onchange = () => { const d = +cb.dataset.dec; cfg.decades = cb.checked ? [...cfg.decades, d] : cfg.decades.filter(x => x !== d); });
-      const ps = app.querySelector('[data-play]');
+      const ps = app.querySelector('[data-play-season]');
       ps.onchange = () => { cfg.playSeason = +ps.value; U.setEra(HL.eraForSeason(cfg.playSeason)); };
-      app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun(cfg.mode, cfg.decades.sort(), cfg.playSeason); render(); };
+      app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun({ ...cfg, decades: cfg.decades.slice().sort() }); render(); };
+      app.querySelector('[data-daily]').onclick = () => { newRun({ ...cfg, daily: true }); render(); };
     };
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, franchisesIn, loadDecade, posOk };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, franchisesIn, loadDecade, posOk, penalty, naturals };
 })();
