@@ -39,9 +39,9 @@ HL.SkillDraft = (function () {
 
   // Debut: a real draft year. Random debuts leave room for a full career inside the real data.
   const randomDebut = () => R.int(1956, HL.LATEST_SEASON - 14);
-  function newRun(mode, debut) {
+  function newRun(mode, debut, draftStyle = 'original') {
     HL.DNAFX?.reset();
-    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto' };
+    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -52,6 +52,7 @@ HL.SkillDraft = (function () {
 
   // Spin the three reels (team, decade, skill), deal a hand of five from that club and decade, flip it.
   async function spin(what = 'all') {
+    if (st.draftStyle === 'free') return spinFree(what);
     const run=st;
     st.phase = 'reeling';
     if (what === 'all' || what === 'stat') st.cat = R.pick(remaining().filter(c => c !== st.cat || remaining().length === 1));
@@ -81,6 +82,80 @@ HL.SkillDraft = (function () {
     st.phase = 'hand';
     render(true);
   }
+
+  // Free Choice drafts spin only franchise and decade. Every qualifying player
+  // is selectable, rather than restricting the hand to five specialists.
+  async function spinFree(what = 'all') {
+    const run = st;
+    if (!run || !['spin', 'hand'].includes(run.phase)) return;
+    run.phase = 'reeling';
+    run.selected = null; run.skillChoices = null; run.rosterQuery = ''; run.rosterPage = 0;
+    if (!run.decade || what === 'all' || what === 'era')
+      run.decade = R.pick(decades.filter(d => d !== run.decade || decades.length === 1));
+    try {
+      await C().loadDecade(run.decade);
+      if (st !== run) return;
+      const franchises = C().franchisesIn(run.decade);
+      if (!franchises.length) throw new Error('This decade has no eligible franchises');
+      if (what === 'all' || what === 'team' || !franchises.includes(run.team))
+        run.team = R.pick(franchises.filter(f => f !== run.team || franchises.length === 1));
+      run.hand = C().candidates(run.team, run.decade);
+      render();
+      const host = document.querySelector('#reels');
+      if (host) {
+        const teams = HL.TEAMS.map(t => t.abbr);
+        await FX.reels(host, [
+          { label: 'Franchise', items: teams.map(a => '<div>' + U.logo(tm(a), 62) + '</div>'), final: teams.indexOf(run.team) },
+          { label: 'Decade', items: decades.map(d => '<div>' + d + 's</div>'), final: decades.indexOf(run.decade) },
+        ], { colors: [U.teamAccent(tm(run.team)).c, '#ffd84f'] }).catch(() => U.toast('Reels skipped; your full roster is ready.'));
+      }
+      if (st !== run) return;
+      run.phase = 'hand';
+      render(true);
+    } catch (e) {
+      if (st !== run) return;
+      console.error(e);
+      run.phase = 'spin';
+      run.hand = [];
+      U.toast('Unable to load that franchise and decade. Try another spin.');
+      render();
+    }
+  }
+
+  // Once a player is selected, identify their *best qualifying season* for
+  // each unfilled tool. Do not use that player's highest OVR year for every skill.
+  function freePlayerSkills(player) {
+    const seasons = HL.HISTORY.seasons.filter(k =>
+      !k.includes('-') && Math.floor(+k / 10) * 10 === st.decade && HL.HISTORY_SEASONS[k]);
+    const career = [];
+    for (const key of seasons) for (const row of C().candidates ? HL.History.seasonRows(key) : []) {
+      if (row.pid !== player.row.pid) continue;
+      const club = row.stints.find(t => C().LINEAGE[t[0]] === st.team && t[1] >= 20);
+      if (club) career.push({ row, season: +key, club: club[0] });
+    }
+    const choices = {};
+    for (const id of remaining()) {
+      const cat = catOf(id);
+      const best = career.reduce((chosen, option) =>
+        !chosen || skillValue(option, cat) > skillValue(chosen, cat) ||
+          (skillValue(option, cat) === skillValue(chosen, cat) &&
+            HL.historicalSeasonOvr(option.row) > HL.historicalSeasonOvr(chosen.row))
+          ? option : chosen, null);
+      if (best) choices[id] = best;
+    }
+    return choices;
+  }
+
+  function chooseFreePlayer(i) {
+    if (st.phase !== 'hand' || st.draftStyle !== 'free') return;
+    const player = st.hand[i];
+    if (!player) return;
+    st.selected = player;
+    st.skillChoices = freePlayerSkills(player);
+    st.phase = 'choose-skill';
+    render();
+  }
+
   function take(i) {
     const c = st.hand[i];
     if (!c || st.phase !== 'hand') return;
@@ -88,13 +163,14 @@ HL.SkillDraft = (function () {
     finishPick(c,st.cat);
   }
   function finishPick(c,category) {
+    if (!c || !remaining().includes(category)) return;
     const oldDna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
     const cat=catOf(category);
     st.picks[category] = c;
     const v = skillValue(c, cat);
     FX.sfx.pop(FX.tierIndex(v));
     const id = category;
-    st.hand = []; st.cat = null;st.wildCandidate=null;
+    st.hand = []; st.cat = null;st.wildCandidate=null;st.selected=null;st.skillChoices=null;
     st.phase = remaining().length ? 'spin' : 'built';
     render();
     const tile = document.querySelector(`.tile[data-cat="${id}"]`);
@@ -695,13 +771,14 @@ HL.SkillDraft = (function () {
     else if (c) main = hubView();
     else if (done) main = builtView();
     else if (st.phase === 'wildchoice') main = wildcardView();
+    else if (st.phase === 'choose-skill' && st.draftStyle === 'free') main = freeSkillChoiceView(hide);
     else main = draftView(hide, revealHand);
     const side = c ? careerSide(c) : buildSide(done, hide);
     U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">Skill Draft Career</button></div>
       <div class="simbar">${c ? `<span class="t2 sm">${c.done ? 'Career over' : `${yrLabel(c.yr)} · Age ${c.age}`}</span>` : `<span class="t2 sm">${CATS.length - remaining().length}/${CATS.length} skills</span>`}${FX.soundToggle()}<button class="btn small" data-new>New run</button></div></div></div>
       <div class="page">${c && !c.done && c.stage !== 'draft' && !st.busy ? teamBand(c) : ''}<div class="cols c-main"><div class="stack" style="gap:16px">${main}</div><div class="stack" style="gap:16px">${side}</div></div></div></div>`;
     bind();
-    if (revealHand) {
+    if (revealHand && st.draftStyle !== 'free') {
       const cards=[...document.querySelectorAll('.hand .gcard')];
       FX.flipIn(cards).catch(()=>cards.forEach(c=>{c.classList.remove('down','charging');c.classList.add('up');}));
     }
@@ -1068,6 +1145,7 @@ HL.SkillDraft = (function () {
   }
 
   function draftView(hide, reveal) {
+    if (st.draftStyle === 'free') return freeDraftView(hide);
     const fm = st.team ? tm(st.team) : null, cat = st.cat ? catOf(st.cat) : null;
     const show = fm && cat && st.phase === 'hand';
     const reel = (label, inner) => `<div class="reel ${show ? 'landed' : ''}"><div class="reel-label">${label}</div><div class="reel-win"><div class="reel-item ${label === 'Skill' ? 'txt' : ''}" style="height:96px">${inner}</div></div></div>`;
