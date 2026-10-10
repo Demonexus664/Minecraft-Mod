@@ -33,10 +33,12 @@ jobs:
           node --check js/modes/challenge820.js
           node --check js/modes/skilldraft.js
           node --check js/core/fx.js
+          node --check js/media/fanfeed.js
       - name: Test draft modes, generated leagues, longevity, gameplay and presentation
         run: |
           node --test \
             tools/test-overhaul-batch1.js \
+            tools/test-fanfeed.js \
             tools/test-overhaul-batch2.js \
             tools/test-skilldraft-freechoice.js \
             tools/test-skilldraft-future.js \
