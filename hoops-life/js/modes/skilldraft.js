@@ -544,11 +544,7 @@ HL.SkillDraft = (function () {
       const earlyPhysical=physical?Math.max(0,age-(exceptional?30:28))*(exceptional?.35:.46+(99-c.prime.longevity)*.01):0;
       const fade=decline*(physical?1.45:skillFade)+earlyPhysical+(physical?wear*1.6:wear*.2);
       const gap=physical?5:13;
-      const earned=Object.entries(c.training||{}).reduce((total,[id,invested])=>
-        total+(TRAINING[id]?.keys.includes(k)?Math.min(5.5,invested*.9):0),0);
-      const physicalTaper=physical?Math.max(.2,1-Math.max(0,age-31)*.055):1;
-      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade+earned*physicalTaper,
-        25,Math.max(99,goal)));
+      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,99));
     }
     return HL.DNA.reconcileAttributes(out,c.prime.height||c.me.height||78).attrs;
   }
@@ -626,23 +622,14 @@ HL.SkillDraft = (function () {
     let missed = 0, injury = null;
     const eliteCondition = Math.max(0, (Math.min(me.attrs.stam || 65, me.attrs.dur || 65) - 70) / 29);
     const ageRisk = Math.max(0, c.age - 32) * 0.012 * (1 - 0.7 * eliteCondition);
-    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk + (ROLES[c.role]?.injury||0) + (c.careerWear||0), 0.01, 0.75))) {
+    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk, 0.01, 0.75))) {
       const inj = HL.rollInjury(1.2);
       missed = Math.min(L.games, inj.games);
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
       if (missed > 0) injury = { name: inj.name, games: missed, lasting: !!inj.lasting };
     }
-    const res = interactive ? await simSeasonInteractive(L,team,me,missed,c.role,c.press?.pledge) :
-      simSeason(L,team,me,missed,c.role,c.press?.pledge);
+    const res = simSeason(L,team,me,missed,'balanced',null);
     const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
-    // Aggressive game-night strategies carry a small workload risk forward.
-    // A balanced season fades that risk instead of accumulating forever.
-    const planWear=(s.gameNights||[]).reduce((v,e)=>v+(e.wear||0),0)/
-      Math.max(1,(s.gameNights||[]).length);
-    c.careerWear=+(HL.clamp((c.careerWear||0)*.4+planWear*.006,0,.045).toFixed(4));
-    s.gameNightWear=c.careerWear;
-    s.agenda=finishAgenda(c,s,L.games);
-    HL.SkillPress?.resolve(c,s);
     if(L.season>HL.LATEST_SEASON){
       s.leagueRecap={
         rookies:Object.values(L.players).filter(p=>p.draft?.year===c.yr&&p.teamId!=null)
@@ -655,7 +642,6 @@ HL.SkillDraft = (function () {
       };
     }
     c.seasons.push(s);
-    rememberRival(c,s);
     addLine(c.totals, res.line); addLine(c.ptotals, res.pline);
     c.earnings += s.salary;
     for (const a of res.awards) c.awards.push({ season: c.yr, award: a.award || a, over: a.over });
@@ -681,11 +667,10 @@ HL.SkillDraft = (function () {
       end(c, 'Retired after '+played+' NBA seasons at age '+c.age+'.');
       return;
     }
-    const earnedCamp=trainSummer(c);
     const L = await leagueFor(c.yr,c);if(!L)return;
     setAge(c, c.age);
     const ovr = c.me.ovr;
-    const pend = { type: 'season', from, to: ovr, offers: [], notes: ['Completed '+earnedCamp+' camp. Specific practiced skills have improved, subject to aging.'] };
+    const pend = { type: 'season', from, to: ovr, offers: [], notes: [] };
     const cur = c.franchise && !c.minors ? L.teams.find(t => fr(t) === c.franchise) : null;
     if (c.franchise && !c.minors && !cur) pend.notes.push(`The ${c.teamMeta.city} ${c.teamMeta.name} no longer exist. He is a free agent.`);
     // Leaving the NBA is not the same as retiring. Even at 50+, the player
@@ -1556,27 +1541,11 @@ HL.SkillDraft = (function () {
       if (selected && remaining().includes(id)) finishPick(selected, id);
     });
     app.querySelectorAll('[data-wild-cat]').forEach(btn=>btn.onclick=()=>finishPick(st.wildCandidate,btn.dataset.wildCat));
-    app.querySelectorAll('[data-press]').forEach(btn=>btn.onclick=()=>{
-      const c=st?.career;if(!c||c.done||!HL.SkillPress)return;
-      const response=HL.SkillPress.respond(c,btn.dataset.press);
-      if(!response.ok){U.toast(response.reason);return;}
-      FX.sfx.camera?.();render();
-    });
     app.querySelectorAll('[data-build-view]').forEach(btn=>btn.onclick=()=>{
       if(st.career)return;st.buildView=btn.dataset.buildView;render();
     });
     app.querySelectorAll('[data-skill-filter]').forEach(btn=>btn.onclick=()=>{
       if(st.career)return;st.skillFilter=btn.dataset.skillFilter;render();
-    });
-    app.querySelectorAll('[data-role]').forEach(btn=>btn.onclick=()=>{
-      const c=st.career;if(!c||c.done||!ROLES[btn.dataset.role])return;
-      c.role=btn.dataset.role;FX.sfx.pop(1);render();
-    });
-    const agendaSelect=app.querySelector('[data-agenda]');
-    if(agendaSelect)agendaSelect.onchange=()=>{if(st.career&&!st.career.done)st.career.agenda=agendaSelect.value;render();};
-    app.querySelectorAll('[data-training]').forEach(btn=>btn.onclick=()=>{
-      const c=st.career;if(!c||c.done||!TRAINING[btn.dataset.training])return;
-      c.trainingFocus=btn.dataset.training;FX.sfx.pop(1);render();
     });
     FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
