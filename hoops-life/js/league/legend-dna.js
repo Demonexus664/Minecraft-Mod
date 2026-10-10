@@ -445,7 +445,7 @@ HL.DNA = (function () {
        f.type.includes('duo')?2:1;
       return rank(b)-rank(a)||Object.keys(b.mechanics||{}).length-Object.keys(a.mechanics||{}).length;
     });
-    const selected=sorted.slice(0,7);
+    const selected=sorted.slice(0,compact?4:7);
     const dot=key=>'<span class="power-map-source">'+esc(key)+'</span>';
     const nodes=selected.map((f,i)=>{
       const ingredients=[...new Set((f.ingredients||[]).map(e=>name(e.pid)))];
