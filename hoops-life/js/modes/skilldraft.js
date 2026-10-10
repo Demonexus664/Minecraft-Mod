@@ -1267,15 +1267,13 @@ HL.SkillDraft = (function () {
 
   function builtView() {
     const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
-    return `${HL.DNA.powerMap(dna)}<section class="block"><div class="body stack"><h3>Your player is built</h3>
+    return `<section class="block"><div class="body stack"><h3>Your player is built</h3>
       <div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div>
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
       <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
       ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and late-career viability; no fixed retirement age</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
-      <section class="block dna-career-special"><header><h3>SKILL REACTIONS · DUOS, TRIOS & ELITE SKILLS</h3></header><div class="body stack"><p class="t2">The skills you draft form one career player. Elite mechanics and historical duos and trios activate through actual basketball possessions.</p><p class="t3 sm">Player-to-player fusion is exclusive to 82-0 Challenge. Here, your skill sources combine into one career identity.</p></div></section>
-      ${HL.DNA.board(buildPrime().dna)}
       ${buildPrime().constraints.length?`<section class="block"><div class="body"><h3>How your tools work together</h3>${buildPrime().constraints.map(x=>`<p class="t2 sm"><b>${esc(x.key)}: ${x.ceiling} drafted → ${x.effective} executable.</b> ${esc(x.reason)}</p>`).join('')}</div></section>`:''}
-      ${buildDetail(buildPrime())}
+      <details class="build-ratings-fold"><summary>Advanced ratings & tendencies</summary>${buildDetail(buildPrime())}</details>
       <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim next 10 seasons</button></div>
       <div class="t3 sm">Chemistry DNA improves specific possession outcomes. Historical and fictional duos and trios can activate independently; rare mutations are revealed automatically. Body, strength, elevation and basketball tools determine what your player can execute. The prime window supports learned skill; physical decline and injuries can still reduce athleticism during it.</div>
       <div class="t3 sm">Season by season: see every season's numbers, awards and playoff run, then choose free agency offers, ask for trades or retire. Simming the whole career makes those calls for you.</div>
@@ -1373,19 +1371,6 @@ HL.SkillDraft = (function () {
     const extras = [cnt.g40 ? plural(cnt.g40, '40-point game') : '', cnt.g50 ? plural(cnt.g50, '50-point game') : '', cnt.td ? plural(cnt.td, 'triple-double') : '', cnt.dd ? plural(cnt.dd, 'double-double') : ''].filter(Boolean);
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
-      ${s.agenda?'<div class="season-goal-report '+(s.agenda.complete?'complete':'')+'"><div><div class="caps">Season contract · '+esc(ROLES[s.role]?.title||'Balanced')+'</div><b>'+esc(s.agenda.title)+'</b><p>'+esc(s.agenda.detail)+'</p></div><strong>'+(s.agenda.complete?'GOAL ACHIEVED':'GOAL MISSED')+'</strong></div>':''}
-      ${s.pressResult?'<div class="press-season-outcome '+(s.pressResult.won==null?'void':s.pressResult.won?'delivered':'backlash')+'"><span>PUBLIC PROMISE · '+(s.pressResult.won==null?'NO CONTEST':s.pressResult.won?'DELIVERED':'THE INTERNET KEPT RECEIPTS')+'</span><b>'+esc(s.pressResult.measure)+'</b><small>Fan approval '+(s.pressResult.impact>0?'+':'')+s.pressResult.impact+'. Public perception can influence future offers, not skills.</small></div>':''}
-      ${HL.GameNights?.recap(s.gameNights)||''}
-      ${HL.AbilityReplay?.render(s.abilityCounts,'TEAM DNA ACTION REPLAY')||''}
-      ${s.rival?'<div class="season-rivalry '+(s.rival.win?'won':'')+'"><div class="caps">SEASON MVP RIVAL · '+
-        esc(s.rival.name)+'</div><div class="row wrap"><strong>'+
-        (s.rival.win?'RIVAL DEFEATED':'RIVAL WINS THIS ROUND')+'</strong><span class="ml-auto">'+
-        s.rival.myScore.toFixed(1)+' vs '+s.rival.theirScore.toFixed(1)+' voting-impact points</span></div>'+
-        '<p class="t3 sm">Measured with actual production and winning. Rival averaged '+
-        s.rival.ppg.toFixed(1)+' PPG.</p></div>':''}
-      ${HL.FanFeed?'<details class="courtside-fold"><summary>Courtside: fictional fan and analyst reactions</summary>'+
-        HL.FanFeed.render(HL.FanFeed.skilldraft(s))+'</details>':''}
-      
       ${s.leagueRecap ? `<details open><summary>League evolution · new rookies, rising players & scoring rivals</summary>
         <div class="cols c2" style="gap:12px">
         <div class="stack"><div class="caps">New rookie class</div>${s.leagueRecap.rookies.map(p=>`<div class="kv"><span>${esc(p.name)} · ${esc(p.team)}</span><b>${p.ovr} OVR</b></div>`).join('')||'<div class="t3">No rookies in this class</div>'}</div>
@@ -1576,6 +1561,12 @@ HL.SkillDraft = (function () {
       const response=HL.SkillPress.respond(c,btn.dataset.press);
       if(!response.ok){U.toast(response.reason);return;}
       FX.sfx.camera?.();render();
+    });
+    app.querySelectorAll('[data-build-view]').forEach(btn=>btn.onclick=()=>{
+      if(st.career)return;st.buildView=btn.dataset.buildView;render();
+    });
+    app.querySelectorAll('[data-skill-filter]').forEach(btn=>btn.onclick=()=>{
+      if(st.career)return;st.skillFilter=btn.dataset.skillFilter;render();
     });
     app.querySelectorAll('[data-role]').forEach(btn=>btn.onclick=()=>{
       const c=st.career;if(!c||c.done||!ROLES[btn.dataset.role])return;
