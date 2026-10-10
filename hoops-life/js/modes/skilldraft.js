@@ -42,7 +42,7 @@ HL.SkillDraft = (function () {
   function newRun(mode, debut, draftStyle = 'original') {
     cache=null;futureWorld=null;
     HL.DNAFX?.reset();
-    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating' };
+    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating', buildView:'skills', skillFilter:'all' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -1209,18 +1209,49 @@ HL.SkillDraft = (function () {
     return `<section class="block"><div class="body"><h3>${esc(b.title)}</h3><div class="t2 sm" style="margin-top:6px">${esc(b.sub || '')}</div><div class="simcard" style="width:auto;border:0;padding:0"><div class="track"><i style="width:${b.pct || 0}%"></i></div></div></div></section>`;
   }
 
-  function buildSide(done, hide) {
-    const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
-    const prime = done ? buildPrime() : null;
-    const tiles = CATS.map(cat => {
-      const [id, label] = cat;
-      const pk = st.picks[id];
-      if (!pk) return `<div class="tile ${st.cat === id ? 'next' : ''}" data-cat="${id}"><span class="lab">${esc(label)}</span><span class="val t3">—</span><span class="who">${st.cat === id ? 'Drafting now' : ''}</span></div>`;
-      const bio = HL.HISTORY.players[pk.row.pid];
-      const v = skillValue(pk, cat);
-      return `<div class="tile on t-${FX.tierOf(v).key}" data-cat="${id}"><span class="lab">${esc(label)}</span><span class="val">${hide ? '?' : id === 'body' ? HL.fmtHeight(bio[3]) : v}</span><span class="who">${esc(bio[0])} · ${yrLabel(pk.season)}</span></div>`;
-    }).join('');
-    return `${HL.DNA.board(dna,{compact:true})}${Object.keys(st.picks).length>=3?HL.DNA.powerMap(dna,{compact:true}):''}<section class="block"><header><h3>Your build</h3><span class="ml-auto t3 sm">${CATS.length - remaining().length}/${CATS.length}</span>${prime && !hide ? `<span>${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body"><div class="board">${tiles}</div></div></section>`;
+  // Drafting workspace: skills and the DNA network never occupy one giant stack.
+  function buildSide(done,hide) {
+    const picks=Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season}));
+    const dna=HL.DNA.analyze(picks),num=picks.length;
+    const prime=done?buildPrime():null;
+    const view=st.buildView==='combos'?'combos':'skills';
+    const tab=(id,name,stat)=>'<button data-build-view="'+id+'" aria-pressed="'+(view===id)+
+      '" class="'+(view===id?'on':'')+'"><span>'+name+'</span><b>'+stat+'</b></button>';
+    const tabs='<nav class="draft-workspace-tabs" aria-label="Draft build sections">'+
+      tab('skills','MY SKILLS',num+'/'+CATS.length)+
+      tab('combos','ABILITIES & COMBOS',(dna.mutations?.length||0)+' RARE')+'</nav>';
+    let body;
+    if(view==='skills'){
+      const filter=['all','picked','left'].includes(st.skillFilter)?st.skillFilter:'all';
+      const filters=[['all','All'],['picked','Collected'],['left','Open']].map(([id,label])=>
+        '<button data-skill-filter="'+id+'" class="'+(id===filter?'on':'')+'">'+label+'</button>').join('');
+      const cells=CATS.filter(([id])=>filter==='all'||(filter==='picked'?!!st.picks[id]:!st.picks[id]))
+        .map(([id,label])=>{
+          const pk=st.picks[id];
+          if(!pk)return '<article class="draft-skill-cell empty '+(st.cat===id?'next':'')+
+            '"><span>'+esc(label)+'</span><strong>—</strong><small>'+
+            (st.cat===id?'DRAFTING NOW':'Unfilled')+'</small></article>';
+          const bio=HL.HISTORY.players[pk.row.pid],score=skillValue(pk,catOf(id));
+          return '<article class="draft-skill-cell filled"><span>'+esc(label)+'</span>'+
+            '<strong>'+(hide?'?':id==='body'?HL.fmtHeight(bio[3]):score)+'</strong>'+
+            '<small>'+esc(bio[0])+' · '+yrLabel(pk.season)+'</small></article>';
+        }).join('');
+      body='<div class="draft-filter">'+filters+'</div>'+
+        '<div class="draft-skill-list" role="region" tabindex="0" aria-label="Drafted skill slots">'+cells+'</div>';
+    }else{
+      const nums=[['SIGNATURES',dna.signatures?.length||0],
+        ['DUOS',dna.pairs?.length||0],['TRIOS',dna.trios?.length||0],
+        ['MUTATIONS',dna.mutations?.length||0]];
+      body='<div class="draft-dna-counters">'+nums.map(([name,n])=>
+        '<div><b>'+n+'</b><span>'+name+'</span></div>').join('')+'</div>'+
+        '<div class="draft-combo-scroll">'+HL.DNA.board(dna,{compact:true})+
+        (num>=3?'<details><summary>Explore the full synergy map</summary>'+
+          HL.DNA.powerMap(dna,{compact:true})+'</details>':'')+'</div>';
+    }
+    return '<section class="block draft-inspector"><header><h3>YOUR BUILD</h3>'+
+      '<span class="ml-auto t3 sm">'+num+'/'+CATS.length+'</span>'+
+      (prime&&!hide?U.rating(HL.computeOvr(prime.attrs,prime.pos)):'')+
+      '</header>'+tabs+'<div class="body">'+body+'</div></section>';
   }
 
   function buildDetail(prime) {
@@ -1282,7 +1313,6 @@ HL.SkillDraft = (function () {
         <div class="kv"><span>Rookie rating</span><b>${c.me.ovr} OVR</b></div>
         <div class="kv"><span>Achievable prime (age 28–29)</span><b>${c.primeOvr} OVR</b></div>
         <div class="kv"><span>Work ethic</span><b>${c.me.traits.workEthic >= 75 ? 'Gym rat' : c.me.traits.workEthic >= 55 ? 'Solid' : c.me.traits.workEthic >= 40 ? 'Inconsistent' : 'Questionable'}</b></div>
-        ${trainingView(c)}
         <div class="row wrap" style="gap:10px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div>
       </div></section>
       ${cls.length ? `<section class="block"><header><h3>The real ${c.debut} draft</h3><span class="ml-auto t3 sm">He joins this class</span></header><div class="body flush">${cls.map(r => `<div class="res-row" style="grid-template-columns:40px 1fr auto;cursor:default"><b class="num">${r.pick}</b><div class="row">${U.face({ name: r.name, nbaId: r.nbaId, real: true }, 26, null)}<span>${esc(r.name)}</span></div><span class="t3 sm">${esc(r.club)}${r.college ? ' · ' + esc(r.college) : ''}</span></div>`).join('')}</div></section>` : ''}`;
@@ -1311,15 +1341,10 @@ HL.SkillDraft = (function () {
       out.push(`<section class="block"><div class="body row wrap" style="gap:10px"><div class="grow"><h3>${yrLabel(c.yr)}</h3><div class="t2 sm">${c.minors ? 'A season in the minor leagues.' : `With the ${esc(fullName(c.teamMeta))}.`}</div></div><button class="btn go big" data-play>Play the season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div></section>`);
     }
     const last = c.seasons[c.seasons.length - 1];
-    if(last&&!last.minors&&HL.SkillPress)out.push(HL.SkillPress.panel(c));
-    out.push(rolePanel(c));
     if(c.pendingStory){const e=c.pendingStory;out.unshift(`<section class="block dna-story-choice"><div class="body stack"><span class="dna-section-label">A CAREER TURNING POINT</span><h2>${esc(e.title)}</h2><p>${esc(e.subtitle)}</p><div class="row wrap"><button class="btn go" data-story-choice="a">${esc(e.a)}</button><button class="btn" data-story-choice="b">${esc(e.b)}</button></div></div></section>`);}
     if (last) out.push(seasonReport(last));
-    out.push(trainingView(c));
-    if (c.seasons.length) out.push(milestoneView(c));
-    if (c.seasons.length) out.push(rivalryView(c));
-    if (c.seasons.length) out.push(careerTable(c));
-    if (c.log.length) out.push(timeline(c));
+    if(c.seasons.length)out.push('<details class="career-archive"><summary>Career totals & previous seasons</summary>'+
+      careerTable(c)+'</details>');
     return out.join('');
   }
 
