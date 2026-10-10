@@ -1200,6 +1200,31 @@ HL.SkillDraft = (function () {
     return `<section class="block dna-legend-screen"><div class="body stack"><div class="dna-legend-title">✦ LEGENDARY WILDCARD</div><h2>${esc(bio[0])} · ${c.season}</h2><p>Choose ANY unfilled skill to inherit. This legendary card also carries its own signature DNA into the simulation.</p><div class="dna-choice-grid">${open.map(id=>{const cat=catOf(id),val=skillValue(c,cat);return `<button class="dna-choice" data-wild-cat="${id}"><b>${esc(cat[1])}</b><strong>${val}</strong></button>`;}).join('')}</div></div></section>`;
   }
 
+
+  function fusionDossier(node,report=null){
+    if(!node)return '';
+    const left={photo:node.images?.[0]||'',name:node.heads?.[0]||'Parent A'};
+    const right={photo:node.images?.[1]||'',name:node.heads?.[1]||'Parent B'};
+    const art=HL.FusionUI?.portrait(left,right,true)||'';
+    const skills=Object.entries(node.mechanics||{}).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const gain=report?.changes||[];
+    const trade=node.tradeoffs||[];
+    return '<section class="block fusion-dossier"><header><h3>GENESIS HYBRID · EQUIPPED</h3>'+
+      '<span class="ml-auto t3 sm">Generation '+node.depth+'</span></header>'+
+      '<div class="body"><div class="fusion-dossier-layout">'+art+
+      '<div class="fusion-dossier-story"><span class="caps">'+esc(node.family)+'</span>'+
+      '<h3>'+esc(node.name)+'</h3><p>Created from '+esc(node.heads?.join(' × ')||'two players')+
+      '. The fusion inherits actual specialized basketball tools, with its chosen physique and matchup tradeoffs.</p>'+
+      '<div class="fusion-dossier-skill-list">'+skills.map(([k,v])=>
+        '<div><b>'+esc(k.replace(/([A-Z])/g,' $1'))+'</b><span>'+Math.round(v*100)+'% mechanic intensity</span></div>').join('')+'</div>'+
+      '<details><summary>What transferred into MyPlayer?</summary><div class="stack">'+
+      (gain.length?gain.map(x=>'<div class="kv"><span>'+esc(x.key)+'</span><b>'+
+        x.from+' → '+x.to+'</b></div>').join(''):'<p class="t3 sm">The fusion adds tactical mechanics, but none of its listed skills exceeded the player’s original ratings.</p>')+
+      (trade.length?'<div class="caps">Physical inheritance costs</div>'+trade.map(x=>
+        '<div class="kv"><span>'+esc(x.key)+'</span><b>−'+x.lost+' versus the stronger parent</b></div>').join(''):'')+
+      '</div></details></div></div></div></section>';
+  }
+
   function builtView() {
     const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
     return `${HL.DNA.powerMap(dna)}<section class="block"><div class="body stack"><h3>Your player is built</h3>
@@ -1208,7 +1233,7 @@ HL.SkillDraft = (function () {
       <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
       ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and late-career viability; no fixed retirement age</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
       <div class="gf-launch"><div class="grow"><div class="caps">NEW · EXPERIMENTAL PLAYER ENGINEERING</div><h3>Genesis Fusion Laboratory</h3><p>Fuse any pair from the historical archive. Recombine successful fusions with new players or other creations. Even incompatible stars can produce rare paradox outcomes. Odds are shown before every attempt, and the outcome can alter your actual career skills.</p></div><button class="btn go big" data-open-fusion>OPEN FUSION LAB</button></div>
-      ${st.fusionEquipped?'<div class="gf-equipped"><b>FUSION EQUIPPED · '+esc(st.fusionEquipped.name)+'</b><p>Generation '+st.fusionEquipped.depth+' · '+st.fusionEquipped.ovr+' donor OVR · '+esc(st.fusionEquipped.family)+' · '+st.fusionEquipped.ancestry.length+' ancestry entries. The physique and real gameplay mechanics are reflected in the full ratings panel below.</p><button class="btn small" data-unequip-fusion>Remove fusion</button></div>':''}
+      ${st.fusionEquipped?fusionDossier(st.fusionEquipped,buildPrime().fusionReport)+'<div class="row"><button class="btn small" data-unequip-fusion>Remove fusion</button></div>':''}
       ${HL.DNA.board(buildPrime().dna)}
       ${buildPrime().constraints.length?`<section class="block"><div class="body"><h3>How your tools work together</h3>${buildPrime().constraints.map(x=>`<p class="t2 sm"><b>${esc(x.key)}: ${x.ceiling} drafted → ${x.effective} executable.</b> ${esc(x.reason)}</p>`).join('')}</div></section>`:''}
       ${buildDetail(buildPrime())}
@@ -1383,6 +1408,7 @@ HL.SkillDraft = (function () {
     const cur = Object.fromEntries(CATS.filter(x => x[2].length&&!x[0].startsWith('tend')).map(([id, label, keys]) => [id, [label, avgOf(c.me.attrs, keys), avgOf(c.prime.attrs, keys)]]));
     const habits=CATS.filter(x=>x[0].startsWith('tend')).map(([id,label,keys])=>`<details><summary>${esc(label)}</summary>${keys.map(k=>`<div class="kv"><span>${esc(k)}</span><b>${c.me.tend[k]??'—'}/100</b></div>`).join('')}</details>`).join('');
     return `<div style="max-width:340px">${card}</div>
+      ${c.prime.fusion?fusionDossier(c.prime.fusion,c.prime.fusionReport):''}
       <section class="block"><header><h3>Trophy case</h3></header><div class="body">${cab.length ? cab.map(([k, n]) => `<div class="kv"><span>${esc(k)}</span><b>${n}</b></div>`).join('') : '<div class="t3 sm">Empty, for now.</div>'}</div></section>
       ${hi.length ? `<section class="block"><header><h3>Career highs</h3></header><div class="body">${hi.map(([k, h]) => `<div class="kv"><span>${k}</span><b>${h.v} <span class="t3 xs">vs ${esc(h.opp)}, ${yrLabel(h.yr)}${h.playoffs ? ' (playoffs)' : ''}</span></b></div>`).join('')}</div></section>` : ''}
       <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>
