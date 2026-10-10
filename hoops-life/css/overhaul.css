@@ -885,3 +885,29 @@ html[data-fx-level=off] .game-night-overlay{animation:none!important}
 @media(max-width:400px){.power-map-network{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){.power-map-node{animation:none!important}}
 html[data-fx-level=off] .power-map-node{animation:none!important}
+
+
+/* ABILITY REPLAY: show genuine in-sim effects rather than theoretical OVR. */
+.ability-replay {position:relative;overflow:hidden;
+ background:radial-gradient(ellipse at 100% -10%,#298ab920,transparent 57%),
+ linear-gradient(150deg,#142032,#090f1a 95%);}
+.ability-replay-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:8px;}
+.ability-replay-row{display:grid;grid-template-columns:37px 1fr auto;gap:12px;align-items:center;
+ border:1px solid #89b9f433;border-radius:12px;padding:11px 13px;
+ background:linear-gradient(130deg,#273751bb,#111c2cee);
+ animation:power-materialize .4s both;animation-delay:calc(var(--replay-rank)*50ms);}
+.ability-replay-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:8px;
+ border:1px solid #91c5f455;background:#183354;
+ font:900 19px var(--display);color:#bfe6ff;}
+.ability-replay-copy{min-width:0;display:grid;gap:8px;}
+.ability-replay-copy>b{font:800 14px/1.2 var(--body);color:#e9f5ff;}
+.ability-replay-track{height:5px;overflow:hidden;border-radius:5px;background:#aac7ef29;}
+.ability-replay-track>i{display:block;height:100%;border-radius:5px;
+ background:linear-gradient(90deg,#6dcafa,#f3d294);box-shadow:0 0 13px #78c4fd5b;}
+.ability-replay-row>strong{display:flex;flex-direction:column;align-items:end;gap:3px;
+ font:900 24px/1 var(--display);color:#fce2ad;font-variant-numeric:tabular-nums;}
+.ability-replay-row>strong>small{font:850 9px var(--body);color:#a7bdd8;letter-spacing:.08em;}
+@media(max-width:650px){.ability-replay-grid{grid-template-columns:1fr}
+ .ability-replay-row>strong{font-size:19px}}
+@media(prefers-reduced-motion:reduce){.ability-replay-row{animation:none!important}}
+html[data-fx-level=off] .ability-replay-row{animation:none!important}
