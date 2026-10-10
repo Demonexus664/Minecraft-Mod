@@ -51,16 +51,16 @@ test('elite tool ratings have a visibly nonlinear bounded simulation bonus',()=>
   assert.ok(z(99)-z(95)>z(95)-z(90));
   assert.ok(z(99)>=1 && z(99)<=1.001);
 });
-test('a jointly extraordinary build can sustain an exceptional prime without raising the cap',()=>{
+test('a jointly extraordinary build still ages, and the league career has a realistic limit',()=>{
  const {load}=require('./load');
  HL.UI={esc:s=>String(s)}; HL.FX={};
  load(['js/league/legend-dna.js','js/modes/challenge820.js','js/modes/skilldraft.js']);
  const c={prime:{attrs:Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,99])),height:85,longevity:99,primeLength:99},me:{height:85,traits:{workEthic:75}}};
  const w=HL.SkillDraft.primeWindow(c);
- assert.ok(w.end>=50,JSON.stringify(w));
- const a=HL.SkillDraft.ratingsAt(c,50);
- assert.ok(HL.ATTR_KEYS.every(k=>a[k]===99),JSON.stringify(a));
- assert.equal(HL.SkillDraft.careerLimit(c),Infinity);
+ assert.ok(w.end>=30 && w.end<=38,JSON.stringify(w));
+ const age40=HL.SkillDraft.ratingsAt(c,40),age50=HL.SkillDraft.ratingsAt(c,50);
+ assert.ok(age40.speed<99 && age50.speed<age40.speed,'Athleticism declines after the prime');
+ assert.ok(Number.isFinite(HL.SkillDraft.careerLimit(c))&&HL.SkillDraft.careerLimit(c)<=25);
 });
 
 test('100 OVR is reserved for legendary historical peak at an eligible position',()=>{
