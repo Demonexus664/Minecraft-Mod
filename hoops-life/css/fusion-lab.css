@@ -225,3 +225,33 @@ html[data-fx-level=off] .gf-result .gf-portrait,html[data-fx-level=off] .gf-port
  .gf-gene{padding:9px}.gf-gene b{font-size:29px}
  .gf-genome-head>b{font-size:15px}
  .gf-tradeoff>div{flex-direction:column;gap:3px}}
+
+
+/* Saved generations form a real visual archive, not disposable text entries. */
+.gf-lineage{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:12px;
+ margin-bottom:18px;border:1px solid #96b3ed2d;background:#0d192c88;border-radius:10px;}
+.gf-lineage>.caps{width:100%;font:850 10px var(--body);letter-spacing:.18em;color:#b5cfeb;margin-bottom:5px;}
+.gf-lineage>span{font:750 11px var(--body);padding:6px 8px;border-radius:5px;
+ color:#e9f4ff;background:linear-gradient(145deg,#2d4265,#142338);border:1px solid #9db8f83c;}
+.gf-lineage>small{font:600 11px var(--body);color:#9ab7dc;}
+.gf-collection{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:13px;margin:19px 0;}
+.gf-collection-card{min-width:0;display:flex;flex-direction:column;gap:11px;position:relative;
+ padding:14px;background:linear-gradient(145deg,#212d49,#0b1424);
+ border:1px solid #d5b4fd48;border-radius:14px;
+ box-shadow:0 12px 30px #0005,inset 0 1px #ffffff13;
+ transition:transform .2s,border-color .2s,box-shadow .2s;}
+.gf-collection-card:hover{transform:translateY(-4px);border-color:#efc0fb;
+ box-shadow:0 22px 34px #0007,0 0 22px #ac8de930;}
+.gf-collection-card .gf-portrait.mini{width:clamp(120px,52%,155px);margin:3px auto 1px;}
+.gf-collection-card .gf-portrait.mini .gf-image-label{font-size:7px;letter-spacing:.03em;}
+.gf-collection-desc{display:grid;gap:6px;text-align:center;padding-bottom:10px;border-bottom:1px solid #b6caf02a;}
+.gf-collection-desc>b{font:900 20px/1 var(--display);color:#fff;text-transform:uppercase;}
+.gf-collection-desc>small{font:800 10px var(--body);letter-spacing:.1em;color:#f2d4b2;}
+.gf-collection-desc>span{font:550 11px/1.5 var(--body);color:#aac1dd;}
+.gf-collection-actions{display:flex;gap:6px;margin-top:auto;}
+.gf-collection-actions .btn{flex:1;font-size:10px;padding:9px 6px;}
+@media(max-width:580px){.gf-collection{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+ .gf-collection-card{padding:9px}.gf-collection-desc>b{font-size:15px}
+ .gf-collection-actions{flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.gf-collection-card{transition:none!important}}
+html[data-fx-level=off] .gf-collection-card{transition:none!important}
