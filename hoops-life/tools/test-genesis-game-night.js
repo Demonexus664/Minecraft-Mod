@@ -96,3 +96,36 @@ test('NBA game-night interactive path and sync path are both available',()=>{
  assert.match(source,/HL\.AbilityReplay\?\.accumulate/);
  assert.match(source,/gameNights:nightEvents/);
 });
+
+test('successful fusion creations persist across a real browser-style reload',()=>{
+ const storage=new Map();
+ const localStorage={getItem:k=>storage.has(k)?storage.get(k):null,
+   setItem:(k,v)=>storage.set(k,v)};
+ const raw=fs.readFileSync(path.join(__dirname,'../js/league/fusion-lab.js'),'utf8');
+ const newInstance=()=>{
+  const h={ATTR_KEYS:HL.ATTR_KEYS,computeOvr:HL.computeOvr,DNA:HL.DNA};
+  vm.runInNewContext(raw,{window:{HL:h},HL:h,localStorage});
+  return h.FusionLab;
+ };
+ const F1=newInstance(),r=F1.attempt(curr,kobe,{roll:()=>0});
+ assert.equal(r.ok,true);
+ assert.equal(r.persisted,true);
+ const F2=newInstance();
+ assert.equal(F2.creations().length,1);
+ assert.equal(F2.find(r.node.id).name,r.node.name);
+ assert.ok(F2.history().length>0);
+ F2.reset();
+ assert.equal(newInstance().creations().length,0,'explicit reset is the only deletion');
+});
+
+test('Genesis portraits use a real split-photo seam and display inheritance costs',()=>{
+ const css=fs.readFileSync(path.join(__dirname,'../css/fusion-lab.css'),'utf8');
+ const js=fs.readFileSync(path.join(__dirname,'../js/core/fusion-ui.js'),'utf8');
+ assert.match(css,/gf-photo-half\.left\{clip-path:polygon/);
+ assert.match(css,/gf-photo-half\.right\{clip-path:polygon/);
+ assert.match(css,/\.gf-genome/);
+ assert.match(css,/\.gf-collection/);
+ assert.match(js,/gf-failed-reading/);
+ assert.match(js,/node\.strengths/);
+ assert.match(js,/node\.tradeoffs/);
+});
