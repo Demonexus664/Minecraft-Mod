@@ -930,3 +930,18 @@ html[data-fx-level=off] .ability-replay-row{animation:none!important}
 .fusion-dossier summary{font:800 11px var(--body);color:#d2baff;cursor:pointer;}
 @media(max-width:600px){.fusion-dossier-layout{grid-template-columns:1fr}
  .fusion-dossier-story>h3{font-size:22px}}
+
+
+/* Third-quarter live reactions use the actual simulated score. */
+.game-night-live{display:flex;align-items:center;justify-content:center;gap:17px;
+ margin:13px 0;padding:13px 10px;border:1px solid rgba(240,218,154,.36);
+ border-radius:11px;background:linear-gradient(90deg,#a7793430,#111a2b,#a7793430);}
+.game-night-live span{font:850 12px var(--body);letter-spacing:.1em;color:#c0d4ed;}
+.game-night-live strong{font:900 clamp(34px,5vw,57px)/1 var(--display);
+ color:#fff6dd;font-variant-numeric:tabular-nums;text-shadow:0 0 24px #ecc36c40;}
+.game-night-dek{color:#e9d3aa!important;font-weight:750!important;letter-spacing:.03em;}
+.game-night-half{display:grid;gap:5px;padding:11px;margin:7px 0;
+ border-left:3px solid #e6c47f;background:linear-gradient(90deg,#b5923d20,transparent);}
+.game-night-half span{font:800 10px var(--body);color:#dfc289;letter-spacing:.1em;}
+.game-night-half b{font:850 16px var(--display);color:#f5f7ff;text-transform:uppercase;}
+.game-night-half small{font:650 11px var(--body);color:#a8c1dd;}
