@@ -614,7 +614,7 @@ HL.SkillDraft = (function () {
     return rows.sort((a, b) => a.pick - b.pick).slice(0, 10);
   }
 
-  async function playSeason(c) {
+  async function playSeason(c,interactive=false) {
     const L = await leagueFor(c.yr,c);if(!L)return;
     const me = c.me;
     if (c.minors) {
@@ -633,7 +633,8 @@ HL.SkillDraft = (function () {
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
       if (missed > 0) injury = { name: inj.name, games: missed, lasting: !!inj.lasting };
     }
-    const res = simSeason(L, team, me, missed,c.role,c.press?.pledge);
+    const res = interactive ? await simSeasonInteractive(L,team,me,missed,c.role,c.press?.pledge) :
+      simSeason(L,team,me,missed,c.role,c.press?.pledge);
     const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
     s.agenda=finishAgenda(c,s,L.games);
     HL.SkillPress?.resolve(c,s);
@@ -854,7 +855,7 @@ HL.SkillDraft = (function () {
   }
 
   // ---------- one season: real schedule, awards voted against the real field, playoff path ----------
-  function simSeason(L, team, me, missed, role='balanced',pressPledge=null) {
+  function* simSeasonFlow(L, team, me, missed, role='balanced',pressPledge=null) {
     const roster = HL.League.teamPlayers(team.id).sort((a, b) => b.ovr - a.ovr).slice(0, 14);
     const historical=L.season<=HL.LATEST_SEASON;
     const realRows=historical?HL.History.seasonRows(String(L.season)):[];
@@ -891,15 +892,31 @@ HL.SkillDraft = (function () {
       if (tens >= 3) counts.td++; else if (tens >= 2) counts.dd++;
     };
     let w = 0, l = 0, gi = 0;
+    const nightEvents=[];
     for (const gm of L.schedule) {
       if (gm.home !== team.id && gm.away !== team.id) continue;
       me.injury = gi++ >= missed ? null : { name: 'Injured', games: 1 };
       const home = gm.home === team.id;
       const opp = L.teams[home ? gm.away : gm.home];
+      let gameNight=null;
+      if([1,21,41,61].includes(gi)&&gi-missed<=L.games){
+        const id=yield {type:'game-night',game:gi,total:L.games,year:L.season,
+          player:me,team,record:{w,l},opp:{...opp,
+            players:HL.League.teamPlayers(opp.id).sort((a,b)=>b.ovr-a.ovr).slice(0,4)}};
+        gameNight={game:gi,opponent:opp.name,record:w+'-'+l};
+        const chosen=HL.GameNights?.apply(tObj,me,id||'trust',gameNight);
+        if(!chosen){
+          gameNight.id='trust';gameNight.title='Trust the system';gameNight.wear=0;
+        }
+      }
       const res = home ? HL.simGame(tObj, objOf(opp), rules) : HL.simGame(objOf(opp), tObj, rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
       const won = mine.score > theirs.score;
       if (won) w++; else l++;
+      if(gameNight){
+        Object.assign(gameNight,{win:won,points:mine.score,allowed:theirs.score});
+        nightEvents.push(gameNight);
+      }
       const b = mine.box[me.id];
       if (b) { for (const k in line) line[k] += b[k] || 0; note(b, opp, won, `${mine.score}-${theirs.score}`, false); }
       for (const p of tObj.players) if (p !== me) p.injury = null;
@@ -1046,12 +1063,31 @@ HL.SkillDraft = (function () {
     // The temporary MyPlayer rotation must never corrupt the persistent NBA roster.
     for(const [p,minutes] of originalMinutes)p.realMpg=minutes;
     return {
-      g, line, pline, ppg, rpg, apg, leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
+      g, line, pline, ppg, rpg, apg, gameNights:nightEvents,leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
       ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
       w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,rival,pressTarget,
       realChamp: rcT ? fullName(rcT) : realChamp || null, games: L.games, nTeams: L.teams.length,
     };
   }
+  // Direct Node callers retain the original synchronous contract. Only an
+  // interactive user-played season pauses for game-night decisions.
+  function simSeason(L,team,me,missed,role='balanced',pressPledge=null){
+    const iterator=simSeasonFlow(L,team,me,missed,role,pressPledge);
+    let current=iterator.next();
+    while(!current.done)current=iterator.next('trust');
+    return current.value;
+  }
+  async function simSeasonInteractive(L,team,me,missed,role,pressPledge){
+    const iterator=simSeasonFlow(L,team,me,missed,role,pressPledge);
+    let current=iterator.next(),auto=false;
+    while(!current.done){
+      let choice=auto?'trust':await HL.GameNights?.prompt(current.value);
+      if(choice==='trust:automatic'){auto=true;choice='trust';}
+      current=iterator.next(choice||'trust');
+    }
+    return current.value;
+  }
+
   function roundName(r, rounds, season) {
     const fromEnd = rounds - 1 - r;
     const div = season < 1970;
@@ -1273,6 +1309,7 @@ HL.SkillDraft = (function () {
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
       ${s.agenda?'<div class="season-goal-report '+(s.agenda.complete?'complete':'')+'"><div><div class="caps">Season contract · '+esc(ROLES[s.role]?.title||'Balanced')+'</div><b>'+esc(s.agenda.title)+'</b><p>'+esc(s.agenda.detail)+'</p></div><strong>'+(s.agenda.complete?'GOAL ACHIEVED':'GOAL MISSED')+'</strong></div>':''}
       ${s.pressResult?'<div class="press-season-outcome '+(s.pressResult.won==null?'void':s.pressResult.won?'delivered':'backlash')+'"><span>PUBLIC PROMISE · '+(s.pressResult.won==null?'NO CONTEST':s.pressResult.won?'DELIVERED':'THE INTERNET KEPT RECEIPTS')+'</span><b>'+esc(s.pressResult.measure)+'</b><small>Fan approval '+(s.pressResult.impact>0?'+':'')+s.pressResult.impact+'. Public perception can influence future offers, not skills.</small></div>':''}
+      ${HL.GameNights?.recap(s.gameNights)||''}
       ${s.rival?'<div class="season-rivalry '+(s.rival.win?'won':'')+'"><div class="caps">SEASON MVP RIVAL · '+
         esc(s.rival.name)+'</div><div class="row wrap"><strong>'+
         (s.rival.win?'RIVAL DEFEATED':'RIVAL WINS THIS ROUND')+'</strong><span class="ml-auto">'+
@@ -1507,7 +1544,7 @@ HL.SkillDraft = (function () {
       const proceeded=await busy(`Playing the ${yrLabel(c.yr)} season`, c.minors ? 'In the minor leagues' : `With the ${fullName(c.teamMeta)}`, async () => {
         if (c.pending) decide(c, { type: 'stay' });
         c.stage = null;
-        await playSeason(c);
+        await playSeason(c,true);
         await offseason(c);
       });if(!proceeded)return;
       await celebrate(c);
