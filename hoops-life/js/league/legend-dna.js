@@ -463,7 +463,7 @@ HL.DNA = (function () {
           '<p>'+esc(f.description)+'</p><p>'+esc(f.qualification||'Historical attributes confirmed.')+
           '</p></details></article>';
     }).join('');
-    return '<section class="block power-map"><header><h3>POWER NETWORK · ACTIVE ON-COURT ABILITIES</h3>'+
+    return '<section class="block power-map '+(compact?'power-map-compact':'')+'"><header><h3>POWER NETWORK · ACTIVE ON-COURT ABILITIES</h3>'+
       '<span class="ml-auto t3 sm">'+active.length+' unlocked · '+(dna.mutations||[]).length+
       ' rare mutations</span></header><div class="body stack">'+
       '<div class="power-map-scoreboard"><div><strong>'+(dna.pairs||[]).length+
