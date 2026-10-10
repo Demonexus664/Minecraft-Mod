@@ -7,6 +7,8 @@ Ratings audit recovery (2026-10-10): 439 individually authored season-scoped sco
 
 Skill Draft now has two rulesets: **Original** (team + decade + random skill, five specialist cards) and **Free Choice** (team + decade reels, all recorded franchise players including short appearances, player search/pagination, then an unfilled skill selected by the user). Free Choice imports that player's strongest qualifying season for the selected skill; the two rulesets share DNA, career progression and legacy rankings. Regression checks: `node --test tools/test-skilldraft-freechoice.js`. Full real-browser and complete career-simulation verification remains pending.
 
+Skill Draft career simulation correction (2026-10-10): post-2025 seasons now advance a persistent, generated NBA league using the existing draft, progression, retirement and free-agency systems instead of replaying 2025 data. Team strength/records are reprojection estimates; the 82-0/full-schedule engine is not silently claimed to play every other club's games. The career sim samples actual simulated possessions for future award rivals, displays yearly rookies/development/scoring leaders, and applies finite, differentiated career lengths (typically 10–20 NBA seasons, exceptional maximum 25) with more realistic decline. Tests: `node --test tools/test-skilldraft-future.js tools/test-dna-longevity.js tools/test-rare-and-overhaul.js`. Focused runtime integration checks covered five generated seasons, changing rookies/standings, a future simulated season, and retirement. Full browser/whole-suite rerun is still pending.
+
 Open `hoops-life/index.html` in a browser; no build step. Real headshots and logos load from the NBA/ESPN CDNs in your browser.
 
 ## Product goal
