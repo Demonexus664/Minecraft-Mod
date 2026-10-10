@@ -684,7 +684,7 @@ HL.SkillDraft = (function () {
       if (!pend.offers.length) { pend.type = 'minors'; pend.notes.push('Free agency came and went without an offer.'); }
     }
     c.pending = pend;
-    c.pendingStory=HL.Story.prompt(c);
+    c.pendingStory=null; // career play stays focused on results and team decisions
   }
 
   function makeOffers(c, L, cur) {
@@ -1324,7 +1324,6 @@ HL.SkillDraft = (function () {
       out.push(`<section class="block"><div class="body row wrap" style="gap:10px"><div class="grow"><h3>${yrLabel(c.yr)}</h3><div class="t2 sm">${c.minors ? 'A season in the minor leagues.' : `With the ${esc(fullName(c.teamMeta))}.`}</div></div><button class="btn go big" data-play>Play the season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div></section>`);
     }
     const last = c.seasons[c.seasons.length - 1];
-    if(c.pendingStory){const e=c.pendingStory;out.unshift(`<section class="block dna-story-choice"><div class="body stack"><span class="dna-section-label">A CAREER TURNING POINT</span><h2>${esc(e.title)}</h2><p>${esc(e.subtitle)}</p><div class="row wrap"><button class="btn go" data-story-choice="a">${esc(e.a)}</button><button class="btn" data-story-choice="b">${esc(e.b)}</button></div></div></section>`);}
     if (last) out.push(seasonReport(last));
     if(c.seasons.length)out.push('<details class="career-archive"><summary>Career totals & previous seasons</summary>'+
       careerTable(c)+'</details>');
@@ -1564,7 +1563,6 @@ HL.SkillDraft = (function () {
     app.querySelectorAll('[data-play]').forEach(b => b.onclick = play);
     app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { const proceeded=await busy('Simulating the next ten seasons', '', async () => { c.stage = null; await runRest(c); }); if(proceeded&&st.career.done)verdictBanner(st.career); });
     app.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => { decide(c, { type: 'sign', i: +b.dataset.sign }); render(); });
-    app.querySelectorAll('[data-story-choice]').forEach(b=>b.onclick=()=>{HL.Story.chooseDecision(c,b.dataset.storyChoice);setAge(c,c.age);render();});
     app.querySelectorAll('[data-trade]').forEach(b => b.onclick = () => { decide(c, { type: 'trade' }); U.toast(`${esc(c.log[c.log.length - 1].text)}.`); render(); });
     app.querySelectorAll('[data-minors]').forEach(b => b.onclick = () => { decide(c, { type: 'minors' }); render(); });
     app.querySelectorAll('[data-retire]').forEach(b => b.onclick = () => {
