@@ -288,7 +288,8 @@ HL.SkillDraft = (function () {
   };
   function customizeRole(me,id) {
     const role=ROLES[id]||ROLES.balanced;
-    const base=HL.completeTendencies(me);
+    const base=me._skillRoleBaseline||HL.completeTendencies(me);
+    me._skillRoleBaseline ||= {...base};
     const tend={...base};
     for(const [key,delta]of Object.entries(role.t))tend[key]=HL.clamp((base[key]??50)+delta,0,100);
     me.tend=HL.completeTendencies({...me,tend});
