@@ -180,7 +180,7 @@ test('Visual effects intensity persists between screens and can disable motion',
   const sandbox={
     HL:{UI:{esc:String}},document:{documentElement:root},
     localStorage:{getItem:k=>prefs.get(k)||null,setItem:(k,v)=>prefs.set(k,v)},
-    window:{matchMedia:()=>({matches:false})},setTimeout:()=>{},console
+    window:{matchMedia:()=>({matches:false})},setTimeout:()=>{},console:{log(){},error(){}}
   };
   sandbox.window.HL=sandbox.HL;
   vm.runInNewContext(src,sandbox,{filename:'fx.js'});
