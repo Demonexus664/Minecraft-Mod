@@ -18,22 +18,44 @@ HL.FX = (function () {
   }
 
   // ---------- sound (WebAudio blips, no files) ----------
-  let ctx = null;
+  let ctx=null,master=null;
+  function volume(){
+    try{const raw=+localStorage.getItem('hl-volume');return Number.isFinite(raw)?Math.max(0,Math.min(1,raw)):.75;}
+    catch{return .75;}
+  }
+  function setVolume(level){
+    const safe=Math.max(0,Math.min(1,Number(level)||0));
+    try{localStorage.setItem('hl-volume',String(safe));}catch{}
+    if(master)master.gain.value=safe;
+    return safe;
+  }
+  function audioGraph(){
+    const Audio=window.AudioContext||window.webkitAudioContext;
+    if(!Audio)return null;
+    if(ctx)return ctx;
+    ctx=new Audio();
+    const compressor=ctx.createDynamicsCompressor();
+    compressor.threshold.value=-18;compressor.knee.value=19;
+    compressor.ratio.value=3.3;compressor.attack.value=.003;compressor.release.value=.18;
+    master=ctx.createGain();master.gain.value=volume();
+    compressor.connect(master);master.connect(ctx.destination);
+    ctx._hlMix=compressor;
+    return ctx;
+  }
   const soundOn = () => { try { return localStorage.getItem('hl-sound') !== 'off'; } catch (e) { return true; } };
   function setSound(on) { try { localStorage.setItem('hl-sound', on ? 'on' : 'off'); } catch (e) { /* storage unavailable */ } }
   function tone(freq, dur = 0.08, type = 'square', vol = 0.04, slide = 0) {
     if (!soundOn()) return;
     try {
-      const Audio=window.AudioContext||window.webkitAudioContext;
-      if(!Audio)return;
-      ctx=ctx||new Audio();
+      if(!audioGraph())return;
       if(ctx.state==='suspended')ctx.resume().catch(()=>{});
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = type; o.frequency.value = freq;
       if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), ctx.currentTime + dur);
-      g.gain.setValueAtTime(vol, ctx.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
-      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(.0001,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(Math.max(.00011,vol),ctx.currentTime+Math.min(.008,dur*.2));
+      g.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+dur);
+      o.connect(g);g.connect(ctx._hlMix);
       o.onended=()=>{try{o.disconnect();g.disconnect();}catch{}};
       o.start(); o.stop(ctx.currentTime + dur + 0.02);
     } catch (e) { /* audio unavailable */ }
@@ -44,8 +66,7 @@ HL.FX = (function () {
   function noise(dur=.16,vol=.023,cutoff=1800) {
     if(!soundOn())return;
     try{
-      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
-      ctx=ctx||new Audio();
+      if(!audioGraph())return;
       if(ctx.state==='suspended')ctx.resume().catch(()=>{});
       const length=Math.max(1,Math.round(ctx.sampleRate*dur));
       const buffer=ctx.createBuffer(1,length,ctx.sampleRate),data=buffer.getChannelData(0);
@@ -54,7 +75,7 @@ HL.FX = (function () {
       filter.type='lowpass';filter.frequency.value=cutoff;src.buffer=buffer;
       gain.gain.setValueAtTime(vol,ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+dur);
-      src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+      src.connect(filter);filter.connect(gain);gain.connect(ctx._hlMix);
       src.onended=()=>{try{src.disconnect();filter.disconnect();gain.disconnect();}catch{}};
       src.start();src.stop(ctx.currentTime+dur+.02);
     }catch{}
@@ -97,6 +118,7 @@ HL.FX = (function () {
     rival: () => {tone(144,.28,'sawtooth',.046,-22);setTimeout(()=>tone(286,.12,'triangle',.028,340),160);},
     achievement: () => [523,659,784,988,1175].forEach((f,i)=>
       setTimeout(()=>tone(f,i===4?.44:.10,'triangle',.03),i*94)),
+    camera:()=>{noise(.067,.035,3200);tone(680,.028,'square',.016,-250);},
     fusion: fusionSound,
     arena: (moment='win')=>{
       if(moment==='clutch'){noise(.19,.017,3600);tone(195,.17,'triangle',.035,100);}
@@ -231,7 +253,8 @@ HL.FX = (function () {
       '<label class="fx-selector">FX <select data-fx-level aria-label="Visual effects intensity">'+
       levels.map(id=>'<option value="'+id+'" '+(fxLevel()===id?'selected':'')+'>'+
         (id==='full'?'Cinematic':id==='lite'?'Light':'Off')+'</option>').join('')+
-      '</select></label>';
+      '</select></label>'+
+      '<label class="sound-level">VOL <input type="range" data-volume min="0" max="100" step="5" aria-label="Sound effects volume" value="'+Math.round(volume()*100)+'"></label>';
   }
   const boundRoots=new WeakSet();
   function bindSound(root) {
@@ -239,6 +262,8 @@ HL.FX = (function () {
       document.documentElement.setAttribute('data-fx-level',fxLevel());
     const effect=root.querySelector('[data-fx-level]');
     if(effect)effect.onchange=()=>setFxLevel(effect.value);
+    const audioVolume=root.querySelector('[data-volume]');
+    if(audioVolume)audioVolume.oninput=()=>setVolume(+audioVolume.value/100);
     const b=root.querySelector('[data-sound]');
     if(b)b.onclick=()=>{
       setSound(!soundOn());
@@ -257,7 +282,7 @@ HL.FX = (function () {
     }
   }
 
-  return { sfx, TIERS, tierOf, tierIndex, burst, shake, flash, countUp, reels, flipIn, tilt, banner, wait, soundToggle, bindSound, reduced,fxLevel,setFxLevel };
+  return { sfx, TIERS, tierOf, tierIndex, burst, shake, flash, countUp, reels, flipIn, tilt, banner, wait, soundToggle, bindSound, reduced,fxLevel,setFxLevel,volume,setVolume };
 })();
 
 // Game cards (collectible style) for real player-seasons.
