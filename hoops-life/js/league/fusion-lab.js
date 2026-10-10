@@ -37,7 +37,9 @@ HL.FusionLab=(function(){
  function preview(a,b){
   if(!a||!b)return null;
   const base=rating(a,b),repeats=tries[pairKey(a,b)]||0;
-  const chance=Math.round(Math.max(.5,base.chance*Math.pow(.91,repeats))*10)/10;
+  // Repeated research brings a small bounded stabilization benefit. No pairing
+  // becomes guaranteed and paradoxical specimens remain difficult.
+  const chance=Math.round(clamp(base.chance+Math.min(12,repeats*1.4),.5,93)*10)/10;
   return {...base,chance,display:chance.toFixed(1)+'%',repeats,rare:chance<=8};
  }
  // Basketball genetics: strengths require actual complementary tools. A success
@@ -100,7 +102,7 @@ HL.FusionLab=(function(){
   const id='fusion:'+(++serial),pos=height>=81?'C':height>=79?'PF':height>=77?'SF':height>=75?'SG':'PG';
   const node={id,name,attrs,height,weight,ovr:HL.computeOvr?.(attrs,pos)||overall({attrs}),
    pos,depth:Math.max(a.depth||0,b.depth||0)+1,
-   ancestry:[...(a.ancestry||[]),...(b.ancestry||[])],tags:p.tags,mechanics:special,
+   ancestry:[...new Set([...(a.ancestry||[]),...(b.ancestry||[])])],tags:p.tags,mechanics:special,
    heads:[a.name,b.name],images:[a.photo||a.images?.[0]||'',b.photo||b.images?.[1]||''],
    tier:p.rare?'apex':p.chance<25?'mythic':'fusion',family:p.family,rarity:p.chance,
    parentIds:[a.id,b.id],successChance:p.chance,
