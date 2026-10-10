@@ -402,6 +402,25 @@ HL.Challenge = (function () {
     for (const slot of SLOTS) {
       const c = st.lineup[slot];
       const p = HL.History.makePlayer(c.row, c.season, 999);
+      const hybrid=fusionAt(slot);
+      if(hybrid){
+        p.name=hybrid.name;p.nbaId=null;p.real=false;p.height=hybrid.height;
+        p.weight=hybrid.weight;p.pos=STARTERS.includes(slot)?slot:hybrid.pos;
+        p.attrs=HL.completeAttributes({...hybrid.attrs},hybrid.height);
+        const pen=fusionFit(hybrid,slot);
+        if(pen){
+          const limited=STARTERS.includes(slot)&&['PG','SG'].includes(slot)?
+            ['handle','pass','perD','steal','iq']:['intD','block','oreb','dreb','post','iq'];
+          for(const key of limited)p.attrs[key]=Math.max(25,p.attrs[key]-pen);
+        }
+        p.ovr=HL.computeOvr(p.attrs,p.pos);
+        p.tend=HL.completeTendencies({...p,tend:HL.defaultTendencies(p)});
+        p.genesisId=hybrid.id;p.genesisDepth=hybrid.depth;
+        p.genesisMechanics={...hybrid.mechanics};
+        p.historicalPid=hybrid.id;
+        p.realMpg=minutes[slot];p.slot=slot;players.push(p);
+        continue;
+      }
       if (STARTERS.includes(slot)) p.pos = slot;
       // Position changes cost decision-making and role execution, not God-given height,
       // shooting touch or strength. Bigs running PG lose creation, not their post game.
@@ -431,9 +450,19 @@ HL.Challenge = (function () {
       b.realMpg = 2;
       players.push(b);
     }
-    const dnaEntries=SLOTS.map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,row:st.lineup[slot].row,season:st.lineup[slot].season,playerId:players[SLOTS.indexOf(slot)].id}));
+    const dnaEntries=SLOTS.filter(slot=>!fusionAt(slot)).map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,row:st.lineup[slot].row,season:st.lineup[slot].season,playerId:players[SLOTS.indexOf(slot)].id}));
     // Historical mutations remain distinct from team chemistry.
     st.dna=HL.DNA.applyTeam(players.slice(0,8),dnaEntries);
+    const hybrids=[];
+    for(let i=0;i<SLOTS.length;i++){
+      const node=fusionAt(SLOTS[i]);if(!node)continue;
+      const player=players[i];
+      player.dna={effects:{},mechanics:{...node.mechanics},links:[],
+        signature:node.family,mutations:[node.family]};
+      hybrids.push({slot:SLOTS[i],id:node.id,name:node.name,ovr:player.ovr,
+        family:node.family,depth:node.depth,mechanics:Object.keys(node.mechanics||{})});
+    }
+    st.genesisSeason=hybrids;
     dream.players = players;
     st.dream=dream;
     dream.strategy.starters = players.slice(0, 5).map(p => p.id);
@@ -557,7 +586,7 @@ HL.Challenge = (function () {
     }
     st.result = {w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,best,losses:log,lines,players,firstLoss,gameLog,
       absences,injuriesLog,specialEncounter:null,dna:st.dna,specialDraft:st.special?.label||null,
-      closeGames,closeWins,marqueeLog,schemeCounts,schemeRecords,abilityCounts,coach:st.coach,coachLog:st.coachLog,bosses:st.bosses,gauntlet:st.gauntlet,
+      closeGames,closeWins,marqueeLog,schemeCounts,schemeRecords,genesis:st.genesisSeason||[],abilityCounts,coach:st.coach,coachLog:st.coachLog,bosses:st.bosses,gauntlet:st.gauntlet,
       mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
@@ -697,6 +726,15 @@ HL.Challenge = (function () {
 
   // ---------- UI ----------
   function cardFor(c, opts = {}) {
+    const slot=slotForCard(c),hybrid=slot&&fusionAt(slot);
+    if(hybrid){
+      const left={photo:hybrid.images?.[0]||'',name:hybrid.heads?.[0]||'Parent A'};
+      const right={photo:hybrid.images?.[1]||'',name:hybrid.heads?.[1]||'Parent B'};
+      const visual=HL.FusionUI?.portrait(left,right,true)||'';
+      return '<div class="genesis-lineup-card" data-from="'+slot+'">'+visual+
+        '<div class="genesis-lineup-meta"><b>'+esc(hybrid.name)+'</b>'+
+        '<span>'+hybrid.ovr+' OVR · GEN '+hybrid.depth+'</span></div></div>';
+    }
     const bio = HL.HISTORY.players[c.row.pid];
     const team = teamMeta(LINEAGE[c.club]) || null;
     const r = c.row;
@@ -777,7 +815,7 @@ HL.Challenge = (function () {
           cardFor(c,{down:!!reveal,attrs:`data-hand="${i}"`})+
           (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="'+i+'">FULL SCOUT REPORT</button>')+
           '</div>').join('')}</div></div>` : '';
-    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
+    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>${done?genesisPanel():''}`;
   }
 
   function tickerView() {
@@ -1019,6 +1057,22 @@ HL.Challenge = (function () {
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
     app.querySelectorAll('[data-gameplan]').forEach(b=>b.onclick=()=>{st.plan=b.dataset.gameplan;render();});
     app.querySelectorAll('[data-scout]').forEach(b=>b.onclick=()=>scoutPlayer(+b.dataset.scout));
+    app.querySelector('[data-fusion-open]')?.addEventListener('click',()=>{
+      if(!fusionAllowed())return;
+      HL.FusionUI?.open(node=>{
+        if(!fusionAllowed())return;
+        st.pendingFusionId=node.id;FX.sfx.achievement?.();render();
+      });
+    });
+    app.querySelectorAll('[data-fusion-assign]').forEach(b=>b.onclick=()=>{
+      const node=HL.FusionLab?.find(st.pendingFusionId);
+      if(assignFusion(b.dataset.fusionAssign,node)){FX.sfx.achievement?.();render();}
+    });
+    app.querySelectorAll('[data-fusion-remove]').forEach(b=>b.onclick=()=>{
+      if(clearFusion(b.dataset.fusionRemove)){FX.sfx.flip?.();render();}
+    });
+    const cancelFusion=app.querySelector('[data-fusion-cancel]');
+    if(cancelFusion)cancelFusion.onclick=()=>{st.pendingFusionId=null;render();};
     const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
     app.querySelectorAll('[data-start-playoffs]').forEach(b=>b.onclick=()=>{startPlayoffs();render();});
     app.querySelectorAll('[data-finish-playoffs]').forEach(b=>b.onclick=()=>{st.phase='result';render();});
