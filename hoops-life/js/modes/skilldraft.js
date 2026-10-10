@@ -281,7 +281,7 @@ HL.SkillDraft = (function () {
       const lo = ovr >= 82 ? 0 : Math.floor(pool.length * 0.25);
       picks.push(pool.splice(R.int(lo, pool.length - 1), 1)[0]);
     }
-    if (cur && R.chance(ovr >= 72 ? 0.95 : ovr >= 66 ? 0.6 : 0.3)) picks.unshift(teams.find(x => x.t.id === cur.id));
+    if (cur && R.chance(c.seasons.slice(-3).some(s=>s.champion&&s.team.bref===c.teamMeta?.bref) ? 0.995 : ovr>=72 ? .95 : ovr>=66 ? .6 : .3)) picks.unshift(teams.find(x => x.t.id === cur.id));
     return picks.map(x => offerFrom(c, L, x.t, teams.indexOf(x), teams.length, cur && x.t.id === cur.id));
   }
   function offerFrom(c, L, t, strengthRank, nTeams, isCur) {
@@ -333,9 +333,13 @@ HL.SkillDraft = (function () {
     if ((c.age >= 35 && c.me.ovr < 72 && R.chance(0.5)) || c.age >= 41) return decide(c, { type: 'retire' });
     if (p.type === 'fa') {
       const cur = p.offers.findIndex(o => o.isCur);
-      if (cur >= 0 && c.me.traits.loyalty > 70) return decide(c, { type: 'sign', i: cur });
+      const recent=c.seasons.filter(s=>!s.minors && s.team?.bref===c.teamMeta?.bref).slice(-3);
+      const ringRun=recent.filter(s=>s.champion).length;
+      const winning=recent.length ? recent.reduce((a,s)=>a+s.w/Math.max(1,s.w+s.l),0)/recent.length : 0;
+      if (cur >= 0 && (ringRun>=2 || winning>=.73 && c.me.traits.loyalty>=40 || c.me.traits.loyalty>78))
+        return decide(c, {type:'sign',i:cur});
       const tierScore = { Contender: 3, 'Playoff team': 2, Fringe: 1, Rebuilding: 0 };
-      const score = o => c.me.ovr >= 84 ? tierScore[o.tier] * 10 + o.amount / HL.salaryScale(c.yr) * 0.2 : o.amount;
+      const score = o => (o.isCur ? ringRun*12+Math.max(0,c.me.traits.loyalty-50)/3 : 0)+(c.me.ovr>=80?tierScore[o.tier]*9:tierScore[o.tier]*3)+(o.role==='Number one option'?7:0)+o.amount/HL.salaryScale(c.yr)*.23;
       let best = 0;
       p.offers.forEach((o, i) => { if (score(o) > score(p.offers[best])) best = i; });
       return decide(c, { type: 'sign', i: best });
@@ -539,9 +543,14 @@ HL.SkillDraft = (function () {
   function verdict(c) {
     const lg = c.legacy, n = c.seasons.filter(s => !s.minors).length;
     if (!n) return ['NEVER MADE IT', `${c.pick ? `Drafted #${c.pick}, but` : 'Undrafted, and'} never played an NBA game. ${c.seasons.length} season${c.seasons.length === 1 ? '' : 's'} in the minors and overseas.`];
-    if (lg.score > lg.top.score * 1.35) return ['BROKEN', 'This is a cheat code. Nobody in history comes close, and the league is already drafting a rule with your name on it.'];
-    if (lg.rank === 1) return ['THE GOAT', `Ahead of ${HL.HISTORY.players[lg.top.pid][0]}. The debate is over.`];
-    if (lg.rank <= 10) return ['ALL-TIME GREAT', `#${lg.rank} all-time. Mount Rushmore conversations include you.`];
+    const report=HL.Legacy.careerReport(c);
+    if(lg.rank===1 && report.goatQualified)
+      return ['GOAT FRONT-RUNNER', 'First in the historical legacy model, with the sustained MVP, title and playoff resume to support the case. The cross-era debate stays open.'];
+    if(lg.rank<=3 && report.goatQualified)
+      return ['GOAT CONTENDER', 'An elite historical rank backed by meaningful championships, production and longevity.'];
+    if(lg.rank===1)
+      return ['HISTORIC PEAK', 'First in the legacy model, but one rank does not settle the all-time debate.'];
+    if(lg.rank<=10)return ['ALL-TIME GREAT', 'A career worthy of a detailed, era-aware comparison with the legends.'];
     if (lg.rank <= 75) return ['HALL OF FAMER', `#${lg.rank} all-time. First-ballot.`];
     if (lg.rank <= 160) return ['SUPERSTAR', `#${lg.rank} all-time. A borderline Hall of Fame career.`];
     if (lg.rank <= 350) return ['ALL-STAR', `#${lg.rank} all-time. A very good career.`];
@@ -752,6 +761,20 @@ HL.SkillDraft = (function () {
       <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>`;
   }
 
+  function careerNarrative(c) {
+    const d=HL.Legacy.careerReport(c), P=c.ptotals||{},T=c.totals||{},top=c.seasons.filter(s=>!s.minors).slice().sort((a,b)=>(b.ppg||0)-(a.ppg||0)).slice(0,3);
+    const honors=d.honors.length ? d.honors.map(x=>'<article class="dossier-honor"><div class="caps">Career identity earned</div><h3>'+esc(x.name)+'</h3><p>'+esc(x.why)+'</p></article>').join('') : '<article class="dossier-honor"><h3>A meaningful career</h3><p>No specialty award was earned just for having a high attribute. Production matters.</p></article>';
+    const moments=top.map(s=>'<article class="dossier-honor"><div class="caps">'+s.yr+'-'+(s.yr+1)+' · '+esc(s.team.name)+'</div><h3>'+(s.ppg||0).toFixed(1)+' PPG</h3><p>'+(s.rpg||0).toFixed(1)+' rebounds · '+(s.apg||0).toFixed(1)+' assists</p></article>').join('');
+    const doubt=(d.ts<.54?'Efficiency leaves room for criticism. ':'Production supports the case. ')+(c.rings>=3?'A dynasty requires teammates and circumstances too.':'Team success is one part of the historical argument.');
+    return '<section class="block dossier"><header><h3>The full career verdict</h3><span class="ml-auto t3 sm">Evidence · specialization · storytelling</span></header><div class="body stack">'+
+      '<div class="dossier-lead">'+esc(d.chapters[0])+'</div>'+
+      '<div class="dossier-grid">'+honors+'</div>'+
+      '<div class="dossier-two"><article class="dossier-honor"><div class="caps">The strongest argument</div><h3>Prime and longevity</h3><p>'+esc(d.chapters[1])+'</p></article><article class="dossier-honor"><div class="caps">What critics would say</div><h3>The counterargument</h3><p>'+esc(doubt)+'</p></article></div>'+
+      d.chapters.slice(2).map(t=>'<p class="dossier-chapter">'+esc(t)+'</p>').join('')+
+      (moments?'<div class="caps">Signature scoring seasons</div><div class="dossier-grid">'+moments+'</div>':'')+
+      '<details><summary>How honors are decided</summary><p>Historical legacy rank is a weighted comparison with real players. Specialty titles require enough NBA years, actual simulated production and, where noted, scouting strengths. Neither a 99 rating nor the highest numerical score automatically makes a player the GOAT.</p></details></div></section>';
+  }
+
   function resultView() {
     const c = st.career;
     const [tier, line] = verdict(c);
@@ -777,7 +800,8 @@ HL.SkillDraft = (function () {
           </div></div>
           <div class="row"><button class="btn go" data-new>Build another</button></div>
         </div></section>
-      ${c.seasons.length ? careerTable(c) : ''}
+      ${careerNarrative(c)}
+      ${c.seasons.length ? `<details class="dossier-data"><summary>Expand all ${c.seasons.length} seasons of statistics and awards</summary>${careerTable(c)}</details>` : ''}
       ${c.log.length ? timeline(c) : ''}`;
   }
 
