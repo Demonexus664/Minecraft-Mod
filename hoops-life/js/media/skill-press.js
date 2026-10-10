@@ -104,7 +104,7 @@ HL.SkillPress=(function(){
   }
   function panel(c){
     const b=beat(c);if(!b||c.done)return '';
-    const v=values(c),rec=v.history.findLast(x=>x.year===c.yr);
+    const v=values(c),rec=v.history.findLast(x=>x.year===c.yr),oldReceipt=v.history.findLast(x=>x.outcome==='won'||x.outcome==='lost');
     const buttons=choices(c).map(x=>'<button class="press-choice" data-press="'+x.id+'">'+
       '<div class="press-choice-kicker">'+(x.pledge?'HIGH STAKES · PUBLIC PROMISE':'MEDIA RESPONSE')+'</div>'+
       '<strong>'+esc(x.title)+'</strong><p>'+esc(x.quote)+'</p><small>'+esc(x.detail)+'</small></button>').join('');
