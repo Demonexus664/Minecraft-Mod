@@ -40,14 +40,31 @@ HL.FusionLab=(function(){
   const chance=Math.round(Math.max(.5,base.chance*Math.pow(.91,repeats))*10)/10;
   return {...base,chance,display:chance.toFixed(1)+'%',repeats,rare:chance<=8};
  }
- function combine(a,b,p,success){
-  const attrs={};const keys=new Set([...Object.keys(a.attrs||{}),...Object.keys(b.attrs||{})]);
+ // Basketball genetics: strengths require actual complementary tools. A success
+ // never simply takes BOTH parents' best number in every category.
+ const PHYSICAL=new Set(['speed','accel','agility','burst','vert','stam','lateral']);
+ const POST=new Set(['post','str','contactFinish','oreb','dreb','boxout','screen','intD','block']);
+ const PERIMETER=new Set(['three','mid','shotCreation','handle','releaseSpeed','range','pass','vision','passingAccuracy']);
+ function combine(a,b,p,height){
+  const attrs={},strengths=[],tradeoffs=[];
+  const keys=new Set([...Object.keys(a.attrs||{}),...Object.keys(b.attrs||{})]);
+  const rare=p.rare?2.8:p.chance<25?1.4:.6;
   for(const k of keys){
-   const x=a.attrs?.[k]??65,y=b.attrs?.[k]??65;
-   const v=success?Math.max(x,y)*.96+Math.min(x,y)*.04+(p.rare?5.5:p.chance<25?3.5:1.5):x*.58+y*.42;
-   attrs[k]=Math.round(clamp(v,25,99));
+   const x=a.attrs?.[k]??65,y=b.attrs?.[k]??65,best=Math.max(x,y),worst=Math.min(x,y);
+   const overlap=Math.abs(x-y)<=12;
+   const training=overlap?best*.88+worst*.12:best*.71+worst*.29;
+   const frameCost=height>=82&&PHYSICAL.has(k)?Math.max(0,(height-80)*1.8):0;
+   const smallCost=height<=76&&POST.has(k)?Math.max(0,(79-height)*1.4):0;
+   const paradox=p.family==='Impossible Gravity'&&
+     ((POST.has(k)&&height<=77)||(PERIMETER.has(k)&&height>=83))?2.1:0;
+   const fatigue=(a.depth||0)+(b.depth||0);
+   const val=clamp(Math.round(training+rare+paradox-frameCost-smallCost-Math.min(6,fatigue*.7)),25,99);
+   attrs[k]=val;
+   if(val>=88&&best>=90)strengths.push({key:k,value:val});
+   if((frameCost+smallCost)>=3&&best-val>=4)tradeoffs.push({key:k,lost:Math.round(best-val),value:val});
   }
-  return attrs;
+  return {attrs,strengths:strengths.sort((a,b)=>b.value-a.value).slice(0,8),
+    tradeoffs:tradeoffs.sort((a,b)=>b.lost-a.lost).slice(0,6)};
  }
  function mechanics(p){
   const out={};for(const k of p.tags)if(HL.DNA?.MECHANIC_TEXT?.[k])out[k]=p.rare?1.3:.7;
@@ -65,10 +82,20 @@ HL.FusionLab=(function(){
   tries[pairKey(a,b)]=(tries[pairKey(a,b)]||0)+1;
   const res={ok,chance:p.chance,roll:r,family:p.family,sourceA:a.name,sourceB:b.name,
    outcome:ok?(p.rare?'miracle':'stabilized'):r>.9?'unstable-echo':'fracture'};
-  if(!ok){history.unshift(res);history=history.slice(0,80);return res;}
+  if(!ok){
+   const mismatch=p.family==='Impossible Gravity'?'Body and playstyle pulled in opposite directions.':
+    p.tension>=22?'Different athletic and skill profiles would not stabilize.':
+    'The genetic roll did not stabilize a new basketball identity.';
+   res.failureReason=mismatch;
+   res.echo=r>.9?'A partial ability echo appeared, but the specimen did not stabilize.':'No viable hybrid was created.';
+   history.unshift(res);history=history.slice(0,80);return res;
+  }
   const height=frame==='left'?a.height:frame==='right'?b.height:Math.round((a.height+b.height)/2);
   const weight=frame==='left'?a.weight:frame==='right'?b.weight:Math.round((a.weight+b.weight)/2);
-  const attrs=combine(a,b,p,true),special=mechanics(p);
+  const combined=combine(a,b,p,height);
+  const limited=HL.DNA?.reconcileAttributes?HL.DNA.reconcileAttributes(combined.attrs,height):{attrs:combined.attrs,constraints:[]};
+  const attrs=limited.attrs,special=mechanics(p);
+  const cost=combined.tradeoffs;
   const name=(p.rare?'APEX · ':'')+a.name.split(' ').at(-1)+' × '+b.name.split(' ').at(-1);
   const id='fusion:'+(++serial),pos=height>=81?'C':height>=79?'PF':height>=77?'SF':height>=75?'SG':'PG';
   const node={id,name,attrs,height,weight,ovr:HL.computeOvr?.(attrs,pos)||overall({attrs}),
@@ -76,7 +103,9 @@ HL.FusionLab=(function(){
    ancestry:[...(a.ancestry||[]),...(b.ancestry||[])],tags:p.tags,mechanics:special,
    heads:[a.name,b.name],images:[a.photo||a.images?.[0]||'',b.photo||b.images?.[1]||''],
    tier:p.rare?'apex':p.chance<25?'mythic':'fusion',family:p.family,rarity:p.chance,
-   parentIds:[a.id,b.id],successChance:p.chance,dna:{mechanics:special,effects:{},links:[],mutations:[p.family]}};
+   parentIds:[a.id,b.id],successChance:p.chance,
+   strengths:combined.strengths,tradeoffs:cost,constraints:limited.constraints,
+   dna:{mechanics:special,effects:{},links:[],mutations:[p.family]}};
   creations.unshift(node);res.node=node;history.unshift({...res,id});history=history.slice(0,80);
   return res;
  }
@@ -100,12 +129,24 @@ HL.FusionLab=(function(){
  function project(build,node){
   if(!node)return build;
   const attrs={...build.attrs};
-  for(const [k,v]of Object.entries(node.attrs||{}))if(Number.isFinite(v))
-   attrs[k]=Math.max(attrs[k]||25,Math.round(clamp(v*.94+4,25,99)));
+  // Equipping changes up to six elite tools and the specimen's body, not every
+  // rating. This preserves the importance of the actual Skill Draft.
+  const tools=Object.entries(node.attrs||{}).filter(([k,v])=>Number.isFinite(v)&&v>=88)
+   .sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const changes=[];
+  for(const [k,v]of tools){
+   const before=attrs[k]??65;
+   const upgraded=Math.min(99,Math.round(Math.max(before,v*.87+before*.13)));
+   attrs[k]=upgraded;
+   if(upgraded>before)changes.push({key:k,from:before,to:upgraded});
+  }
   const physical=HL.DNA.reconcileAttributes(attrs,node.height);
+  const mechanisms=HL.DNA.mergeMechanics([{mechanics:build.mechanics||{}},{mechanics:node.mechanics}]);
   return {...build,attrs:physical.attrs,height:node.height,weight:node.weight,
-   mechanics:HL.DNA.mergeMechanics([{mechanics:build.mechanics||{}},{mechanics:node.mechanics}]),
-   fusion:node,fusionReport:{id:node.id,ancestry:node.ancestry,depth:node.depth,tier:node.tier}};
+   dna:{...(build.dna||{}),mechanics:mechanisms,mutations:[...(build.dna?.mutations||[]),node.family]},
+   mechanics:mechanisms,fusion:node,
+   fusionReport:{id:node.id,ancestry:node.ancestry,depth:node.depth,tier:node.tier,changes,
+     tradeoffs:node.tradeoffs||[],active:Object.keys(node.mechanics||{})}};
  }
  function search(q){
   const term=String(q||'').trim().toLowerCase();if(term.length<2)return [];
