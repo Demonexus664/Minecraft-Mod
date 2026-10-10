@@ -52,7 +52,7 @@ HL.SkillPress=(function(){
         detail:'High-risk rivalry challenge. Beat his real voting-impact result next year or face a backlash.',
         sentiment:0,trust:-2,heat:15,pledge:'rival'}]:[]),
       {id:'bold',title:'Guarantee a statement year',
-       quote:(last(c)?.ppg||0)>=24?'Put it in the headline: thirty a night.':'Save this clip. We are making the playoffs.',
+       quote:(last(c)?.ppg||0)>=24?'Put it in the headline: thirty a night.':(year(c)>=2010?'Save this clip. We are making the playoffs.':'Print it in the paper. We are making the playoffs.'),
        detail:(last(c)?.ppg||0)>=24?'Publicly promise 30 PPG. Miss and the internet keeps receipts.':
          'Publicly promise a playoff berth. Miss and the internet keeps receipts.',
        sentiment:1,trust:-2,heat:12,pledge:(last(c)?.ppg||0)>=24?'30ppg':'playoffs'}
