@@ -848,3 +848,21 @@ html:not([data-era]) .career-frame .btn,html:not([data-era]) .live-frame .btn { 
 html:not([data-era]) .live-frame { background: repeating-linear-gradient(135deg,transparent 0 150px,#ffffff03 150px 155px,transparent 155px 250px),#101113; }
 html:not([data-era]) .live-score-stage { background: radial-gradient(ellipse at 50% -20%,#ff792b20,transparent 65%),#191d23; border-color: #ff792b80; box-shadow: 0 14px 45px #0004; }.live-score-stage .btn.go { background: #ff792b; border-color: #ff792b; color: #111; }
 @media(max-width:800px) { .live-layout { grid-template-columns: 1fr; }.live-score-stage { padding: 22px 14px; }.live-scoreboard { grid-template-columns: 1fr 90px 1fr; gap: 8px; }.live-scoreboard h3 { font-size: 19px; }.live-clock { font-size: 28px; }.live-scoreboard .logo { width: 52px!important; height: 52px!important; }.live-buttons .btn { white-space: normal; }.live-frame .bar { flex-wrap: wrap; } }
+
+/* Photo pieces and personal replies, rather than another statistics table. */
+.player-post-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:18px; }
+.player-post-card { border:1px solid var(--rule);border-radius:24px;overflow:hidden;background:var(--surface-2); }
+.player-post-card > header { display:flex;gap:10px;align-items:center;padding:16px; }
+.player-post-card > header small { display:block;color:var(--text-3); }
+.player-post-photo { position:relative;overflow:hidden;background:radial-gradient(ellipse at center,#354050,#121820);max-height:260px; }
+.player-post-photo .gfx-figure { max-width:360px;margin:auto; }
+.player-post-photo-label { position:absolute;bottom:6px;left:12px;color:#d8dce3;font-size:10px;background:#111b;padding:3px 6px;border-radius:10px; }
+.player-post-copy { padding:18px; }
+.player-post-copy blockquote { margin:0 0 12px;font-family:var(--display);font-size:25px;line-height:1.2; }
+.player-post-comments { margin:12px 0;border-top:1px solid var(--rule);padding-top:8px;font-size:13px; }
+.player-post-comments p { margin:8px 0; }
+.player-post-comments b { color:var(--team,#f9b23b); }
+.player-post-created { min-height:140px;padding:28px;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(120deg,#1b273b,#11151e); }
+.player-post-created b { font:800 32px var(--display); }
+[data-era="60s"] .player-post-photo, [data-era="70s"] .player-post-photo { filter:grayscale(1); }
+@media(max-width:600px) { .player-post-card > header { flex-wrap:wrap; }.player-post-copy blockquote { font-size:23px; } }

@@ -176,7 +176,7 @@ HL.Career = (function () {
     if(HL.LiveGame?.active(L))return fail('Finish the live game before changing contracts.');
     const offer=offers(L).find(o=>o.teamId===teamId);if(!offer)return fail('That contract is not available. Honor your current deal or choose a valid offer.');
     const c=L.career,p=me(L),old=p.teamId,t=L.teams[teamId];
-    if(old!==teamId)HL.Interviews?.cancel(L,p.id);
+    if(old!==teamId){HL.Interviews?.cancel(L,p.id);HL.PlayerPosts?.cancel(L,p.id);}
     p.teamId=teamId;p.retired=null;p.contract={amount:offer.amount,start:offer.year,exp:offer.year+offer.years-1};L.userTeamId=teamId;c.people.coach={like:50,respect:50,trust:50};
     log(L,'contract',`${p.name} ${old===teamId?'re-signs with':'joins'} the ${t.city} ${t.name} on a ${offer.years}-year, $${offer.amount.toFixed(3)}M annual deal.`,true);
     quote(L,`${p.name} agrees to terms with ${t.name}`,`${offer.years} years at $${offer.amount.toFixed(3)}M per season; ${offer.role.toLowerCase()}.`,'I want the opportunity to earn my role.','career.contract');role(L);return {ok:true};
@@ -184,7 +184,7 @@ HL.Career = (function () {
   function retire(L) {
     if(HL.LiveGame?.active(L))return fail('Finish the live game before retiring.');
     const c=L.career,p=c&&me(L);if(!c||c.retired)return fail('This player has already retired.');
-    HL.Interviews?.cancel(L,p.id);
+    HL.Interviews?.cancel(L,p.id); HL.PlayerPosts?.cancel(L, p.id);
     c.retired=true;p.retired=L.season;p.teamId=null;c.pendingPress=null;c.watches.forEach(w=>{if(!w.resolved){w.resolved=true;w.cancelled='Retirement';}});
     log(L,'retirement',`${p.name} retired from the league. His life and career record remain in this save.`,true);quote(L,`${p.name} steps away from basketball`,'The player ends his current playing contract and keeps his life story open.','I need a new chapter.','retire');return {ok:true};
   }

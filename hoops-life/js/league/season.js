@@ -319,6 +319,7 @@ HL.League = {};
     HL.World && HL.World.afterGame(L, g, res);
     HL.Career && HL.Career.afterGame(L, g, res);
     HL.Interviews && HL.Interviews.afterGame(L, g, res);
+    HL.PlayerPosts && HL.PlayerPosts.afterGame(L, g, res);
   }
 
   function healPlayer(p) {
@@ -349,7 +350,7 @@ HL.League = {};
       HL.News && HL.News.hardship && HL.News.hardship(L, t, p);
     }
     const hs = HL.League.teamPlayers(tid).filter(p => p.hardship && p.id !== L.career?.pid);
-    if (hs.length && healthy(tid).length - hs.length >= 9) for (const p of hs) { HL.Interviews?.cancel(L, p.id); p.teamId = null; p.hardship = false; }
+    if (hs.length && healthy(tid).length - hs.length >= 9) for (const p of hs) { HL.Interviews?.cancel(L, p.id); HL.PlayerPosts?.cancel(L, p.id); p.teamId = null; p.hardship = false; }
   }
 
   // ---------- Regular season ----------
@@ -770,7 +771,7 @@ HL.League = {};
           continue;
         }
         // Not in the league next season in real life: retire (may come back if he reappears later).
-        p.retired = season; HL.Interviews?.cancel(L, p.id); p.teamId = null; p.retiredBecause = 'history';
+        p.retired = season; HL.Interviews?.cancel(L, p.id); HL.PlayerPosts?.cancel(L, p.id); p.teamId = null; p.retiredBecause = 'history';
         if (p.age >= 30) HL.News && HL.News.retire && HL.News.retire(L, p);
         continue;
       }
@@ -778,7 +779,7 @@ HL.League = {};
       HL.applyProgression(p, delta);
       p.potential = Math.max(p.ovr, p.potential - (p.age > 25 ? 2 : 0));
       if (R.chance(HL.clamp(retireChance(p), 0, 0.98))) {
-        p.retired = season; HL.Interviews?.cancel(L, p.id); p.teamId = null;
+        p.retired = season; HL.Interviews?.cancel(L, p.id); HL.PlayerPosts?.cancel(L, p.id); p.teamId = null;
         if (p.age < 30) p.leftFor = R.pick(['EuroLeague', 'the Chinese Basketball Association', 'the Australian NBL', 'Japan\'s B.League', 'the Turkish BSL', 'the Spanish ACB']);
         else HL.News && HL.News.retire && HL.News.retire(L, p);
       }
@@ -786,7 +787,7 @@ HL.League = {};
   }
 
   function contractsAndFreeAgency(season, next) {
-    for (const p of Object.values(L.players)) if (p.hardship) { p.hardship = false; HL.Interviews?.cancel(L, p.id); p.teamId = null; }
+    for (const p of Object.values(L.players)) if (p.hardship) { p.hardship = false; HL.Interviews?.cancel(L, p.id); HL.PlayerPosts?.cancel(L, p.id); p.teamId = null; }
     const fa = [];
     for (const p of Object.values(L.players)) {
       if (L.career && p.id === L.career.pid) continue;
@@ -795,7 +796,7 @@ HL.League = {};
       if (p.contract.exp <= season) {
         const keep = p.ovr >= 74 ? R.chance(0.7) : R.chance(0.35);
         if (keep) setContract(p, next);
-        else { HL.Interviews?.cancel(L, p.id); p.teamId = null; fa.push(p); }
+        else { HL.Interviews?.cancel(L, p.id); HL.PlayerPosts?.cancel(L, p.id); p.teamId = null; fa.push(p); }
       }
     }
     fa.sort((a, b) => b.ovr - a.ovr);
@@ -811,7 +812,7 @@ HL.League = {};
       // Preserve negotiated roster moves ahead of automatic depth signings and draft additions.
       const priority = p => L.career && p.id === L.career.pid ? 3 : p.userRosterMove ? (p.draft?.year === next ? 2 : 1) : 0;
       const r = roster().sort((a, b) => priority(a) - priority(b) || a.ovr - b.ovr);
-      while (r.length > 15) { const cut = r.shift(); HL.Interviews?.cancel(L, cut.id); cut.teamId = null; }
+      while (r.length > 15) { const cut = r.shift(); HL.Interviews?.cancel(L, cut.id); HL.PlayerPosts?.cancel(L, cut.id); cut.teamId = null; }
     }
     L.newTeams = [];
   }

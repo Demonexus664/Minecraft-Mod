@@ -44,7 +44,7 @@ const assets = [...manifest.portraits, ...(manifest.additionalPortraits || [])];
       }).join('')}</div></main>`;
       document.querySelectorAll('img').forEach(img => img.loading = 'eager');
     }, chosen);
-    await p.waitForFunction(n => document.querySelectorAll('.gfx-head.ok').length === n, chosen.length);
+    await p.waitForFunction(n => document.querySelectorAll('.gfx-head.ok').length === n && document.querySelectorAll('.gfx-uniform.ready').length === n, chosen.length);
     assert.ok(await p.locator('.gfx-uniform-number').evaluateAll(nums => nums.every(n => {
       const number = n.getBoundingClientRect(), figure = n.closest('.gfx-figure').getBoundingClientRect();
       return number.top >= figure.top && number.bottom <= figure.bottom + 1;

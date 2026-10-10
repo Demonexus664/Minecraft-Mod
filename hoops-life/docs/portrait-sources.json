@@ -126,11 +126,11 @@
       "name": "Giannis Antetokounmpo",
       "slug": "giannis-antetokounmpo",
       "id": 203507,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/203507.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/203507.png",
       "src": "media/players/library/giannis-antetokounmpo.png",
-      "sha256": "f4901360d50189e521d7cf7c579296790de08422c5e36bb761643485285495ea",
-      "bytes": 14566
+      "sha256": "789a56c657a0a59576db09d5d999d6a1268170afb80b9c5fa5d98c2ab6104e24",
+      "bytes": 172539
     },
     {
       "name": "Thanasis Antetokounmpo",
@@ -246,11 +246,11 @@
       "name": "Paolo Banchero",
       "slug": "paolo-banchero",
       "id": 1631094,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1631094.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1631094.png",
       "src": "media/players/library/paolo-banchero.png",
-      "sha256": "00cf8eca9700736ad6880442a462e67bb1c0bb8be890b246e274bc3f71e94ea4",
-      "bytes": 16110
+      "sha256": "ab77db6f0c093b09ec23565ed28c691e4ef2452823d4fe9ae22842c8b1fe1372",
+      "bytes": 199235
     },
     {
       "name": "Desmond Bane",
@@ -466,11 +466,11 @@
       "name": "Devin Booker",
       "slug": "devin-booker",
       "id": 1626164,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1626164.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1626164.png",
       "src": "media/players/library/devin-booker.png",
-      "sha256": "fd1ec437fff4c46ac5e7bad0d54b6173bfe3e3f2d2cf55f959fed92b80cda283",
-      "bytes": 15230
+      "sha256": "f5f11823e2da94c3fb639322e718921191466cd3a50a6a6772ade705d36c58cf",
+      "bytes": 169964
     },
     {
       "name": "Chris Boucher",
@@ -586,11 +586,11 @@
       "name": "Jaylen Brown",
       "slug": "jaylen-brown",
       "id": 1627759,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1627759.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1627759.png",
       "src": "media/players/library/jaylen-brown.png",
-      "sha256": "be9028328191a9770ca419bd188410f0c57fe0823f339eb0e85f6923d4b3d42d",
-      "bytes": 15948
+      "sha256": "e4b68da28b893f5e0a0b05375579236e83ed3dde5a03c13c4601d524df5c1446",
+      "bytes": 177460
     },
     {
       "name": "Kobe Brown",
@@ -606,11 +606,11 @@
       "name": "Jalen Brunson",
       "slug": "jalen-brunson",
       "id": 1628973,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1628973.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1628973.png",
       "src": "media/players/library/jalen-brunson.png",
-      "sha256": "b1eb5fef1a935c826fcb177e5d1a8d7e4103c474a4b7b3bd2498cf4910bc7719",
-      "bytes": 15649
+      "sha256": "183ba6f3ad316cbae905a4f3af3d281964c35d42240b715019e234bc3fabd154",
+      "bytes": 208363
     },
     {
       "name": "Carter Bryant",
@@ -1086,11 +1086,11 @@
       "name": "Anthony Davis",
       "slug": "anthony-davis",
       "id": 203076,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/203076.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/203076.png",
       "src": "media/players/library/anthony-davis.png",
-      "sha256": "47ef1eab28120af2624c8ba62c331366dcfae3e08b5c1299e68e91579859f5d7",
-      "bytes": 15734
+      "sha256": "c111cf463a7803433faa5c6bcc7f192392fcba32edf4dcd176784c1c56dfd6af",
+      "bytes": 215407
     },
     {
       "name": "JD Davison",
@@ -1196,11 +1196,11 @@
       "name": "Luka Dončić",
       "slug": "luka-doncic",
       "id": 1629029,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1629029.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1629029.png",
       "src": "media/players/library/luka-doncic.png",
-      "sha256": "41c9d52dd88450bc8d41e8c1b3c6b22720078e25b368a2cc93108fb7cbbcb5f8",
-      "bytes": 15494
+      "sha256": "ff5f5c0f43ef1e40062795ea887dac22910afe9207c5b3a14558dfb1fdfdb596",
+      "bytes": 190870
     },
     {
       "name": "Luguentz Dort",
@@ -1296,11 +1296,11 @@
       "name": "Anthony Edwards",
       "slug": "anthony-edwards",
       "id": 1630162,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1630162.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1630162.png",
       "src": "media/players/library/anthony-edwards.png",
-      "sha256": "583f8675794ea93af37fabf18bfe8ee9fc192a2454dac3905ee89c810c293066",
-      "bytes": 16291
+      "sha256": "d9ebd9ac949ae5f669e3d5e87fbba9ec84dcb260143b3e89be0bb500a33b4007",
+      "bytes": 201915
     },
     {
       "name": "Justin Edwards",
@@ -1786,11 +1786,11 @@
       "name": "James Harden",
       "slug": "james-harden",
       "id": 201935,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/201935.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/201935.png",
       "src": "media/players/library/james-harden.png",
-      "sha256": "141ae5acbb1948f12757cb91432aeca62f2c1de5bd72ed8e5281d953b8255f3a",
-      "bytes": 17581
+      "sha256": "51f92fe724a4494405447c1108c465746ae4d701b2c254187fb3267bc0207a11",
+      "bytes": 223396
     },
     {
       "name": "Jaden Hardy",
@@ -3266,11 +3266,11 @@
       "name": "Donovan Mitchell",
       "slug": "donovan-mitchell",
       "id": 1628378,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1628378.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1628378.png",
       "src": "media/players/library/donovan-mitchell.png",
-      "sha256": "de363702f976343440f12e95497f69378ca5318448b908a2d548a3e7e53aba07",
-      "bytes": 16151
+      "sha256": "5a8590c3eb9e81c07fc5f66c58ba0a956d29ad9edede300e818aa7d3f2710977",
+      "bytes": 205511
     },
     {
       "name": "Evan Mobley",
@@ -4546,11 +4546,11 @@
       "name": "Jayson Tatum",
       "slug": "jayson-tatum",
       "id": 1628369,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1628369.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1628369.png",
       "src": "media/players/library/jayson-tatum.png",
-      "sha256": "b4075e3e7c2908e99af15dffca2902eeae965ca322f62529dbd4d8935c268096",
-      "bytes": 16190
+      "sha256": "ece4b0f2f871e3ab3bfa4f86ed5353909abb81e405867a3edec9307ba1787554",
+      "bytes": 214148
     },
     {
       "name": "Jahmyl Telfort",
@@ -4706,11 +4706,11 @@
       "name": "Karl-Anthony Towns",
       "slug": "karl-anthony-towns",
       "id": 1626157,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1626157.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1626157.png",
       "src": "media/players/library/karl-anthony-towns.png",
-      "sha256": "f0490dc2b0436eb1210a22eab4eb8e0222c337f7dd7a9620dd07d2bf89f0fb94",
-      "bytes": 15652
+      "sha256": "ff9ef8262bc375e55341dc5aeb2e954495620288fe1791fa19feee5e1e0955de",
+      "bytes": 178765
     },
     {
       "name": "Nolan Traoré",
@@ -5026,11 +5026,11 @@
       "name": "Victor Wembanyama",
       "slug": "victor-wembanyama",
       "id": 1641705,
-      "size": "260x190",
-      "url": "https://cdn.nba.com/headshots/nba/latest/260x190/1641705.png",
+      "size": "1040x760",
+      "url": "https://cdn.nba.com/headshots/nba/latest/1040x760/1641705.png",
       "src": "media/players/library/victor-wembanyama.png",
-      "sha256": "43e5e6e37686d8ac8e51cace230794852038cc4bd60f58a1319131e374bf8c81",
-      "bytes": 15023
+      "sha256": "938e434166ceeff8b6f152694870ad7d46975b0df0b24cf0bc44d663f6755edf",
+      "bytes": 168386
     },
     {
       "name": "Blake Wesley",

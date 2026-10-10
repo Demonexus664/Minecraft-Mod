@@ -81,11 +81,11 @@ HL.UI = (function () {
     if (!source.src) return '';
     return `<img src="${esc(source.src)}" alt="${esc(p.name)}" loading="lazy" data-fallback="${esc(source.fallback && source.fallback !== source.src ? source.fallback : '')}" onload="this.parentNode.classList.add('ok')" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';const note=this.parentNode.parentNode.querySelector('.gfx-photo-credit');if(note)note.textContent='Archive photo'}else{this.remove()}">`;
   }
-  function face(p, size = 40, team) {
+  function face(p, size = 40, team, season) {
     const L = HL.League.get();
     const t = team || (p.teamId != null && L ? L.teams.find(x => x.id === p.teamId) : null);
     const color = t ? teamAccent(t).c : '#3a3f48';
-    return `<span class="face" style="width:${size}px;height:${size}px;--fc:${color}"><span class="face-initials" aria-label="${esc(p.name)}">${esc(initials(p))}</span>${photoImage(p, photo(p, t, L?.season))}</span>`;
+    return `<span class="face" style="width:${size}px;height:${size}px;--fc:${color}"><span class="face-initials" aria-label="${esc(p.name)}">${esc(initials(p))}</span>${photoImage(p, photo(p, t, season ?? L?.season))}</span>`;
   }
 
   function rtClass(v) { return v >= 95 ? 'r-99' : v >= 90 ? 'r-90' : v >= 85 ? 'r-85' : v >= 80 ? 'r-80' : v >= 75 ? 'r-75' : v >= 70 ? 'r-70' : 'r-lo'; }

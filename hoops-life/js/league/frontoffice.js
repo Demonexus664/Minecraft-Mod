@@ -122,7 +122,7 @@ HL.FrontOffice = (function () {
     const preview = tradePreview(L, deal);
     if (!preview.ok || !preview.accepted) return { ...preview, ok: false };
     for (const [ids, tid] of [[deal.send, deal.teamId], [deal.receive, L.userTeamId]]) for (const id of ids) {
-      HL.Interviews?.cancel(L, id);
+      HL.Interviews?.cancel(L, id); HL.PlayerPosts?.cancel(L, id);
       L.players[id].teamId = tid; L.players[id].userRosterMove = true;
     }
     resetRotation(L, L.userTeamId); resetRotation(L, deal.teamId);
@@ -190,7 +190,7 @@ HL.FrontOffice = (function () {
     if (p.contract.exp >= L.season) L.deadCap.push({ teamId: p.teamId, pid, name: p.name, amount: p.contract.amount, start: Math.max(L.season, p.contract.start ?? L.season), exp: p.contract.exp });
     if (p.extension) L.deadCap.push({ teamId: p.teamId, pid, name: p.name, ...p.extension });
     const through = p.extension ? p.extension.exp : p.contract.exp;
-    HL.Interviews?.cancel(L, pid);
+    HL.Interviews?.cancel(L, pid); HL.PlayerPosts?.cancel(L, pid);
     p.teamId = null; p.extension = null; p.userRosterMove = false;
     resetRotation(L, L.userTeamId);
     const transaction = record(L, { kind: 'waiver', teamId: L.userTeamId, playerIds: [pid], through });
