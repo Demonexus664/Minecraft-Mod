@@ -474,8 +474,7 @@ HL.DNA = (function () {
       '<p class="t2 sm">Each strand has named historical sources and measurable gameplay interactions. Stronger combinations unlock different possessions, not free permanent OVR boosts.</p>'+
       '<div class="power-map-network">'+(nodes||
        '<div class="power-map-empty">Draft your first verified elite basketball tool to light the network.</div>')+
-      '</div><details><summary>Explore every possible and missing power combination</summary>'+
-      codex(dna)+'</details></div></section>';
+      '</div>'+(compact?'':'<details><summary>Explore every possible and missing power combination</summary>'+codex(dna)+'</details>')+'</div></section>';
   }
 
   function preview(entries,candidate,options={}){const next=analyze([...entries,candidate],options),old=analyze(entries,options);return [...next.mutations,...next.trios,...next.pairs].find(f=>!old.active.some(o=>o.id===f.id))||null;}
