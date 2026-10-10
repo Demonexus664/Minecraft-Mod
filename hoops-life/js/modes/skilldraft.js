@@ -1454,7 +1454,7 @@ HL.SkillDraft = (function () {
       const c=st?.career;if(!c||c.done||!HL.SkillPress)return;
       const response=HL.SkillPress.respond(c,btn.dataset.press);
       if(!response.ok){U.toast(response.reason);return;}
-      FX.sfx.rival?.();render();
+      FX.sfx.camera?.();render();
     });
     app.querySelectorAll('[data-role]').forEach(btn=>btn.onclick=()=>{
       const c=st.career;if(!c||c.done||!ROLES[btn.dataset.role])return;
