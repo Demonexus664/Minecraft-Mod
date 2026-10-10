@@ -861,7 +861,7 @@ HL.SkillDraft = (function () {
   }
 
   // ---------- one season: real schedule, awards voted against the real field, playoff path ----------
-  function* simSeasonFlow(L, team, me, missed, role='balanced',pressPledge=null) {
+  function* simSeasonFlow(L, team, me, missed, role='balanced',pressPledge=null,interactive=false) {
     const roster = HL.League.teamPlayers(team.id).sort((a, b) => b.ovr - a.ovr).slice(0, 14);
     const historical=L.season<=HL.LATEST_SEASON;
     const realRows=historical?HL.History.seasonRows(String(L.season)):[];
@@ -915,7 +915,41 @@ HL.SkillDraft = (function () {
           gameNight.id='trust';gameNight.title='Trust the system';gameNight.wear=0;
         }
       }
-      const res = home ? HL.simGame(tObj, objOf(opp), rules) : HL.simGame(objOf(opp), tObj, rules);
+      let res;
+      if(interactive && gameNight && HL.createGame){
+        // Only the featured games are stepped individually. The actual in-game
+        // simulation pauses at the start of Q3 with the real live score intact.
+        const game=home?HL.createGame(tObj,objOf(opp),rules):HL.createGame(objOf(opp),tObj,rules);
+        let step=game.step(),adjusted=false;
+        while(!step.done){
+          if(!adjusted&&step.value?.period>=3){
+            adjusted=true;
+            const snap=game.snapshot();
+            const ours=home?snap.home.score:snap.away.score;
+            const theirs=home?snap.away.score:snap.home.score;
+            const choice=yield {type:'game-night-adjustment',game:gi,total:L.games,
+              year:L.season,player:me,team,record:{w,l},opp:{...opp,
+                players:HL.League.teamPlayers(opp.id).sort((a,b)=>b.ovr-a.ovr).slice(0,4)},
+              ours,theirs};
+            if(choice&&choice!=='keep'){
+              const chosen=HL.GameNights?.apply(tObj,me,choice);
+              if(chosen){
+                game.control(team.id,{pace:chosen.pace,focus:chosen.focus,
+                  defense:chosen.defense,crash:chosen.crash,usageLock:{[me.id]:chosen.usage}});
+                gameNight.wear=Math.max(gameNight.wear||0,chosen.wear||0);
+              }
+            }
+            gameNight.adjustment={
+              choice:choice||'keep',
+              title:choice==='keep'?'Kept existing plan':
+                HL.GameNights?.PLANS?.[choice]?.title||'Trust the system',
+              ours,theirs
+            };
+          }
+          step=game.step();
+        }
+        res=step.value;
+      }else res=home?HL.simGame(tObj,objOf(opp),rules):HL.simGame(objOf(opp),tObj,rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
       HL.AbilityReplay?.accumulate(abilityCounts,res.events,home?'home':'away');
       const won = mine.score > theirs.score;
@@ -1085,7 +1119,7 @@ HL.SkillDraft = (function () {
     return current.value;
   }
   async function simSeasonInteractive(L,team,me,missed,role,pressPledge){
-    const iterator=simSeasonFlow(L,team,me,missed,role,pressPledge);
+    const iterator=simSeasonFlow(L,team,me,missed,role,pressPledge,true);
     let current=iterator.next(),auto=false;
     while(!current.done){
       let choice=auto?'trust':await HL.GameNights?.prompt(current.value);
