@@ -776,6 +776,26 @@ HL.Challenge = (function () {
     ${avg != null && !hide ? `<div class="t2 sm" style="text-align:center">Starting five: <b>${avg}</b> average after position fit</div>` : ''}`;
   }
 
+
+  function draftSidebar(){
+    const drafting=!['season','result','playoffs'].includes(st.phase);
+    if(!drafting)return '<aside class="draft-side">'+courtView()+'</aside>';
+    const view=['roster','dna','fusion'].includes(st.draftView)?st.draftView:'roster';
+    const names=[['roster','MY TEAM',filled()+'/8'],['dna','COMBOS',st.dna?.pairs?.length||0],
+      ['fusion','FUSION',Object.keys(st.fusionSlots).length]];
+    const tabs='<nav class="draft-workspace-tabs" aria-label="Team-building views">'+
+      names.map(([id,label,n])=>'<button data-team-view="'+id+'" aria-pressed="'+(view===id)+
+        '" class="'+(view===id?'on':'')+'"><span>'+label+'</span><b>'+n+'</b></button>').join('')+'</nav>';
+    const content=view==='roster'?courtView():view==='fusion'?genesisPanel():
+      '<section class="block"><header><h3>DUOS, TRIOS & TEAM DNA</h3></header>'+
+      '<div class="body stack">'+(st.dna?HL.DNA.board(st.dna,{compact:true})+
+       (filled()>=3?'<details><summary>View detailed chemistry network</summary>'+
+         HL.DNA.powerMap(st.dna,{compact:true})+'</details>':''):
+         '<p class="t3 sm">Draft players to uncover pair and trio interactions.</p>')+
+      '</div></section>';
+    return '<aside class="draft-side">'+tabs+'<div class="draft-side-body">'+content+'</div></aside>';
+  }
+
   function render(revealHand) {
     if (!st) return setupScreen();
     const fm = st.team ? teamMeta(st.team) : null;
@@ -791,9 +811,7 @@ HL.Challenge = (function () {
         <div class="mainnav"><button class="on">82-0 Challenge${st.daily ? ' · Daily' : ''}</button></div>
         <div class="simbar"><span class="t2 sm">${st.mode === 'hoopiq' ? 'HoopIQ' : 'Classic'} · ${yrLabel(st.playSeason)} · Pick ${Math.min(filled() + 1, SLOTS.length)}/${SLOTS.length}</span>${FX.soundToggle()}<button class="btn small" data-new>New run</button></div>
       </div></div>
-      <div class="page"><div class="game820">${main}<div class="stack" style="gap:12px">${courtView()}${st.phase==='result'||st.phase==='playoffs'?'':st.dna?HL.DNA.board(st.dna,{compact:true}):''}
-        <section class="block"><header><h3>Best runs</h3></header><div class="body">${bestRuns().slice(0, 5).map(r => `<div class="kv"><span>${r.daily ? `<span class="tag">Daily ${esc(r.daily)}</span> ` : ''}${r.five.slice(0, 2).map(esc).join(', ')}…</span><b>${r.w}-${r.l}</b></div>`).join('') || '<div class="t3 sm">No runs yet.</div>'}</div></section>
-      </div></div></div></div>`;
+      <div class="page"><div class="game820 draft-workspace"><div class="draft-main">${main}</div>${draftSidebar()}</div></div></div>`;
     bind();
     if (revealHand) {const cards=[...document.querySelectorAll('.hand .gcard')];FX.flipIn(cards).catch(()=>cards.forEach(c=>{c.classList.remove('down','charging');c.classList.add('up');}));}
   }
@@ -816,7 +834,7 @@ HL.Challenge = (function () {
           cardFor(c,{down:!!reveal,attrs:`data-hand="${i}"`})+
           (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="'+i+'">FULL SCOUT REPORT</button>')+
           '</div>').join('')}</div></div>` : '';
-    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>${done?genesisPanel():''}`;
+    return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
   }
 
   function tickerView() {
@@ -1058,19 +1076,22 @@ HL.Challenge = (function () {
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
     app.querySelectorAll('[data-gameplan]').forEach(b=>b.onclick=()=>{st.plan=b.dataset.gameplan;render();});
     app.querySelectorAll('[data-scout]').forEach(b=>b.onclick=()=>scoutPlayer(+b.dataset.scout));
+    app.querySelectorAll('[data-team-view]').forEach(btn=>btn.onclick=()=>{
+      st.draftView=btn.dataset.teamView;render();
+    });
     app.querySelector('[data-fusion-open]')?.addEventListener('click',()=>{
       if(!fusionAllowed())return;
-      HL.FusionUI?.open(node=>{
+      const sources=SLOTS.filter(slot=>st.lineup[slot]).map(slot=>({
+        slot,node:fusionAt(slot)||HL.FusionLab.fromDraftCard(st.lineup[slot])
+      }));
+      HL.FusionUI?.openDraft(sources,st.fusionSpent,st.fusionUsedCards,node=>{
         if(!fusionAllowed())return;
-        st.pendingFusionId=node.id;FX.sfx.achievement?.();render();
+        st.pendingFusionId=node.id;render();
       });
     });
     app.querySelectorAll('[data-fusion-assign]').forEach(b=>b.onclick=()=>{
       const node=HL.FusionLab?.find(st.pendingFusionId);
       if(assignFusion(b.dataset.fusionAssign,node)){FX.sfx.achievement?.();render();}
-    });
-    app.querySelectorAll('[data-fusion-remove]').forEach(b=>b.onclick=()=>{
-      if(clearFusion(b.dataset.fusionRemove)){FX.sfx.flip?.();render();}
     });
     const cancelFusion=app.querySelector('[data-fusion-cancel]');
     if(cancelFusion)cancelFusion.onclick=()=>{st.pendingFusionId=null;render();};
