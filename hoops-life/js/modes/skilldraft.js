@@ -44,10 +44,8 @@ HL.SkillDraft = (function () {
     await C().loadDecade(st.decade);
     const fr = C().franchisesIn(st.decade);
     if (what === 'all' || what === 'team' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
-    // The hand leans toward rotation players; the best player for the skill is rarely in it.
-    const pool = C().candidates(st.team, st.decade);
-    st.hand = [];
-    while (st.hand.length < 5 && pool.length) { const c = R.weighted(pool, x => (x.row.mpg || 10) + 6); st.hand.push(c); pool.splice(pool.indexOf(c), 1); }
+    // Use the same best-five team/decade hand as 82-0.
+    st.hand = C().dealHand(st.team, st.decade);
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);

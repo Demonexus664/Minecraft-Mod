@@ -47,6 +47,11 @@ HL.Challenge = (function () {
     }
     return [...best.values()].sort((a, b) => b.row.ovr - a.row.ovr);
   }
+  // Deal the best available players, rather than a minutes-weighted lottery of reserves.
+  function dealHand(franchise, dec, excluded = []) {
+    const taken = new Set(excluded);
+    return R.shuffle(candidates(franchise, dec).filter(c => !taken.has(c.row.pid)).slice(0, HAND));
+  }
   function franchisesIn(dec) {
     const set = new Set();
     for (const k of HL.HISTORY.seasons) {
@@ -98,11 +103,7 @@ HL.Challenge = (function () {
     if (what !== 'era' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
     // Deal the hand now (seeded), reveal it after the reels land.
     const taken = new Set(SLOTS.filter(s => st.lineup[s]).map(s => st.lineup[s].row.pid));
-    // A hand leans toward real rotation players (minutes played), so deep-bench names show up less often.
-    const pool = candidates(st.team, st.decade).filter(c => !taken.has(c.row.pid));
-    st.hand = [];
-    while (st.hand.length < HAND && pool.length) { const c = R.weighted(pool, x => (x.row.mpg || 10) + 6); st.hand.push(c); pool.splice(pool.indexOf(c), 1); }
-    st.hand = R.shuffle(st.hand);
+    st.hand = dealHand(st.team, st.decade, taken);
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);
@@ -463,5 +464,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, franchisesIn, loadDecade, posOk, penalty, naturals };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, franchisesIn, loadDecade, posOk, penalty, naturals };
 })();
