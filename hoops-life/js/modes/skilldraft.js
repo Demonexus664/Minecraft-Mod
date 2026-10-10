@@ -1064,7 +1064,7 @@ HL.SkillDraft = (function () {
     // The temporary MyPlayer rotation must never corrupt the persistent NBA roster.
     for(const [p,minutes] of originalMinutes)p.realMpg=minutes;
     return {
-      g, line, pline, ppg, rpg, apg, gameNights:nightEvents,leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
+      g, line, pline, ppg, rpg, apg, gameNights:nightEvents,abilityCounts,leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
       ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
       w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,rival,pressTarget,
       realChamp: rcT ? fullName(rcT) : realChamp || null, games: L.games, nTeams: L.teams.length,
