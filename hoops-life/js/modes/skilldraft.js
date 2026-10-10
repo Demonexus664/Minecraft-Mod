@@ -40,7 +40,7 @@ HL.SkillDraft = (function () {
   // Debut: a real draft year. Random debuts leave room for a full career inside the real data.
   const randomDebut = () => R.int(1956, HL.LATEST_SEASON - 14);
   function newRun(mode, debut) {
-    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 1, era: 1, stat: 1 }, career: null, name: 'Your Player', pos: 'auto' };
+    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -60,6 +60,10 @@ HL.SkillDraft = (function () {
     // The five highest skill scores in the drawn team/era, ordered best-first.
     // Never substitute high overall players or draw random reserves.
     st.hand = C().dealSkillHand(st.team, st.decade, catOf(st.cat));
+    // The ordinary hand remains the actual top five. On rare rolls a bonus
+    // legendary card appears as a sixth option from outside the team/decade.
+    const wild=await HL.Legends.wildcard(catOf(st.cat), Object.values(st.picks).map(c=>c.row.pid));
+    if(wild && !st.hand.some(c=>c.row.pid===wild.row.pid))st.hand.push(wild);
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);
@@ -166,10 +170,17 @@ HL.SkillDraft = (function () {
   // Prime is achievable, not a misleading ceiling permanently diluted by "reach".
   // Work ethic determines how quickly the player develops; prime is exact at 28-29.
   function primeWindow(c) {
-    const seasons=HL.clamp(Math.round(2+(c.prime.primeLength-30)/7.5),2,12);
-    const start=28-Math.floor((seasons-1)/2);
+    // Exceptional builds are intentionally capable of superhuman primes.
+    // Ordinary 55-80 ratings still produce normal multi-year peaks.
+    const p=c.prime.primeLength;
+    const seasons=HL.clamp(Math.round(4+7*(p-40)/59+22*Math.pow(Math.max(0,(p-82)/17),2)),3,33);
+    const start=Math.max(23,28-Math.floor((seasons-1)/2));
     return {start,end:start+seasons-1,seasons};
   }
+  // No forced retirement age: a viable player may keep playing for decades.
+  // The age at which opportunities dry up is determined by his remaining skills
+  // and contract market, not a secret maximum career length.
+  function careerLimit() { return Infinity; }
   function ratingsAt(c, age) {
     const out={}, w=primeWindow(c);
     const work=(c.me.traits?.workEthic??60);
@@ -182,7 +193,7 @@ HL.SkillDraft = (function () {
       const skillFade=['iq','ft','pass','vision','passingAccuracy','shotArc','shotSelection'].includes(k)?.38:1;
       const fade=decline*(physical?1.45:skillFade);
       const gap=physical?5:13;
-      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,99));
+      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,Math.max(99,goal)));
     }
     return out;
   }
@@ -255,7 +266,9 @@ HL.SkillDraft = (function () {
     if (!team) { team = R.pick(L.teams); join(c, team, `Joined the ${fullName(team)}`, c.contract); }
     // Major injury risk grows with age and poor durability.
     let missed = 0, injury = null;
-    if (R.chance(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + Math.max(0, c.age - 30) * 0.015)) {
+    const eliteCondition = Math.max(0, (Math.min(me.attrs.stam || 65, me.attrs.dur || 65) - 70) / 29);
+    const ageRisk = Math.max(0, c.age - 32) * 0.012 * (1 - 0.7 * eliteCondition);
+    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk, 0.01, 0.75))) {
       const inj = HL.rollInjury(1.2);
       missed = Math.min(L.games, inj.games);
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
@@ -290,11 +303,11 @@ HL.SkillDraft = (function () {
     const pend = { type: 'season', from, to: ovr, offers: [], notes: [] };
     const cur = c.franchise && !c.minors ? L.teams.find(t => fr(t) === c.franchise) : null;
     if (c.franchise && !c.minors && !cur) pend.notes.push(`The ${c.teamMeta.city} ${c.teamMeta.name} no longer exist. He is a free agent.`);
-    if (c.age >= HL.clamp(Math.round(40+c.prime.longevity/12),43,49) || (ovr < 58 && c.age >= 24)) return end(c, ovr < 58 ? 'No team wanted him any more' : 'Retired at 44');
+    // Leaving the NBA is not the same as retiring. Even at 50+, the player
+    // can keep trying for a contract while his career save stays alive.
     if (ovr < 62) {
-      if (c.age >= 30) return end(c, c.minors ? 'Never made it back to the league' : `Fell out of the league at ${c.age - 1}`);
       pend.type = 'minors';
-      pend.notes.push('No NBA team has a spot for him this year.');
+      pend.notes.push('No NBA offer this season. Continue outside the league and reassess next summer, or retire by choice.');
     } else if (!cur || !c.contract || c.contract.through < c.yr) {
       pend.type = 'fa';
       pend.offers = makeOffers(c, L, cur);
@@ -357,8 +370,8 @@ HL.SkillDraft = (function () {
       c.tradeRequests++;
       join(c, t, `Traded to the ${fullName(t)} after requesting a trade`, c.contract);
     } else if (choice.type === 'minors') {
-      c.minors = true;
-      c.log.push({ yr: c.yr, text: 'Spent the season in the minor leagues' });
+      c.minors = true; c.contract = null;
+      c.log.push({ yr: c.yr, text: 'Stayed active outside the NBA, seeking another opportunity' });
     }
     c.pending = null;
   }
@@ -367,8 +380,8 @@ HL.SkillDraft = (function () {
   function autoDecide(c) {
     const p = c.pending;
     if (!p) return;
-    if (p.type === 'minors') return decide(c, { type: c.age < 27 ? 'minors' : 'retire' });
-    if ((c.age >= 35 && c.me.ovr < 72 && R.chance(0.5)) || c.age >= HL.clamp(Math.round(39+c.prime.longevity/12),41,48)) return decide(c, { type: 'retire' });
+    if (p.type === 'minors') return decide(c, { type: 'minors' });
+    // Auto-play can negotiate offers but never elects retirement for the user.
     if (p.type === 'fa') {
       const cur = p.offers.findIndex(o => o.isCur);
       // Winning multiple titles rewrites free-agency incentives in this alternate history.
@@ -396,9 +409,11 @@ HL.SkillDraft = (function () {
     c.legacy = legacyOf(c.seasons, c);
   }
 
-  async function simRest(c, onProgress) {
+  async function simRest(c, onProgress, seasons = 10) {
+    // Long-lived builds must remain playable. Advance in bounded, saveable
+    // batches rather than silently ending the career at a fixed age.
     let guard = 0;
-    while (!c.done && guard++ < 40) {
+    while (!c.done && guard++ < seasons) {
       if (c.pending) autoDecide(c);
       if (c.done) break;
       await playSeason(c);
@@ -664,9 +679,9 @@ HL.SkillDraft = (function () {
       <div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div>
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
       <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
-      ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and retirement opportunity</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
+      ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and late-career viability; no fixed retirement age</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
       ${buildDetail(buildPrime())}
-      <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim the whole career</button></div>
+      <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim next 10 seasons</button></div>
       <div class="t3 sm">Every drafted attribute contributes to the same player on the court. Body determines height and weight, while shooting, finishing, defense and athleticism interact in the simulation. Prime is fully attainable throughout your selected prime-duration window.</div>
       <div class="t3 sm">Season by season: see every season's numbers, awards and playoff run, then choose free agency offers, ask for trades or retire. Simming the whole career makes those calls for you.</div>
     </div></section>`;
@@ -703,7 +718,7 @@ HL.SkillDraft = (function () {
         <div class="kv"><span>Rookie rating</span><b>${c.me.ovr} OVR</b></div>
         <div class="kv"><span>Achievable prime (age 28–29)</span><b>${c.primeOvr} OVR</b></div>
         <div class="kv"><span>Work ethic</span><b>${c.me.traits.workEthic >= 75 ? 'Gym rat' : c.me.traits.workEthic >= 55 ? 'Solid' : c.me.traits.workEthic >= 40 ? 'Inconsistent' : 'Questionable'}</b></div>
-        <div class="row wrap" style="gap:10px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-simrest>Sim the whole career</button></div>
+        <div class="row wrap" style="gap:10px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div>
       </div></section>
       ${cls.length ? `<section class="block"><header><h3>The real ${c.debut} draft</h3><span class="ml-auto t3 sm">He joins this class</span></header><div class="body flush">${cls.map(r => `<div class="res-row" style="grid-template-columns:40px 1fr auto;cursor:default"><b class="num">${r.pick}</b><div class="row">${U.face({ name: r.name, nbaId: r.nbaId, real: true }, 26, null)}<span>${esc(r.name)}</span></div><span class="t3 sm">${esc(r.club)}${r.college ? ' · ' + esc(r.college) : ''}</span></div>`).join('')}</div></section>` : ''}`;
   }
@@ -712,7 +727,7 @@ HL.SkillDraft = (function () {
     const c = st.career;
     const p = c.pending;
     const out = [];
-    const sims = `<button class="btn" data-simrest>Sim the rest of the career</button><button class="btn quiet" data-retire>Retire</button>`;
+    const sims = `<button class="btn" data-simrest>Sim next 10 seasons</button><button class="btn quiet" data-retire>Retire</button>`;
     if (p) {
       const dev = p.to - p.from;
       const head = `<header><h3>Offseason · ${yrLabel(c.yr)}</h3><span class="ml-auto sm ${dev > 0 ? 'win' : dev < 0 ? 'loss' : 't3'}">Summer: ${p.from} → ${p.to} OVR</span></header>`;
@@ -728,7 +743,7 @@ HL.SkillDraft = (function () {
           <div class="row wrap" style="gap:8px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-trade>Request a trade</button>${sims}</div></div></section>`);
       }
     } else {
-      out.push(`<section class="block"><div class="body row wrap" style="gap:10px"><div class="grow"><h3>${yrLabel(c.yr)}</h3><div class="t2 sm">${c.minors ? 'A season in the minor leagues.' : `With the ${esc(fullName(c.teamMeta))}.`}</div></div><button class="btn go big" data-play>Play the season</button><button class="btn" data-simrest>Sim the rest</button></div></section>`);
+      out.push(`<section class="block"><div class="body row wrap" style="gap:10px"><div class="grow"><h3>${yrLabel(c.yr)}</h3><div class="t2 sm">${c.minors ? 'A season in the minor leagues.' : `With the ${esc(fullName(c.teamMeta))}.`}</div></div><button class="btn go big" data-play>Play the season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div></section>`);
     }
     const last = c.seasons[c.seasons.length - 1];
     if (last) out.push(seasonReport(last));
@@ -932,7 +947,7 @@ HL.SkillDraft = (function () {
       await celebrate(c);
     };
     app.querySelectorAll('[data-play]').forEach(b => b.onclick = play);
-    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { await busy('Simulating the rest of the career', '', async () => { c.stage = null; await runRest(); }); if (st.career.done) verdictBanner(st.career); });
+    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { await busy('Simulating the next ten seasons', '', async () => { c.stage = null; await runRest(); }); if (st.career.done) verdictBanner(st.career); });
     app.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => { decide(c, { type: 'sign', i: +b.dataset.sign }); render(); });
     app.querySelectorAll('[data-trade]').forEach(b => b.onclick = () => { decide(c, { type: 'trade' }); U.toast(`${esc(c.log[c.log.length - 1].text)}.`); render(); });
     app.querySelectorAll('[data-minors]').forEach(b => b.onclick = () => { decide(c, { type: 'minors' }); render(); });
@@ -971,7 +986,8 @@ HL.SkillDraft = (function () {
   }
   async function runRest() {
     const c = st.career;
-    await simRest(c, cc => setPct(Math.min(100, Math.round((cc.age - 19) / 22 * 100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`));
+    const start = c.seasons.length;
+    await simRest(c, cc => setPct(Math.min(100, Math.round((cc.seasons.length-start)/10*100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`), 10);
   }
 
   function draftView(hide, reveal) {
@@ -983,11 +999,12 @@ HL.SkillDraft = (function () {
         <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${Object.keys(st.picks).length ? `Spin skill ${Object.keys(st.picks).length + 1}` : 'Spin'}</button>
         <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
         <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button>
-        <button class="btn" data-skip="stat" ${st.skips.stat && st.phase === 'hand' ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button></div>
+        <button class="btn" data-skip="stat" ${st.skips.stat && st.phase === 'hand' ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button>
+        <button class="btn" data-skip="all" ${st.skips.all && st.phase === 'hand' ? '' : 'disabled'}>Full respin (${st.skips.all})</button></div>
       ${show ? `<div class="result">${esc(cat[1])} from the ${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
-    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Top ${st.hand.length} by ${esc(cat[1].toLowerCase())} · best-rated first. Tap a card to choose.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
+    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Top five by ${esc(cat[1].toLowerCase())}${st.hand.some(c=>c.legendary) ? " + RARE LEGENDARY WILDCARD" : ""}. Tap a card to choose.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
       <div class="hand">${st.hand.map((c, i) => { const bio = HL.HISTORY.players[c.row.pid]; const r = c.row; const v = skillValue(c, cat);
-        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: SHORT[cat[0]], meta: `#${i + 1} IN ${esc(cat[1].toUpperCase())} · ${yrLabel(c.season)} · ${c.club}`,
+        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: SHORT[cat[0]], meta: c.legendary ? `★ LEGENDARY WILDCARD · ${esc(c.legendaryName)} · ${yrLabel(c.season)}` : `#${i + 1} IN ${esc(cat[1].toUpperCase())} · ${yrLabel(c.season)} · ${c.club}`,
           stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : ['longevity','primeLength'].includes(cat[0]) ? [['YRS', HL.careerTraitFor(r.pid).playedYears], ['PEAK', HL.careerTraitFor(r.pid).peakYears]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
     const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Each draftable tool, habit and career trait builds your player.</p>' : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reels}${intro}${controls}${cards}</section>`;
@@ -1019,10 +1036,12 @@ HL.SkillDraft = (function () {
     const c = st.career = newCareer();
     await draft(c);
     c.stage = null;
-    await simRest(c);
-    if (!c.done) end(c, 'Simulation limit');
-    return { ...c, verdict: verdict(c) };
+    await simRest(c, null, 45);
+    // The headless benchmark reports an interim legacy ranking at its checkpoint;
+    // do not retire an active player to force a verdict.
+    if (!c.legacy) c.legacy = legacyOf(c.seasons, c);
+    return { ...c, verdict: verdict(c), checkpoint: !c.done };
   }
 
-  return { open: () => { st = null; cache = null; render(); }, CATS, simulate, ratingsAt, primeWindow, evaluateCareer: c => ({ verdict: verdict(c), specialties: HL.Legacy.careerReport(c) }) };
+  return { open: () => { st = null; cache = null; render(); }, CATS, simulate, ratingsAt, primeWindow, careerLimit, evaluateCareer: c => ({ verdict: verdict(c), specialties: HL.Legacy.careerReport(c) }) };
 })();

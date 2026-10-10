@@ -25,11 +25,11 @@ test('weak skills remain weak rather than applying an artificial 70 minimum',()=
   assert.ok(ja.screen<65,'Ja remains a weak screen setter');
   assert.ok(giannis.releaseSpeed<90,'Giannis is not suddenly an elite release-speed shooter');
 });
-test('every historical player produces finite 25-99 scouting traits',()=>{
+test('every historical player produces finite 25-100 scouting traits, with a rare 100 tier',()=>{
   let count=0;
   for(const yr of [1967,1975,1995,2015,2017,2019,2020,2024])for(const r of HL.History.seasonRows(''+yr)){
     const a=HL.historicalAttributes(r);
-    for(const key of HL.ATTR_KEYS)assert.ok(Number.isFinite(a[key])&&a[key]>=25&&a[key]<=99,`${yr}: ${r.pid}: ${key}=${a[key]}`);
+    for(const key of HL.ATTR_KEYS)assert.ok(Number.isFinite(a[key])&&a[key]>=25&&a[key]<=100,`${yr}: ${r.pid}: ${key}=${a[key]}`);
     count++;
   }
   assert.ok(count>2000);

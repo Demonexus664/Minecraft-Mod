@@ -42,10 +42,10 @@ HL.Challenge = (function () {
         const games = r.stints.filter(s => LINEAGE[s[0]] === franchise).reduce((a, s) => a + s[1], 0);
         if (games < 20) continue;
         const cur = best.get(r.pid);
-        if (!cur || r.ovr > cur.row.ovr) best.set(r.pid, { row: r, season: +k, club: r.stints.find(s => LINEAGE[s[0]] === franchise)[0] });
+        if (!cur || HL.historicalSeasonOvr(r) > HL.historicalSeasonOvr(cur.row)) best.set(r.pid, { row: r, season: +k, club: r.stints.find(s => LINEAGE[s[0]] === franchise)[0] });
       }
     }
-    return [...best.values()].sort((a, b) => b.row.ovr - a.row.ovr);
+    return [...best.values()].sort((a, b) => HL.historicalSeasonOvr(b.row) - HL.historicalSeasonOvr(a.row));
   }
   // Deal the best available players, rather than a minutes-weighted lottery of reserves.
   function dealHand(franchise, dec, excluded = []) {
@@ -92,10 +92,10 @@ HL.Challenge = (function () {
         const c = { row: r, season: +k, club: club[0] };
         const old = best.get(r.pid);
         if (!old || skillValue(c, category) > skillValue(old, category) ||
-          (skillValue(c, category) === skillValue(old, category) && c.row.ovr > old.row.ovr)) best.set(r.pid, c);
+          (skillValue(c, category) === skillValue(old, category) && HL.historicalSeasonOvr(c.row) > HL.historicalSeasonOvr(old.row))) best.set(r.pid, c);
       }
     }
-    const ranked = [...best.values()].sort((a, b) => skillValue(b, category) - skillValue(a, category) || b.row.ovr - a.row.ovr);
+    const ranked = [...best.values()].sort((a, b) => skillValue(b, category) - skillValue(a, category) || HL.historicalSeasonOvr(b.row) - HL.historicalSeasonOvr(a.row));
     skillCache.set(ck, ranked);
     return ranked;
   }
@@ -121,6 +121,13 @@ HL.Challenge = (function () {
       if (p === 'G') { out.add(0); out.add(1); }
       if (p === 'F') { out.add(2); out.add(3); }
     }
+    // Generational point-forwards who truly combine elite passing/handling,
+    // quickness and paint resistance can operate at all five positions.
+    // This is evidence-based eligibility rather than a name-specific exception.
+    const a=HL.historicalAttributes(c.row);
+    if (bio[3]>=79 && bio[3]<=85 && a.pass>=96 && a.handle>=83 &&
+        a.speed>=79 && a.intD>=75 && a.str>=76 && a.iq>=88)
+      for (let i=0;i<5;i++) out.add(i);
     return out.size ? [...out] : [2];
   }
   // Out-of-position cost in rating points: distance between spots, plus how far his size is from the spot's.
@@ -131,7 +138,7 @@ HL.Challenge = (function () {
     const size = Math.max(0, Math.abs(ht - TYPICAL_HT[slot]) - 4) * 0.8;
     return Math.round([0, 2, 6, 11, 16][d] + (d ? size : 0));
   }
-  const rating = c => c.row.ovr;
+  const rating = c => HL.historicalSeasonOvr(c.row);
   function fittedAttributes(c, slot, original) {
     const out = { ...original }, pen = penalty(c, slot);
     if (!pen) return out;
@@ -141,7 +148,18 @@ HL.Challenge = (function () {
     for (const k of role) out[k] = Math.max(25, out[k] - pen);
     return out;
   }
-  const effRating = (c, slot) => HL.computeOvr(fittedAttributes(c, slot, (HL.historicalAttributes ? HL.historicalAttributes(c.row) : HL.History.unpack(c.row.attrs, HL.HISTORY.attrs))), slot);
+  // Offensive impact survives a natural-position assignment, but is reduced
+  // when the player is forced into a significantly different position.
+  const effRating = (c, slot) => {
+    const pen=penalty(c,slot);
+    // 82-0 uses the same season rating as Skill Draft and the historical roster.
+    // Matching a natural spot is a +1 bonus, never an inexplicable demotion.
+    // The 100 tier belongs only to verified all-time peaks, not every 99 card.
+    if (pen===0) return Math.min(HL.legendaryPeak(c.row)?100:99,rating(c)+1);
+    // Out-of-position players lose effectiveness in real possessions through
+    // fittedAttributes; the displayed rating also reflects that role penalty.
+    return Math.max(25,rating(c)-pen);
+  };
 
   // ---------- run ----------
   function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
@@ -149,7 +167,7 @@ HL.Challenge = (function () {
   function newRun(cfg) {
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 1, era: 1 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [] };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [] };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -164,6 +182,8 @@ HL.Challenge = (function () {
     // Deal the hand now (seeded), reveal it after the reels land.
     const taken = new Set(SLOTS.filter(s => st.lineup[s]).map(s => st.lineup[s].row.pid));
     st.hand = dealHand(st.team, st.decade, taken);
+    const wild=await HL.Legends.wildcard(null,[...taken]);
+    if(wild && !st.hand.some(c=>c.row.pid===wild.row.pid))st.hand.push(wild);
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);
@@ -173,7 +193,6 @@ HL.Challenge = (function () {
       { label: 'Decade', items: decs.map(d => `<div>${d}s</div>`), final: decs.indexOf(st.decade) },
     ], { colors: [U.teamAccent(teamMeta(st.team)).c, '#ffd84f', '#fff'] });
     st.phase = 'hand';
-    for (const c of st.hand) if (rating(c) >= 95) st.pulls.push(c.row.pid);
     render(true);
   }
 
@@ -181,6 +200,7 @@ HL.Challenge = (function () {
     const c = st.hand[handIdx];
     if (!c || st.lineup[slot] || st.phase !== 'hand') return;
     st.lineup[slot] = c;
+    if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
     st.hand = [];
     st.round++;
@@ -214,7 +234,7 @@ HL.Challenge = (function () {
       p.attrs = fittedAttributes(c, slot, p.attrs);
       p.realMpg = minutes[slot];
       if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
-      p.ovr = HL.computeOvr(p.attrs, p.pos);
+      p.ovr = effRating(c,slot);
       p.slot = slot;
       players.push(p);
     }
@@ -231,9 +251,14 @@ HL.Challenge = (function () {
     // Game plans alter real possessions: tempo, shot priorities, defensive coverage and glass.
     const tactical=HL.Legacy.gamePlans[st.plan] || HL.Legacy.gamePlans.balanced;
     Object.assign(dream.strategy,{ focus:tactical.focus, pace:tactical.pace, defense:tactical.defense, crash:tactical.crash });
+    // Rare crossover exhibition games challenge even the strongest drafted five.
+    // They are explicitly fictional, outside the recorded NBA schedule.
+    const rare=await HL.Legends.rareOpponent();
+    const rareTeam=rare?await HL.Legends.opponent(rare):null;
     const opps = L.teams;
     // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
+    if(rareTeam) schedule[R.int(0,games-1)]=rareTeam;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
@@ -247,7 +272,7 @@ HL.Challenge = (function () {
     const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
       const opp = schedule[g];
-      const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: HL.League.teamPlayers(opp.id) };
+      const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: opp.customPlayers || HL.League.teamPlayers(opp.id) };
       for (const p of players) {
         if(p.injury?.games>0) { absences[p.id]++; }
         else p.injury=null;
@@ -282,7 +307,7 @@ HL.Challenge = (function () {
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog };
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog,specialEncounter:rareTeam?.legendSpec||null };
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
     st.result.unlocked = achievements();
     saveBest();
@@ -340,7 +365,7 @@ HL.Challenge = (function () {
     const r = c.row;
     return HL.Cards.card({
       pid: c.row.pid, name: bio[0], nbaId: bio[1], team, pos: r.pos, rating: opts.rating != null ? opts.rating : rating(c),
-      meta: `${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
+      meta: `${c.legendary ? '★ RARE LEGEND · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
       stat: [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: st.mode === 'hoopiq' && st.phase !== 'result', down: opts.down, cls: opts.cls || '', attrs: opts.attrs || '',
     });
   }
@@ -355,7 +380,7 @@ HL.Challenge = (function () {
       const pen = c ? penalty(c, s) : 0;
       return `<div class="spot slot-wrap" data-slot="${s}" style="left:${spots[s][0]}%;top:${spots[s][1]}%">
         ${c ? cardFor(c, { cls: 'mini placed', attrs: `data-from="${s}"`, rating: hide ? rating(c) : effRating(c, s) }) : `<div class="slot" data-drop="${s}">${s}</div>`}
-        ${c ? `<span class="fit ${pen >= 6 ? 'bad' : pen ? '' : 'ok'}">${s}${hide ? '' : pen ? ` −${pen}` : ' fit'}</span>` : ''}</div>`;
+        ${c ? `<span class="fit ${pen >= 6 ? 'bad' : pen ? '' : 'ok'}">${s}${hide ? '' : pen ? ` −${pen}` : ' +1 fit'}</span>` : ''}</div>`;
     };
     const bench = BENCH.map((s, i) => {
       const c = st.lineup[s];
@@ -406,9 +431,9 @@ HL.Challenge = (function () {
       : `<div class="row" style="justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap">
           <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${st.round === 0 ? 'Spin' : `Spin pick ${st.round + 1}`}</button>
           <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
-          <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button></div>
+          <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button><button class="btn" data-skip="all" ${st.skips.all && st.phase === 'hand' ? '' : 'disabled'}>Full respin (${st.skips.all})</button></div>
         ${fm && st.phase === 'hand' ? `<div class="result">${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
-    const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
+    const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.hand.some(c=>c.legendary) ? '★ RARE LEGENDARY WILDCARD! Choose any card, including this out-of-era bonus.' : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
         <div class="hand">${st.hand.map((c, i) => cardFor(c, { down: !!reveal, attrs: `data-hand="${i}"` })).join('')}</div></div>` : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
   }
@@ -430,7 +455,8 @@ HL.Challenge = (function () {
     const listed=report.labels.map(a=>`<article class="dossier-honor"><div class="caps">Team identity unlocked</div><h3>${esc(a.name)}</h3><p>${esc(a.why)}</p></article>`).join('');
     const swings=[report.biggestWin&&`Biggest blowout: ${esc(report.biggestWin.opp)}, ${report.biggestWin.for}-${report.biggestWin.against}.`,report.worst&&`Toughest loss or closest scare: ${esc(report.worst.opp)}, ${report.worst.for}-${report.worst.against}.`,report.mostPoints&&`Highest scoring night: ${report.mostPoints.for} vs ${esc(report.mostPoints.opp)}.`].filter(Boolean);
     return `<section class="block dossier"><header><h3>The 82-0 Season Film</h3><span class="ml-auto t3 sm">Team DNA · era context · signature moments</span></header><div class="body stack">
-      <div class="dossier-lead">${esc(report.summary)}</div><div class="caps">What this team became</div><div class="dossier-grid">${listed}</div>
+      <div class="dossier-lead">${esc(report.summary)}</div>
+      ${r.specialEncounter?`<article class="dossier-honor"><div class="caps">Rare alternate-history encounter</div><h3>${esc(r.specialEncounter.name)}</h3><p>${esc(r.specialEncounter.note)}</p></article>`:''}<div class="caps">What this team became</div><div class="dossier-grid">${listed}</div>
       ${report.narrative.map((x,i)=>chapter(['The bigger picture','Compared with the era','Under pressure','Rules changed the game'][i]||'Film-room note',x)).join('')}
       <div class="dossier-two"><article class="dossier-honor"><div class="caps">The offense</div><h3>${(100*m.ts).toFixed(1)}% TS</h3><p>${(m.assists).toFixed(1)} assists and ${(m.threes).toFixed(1)} made threes per game. ${(m.threeRate*100).toFixed(1)}% of all shots from distance.</p></article>
       <article class="dossier-honor"><div class="caps">The defense</div><h3>${r.pa.toFixed(1)} allowed</h3><p>${m.blocks.toFixed(1)} blocks, ${m.steals.toFixed(1)} steals per game. Margin: ${m.margin>=0?'+':''}${m.margin.toFixed(1)}.</p></article></div>
@@ -540,7 +566,7 @@ HL.Challenge = (function () {
     U.applyTeamTheme(null);
     U.setEra('modern');
     const all = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
-    const cfg = { mode: 'classic', decades: all.slice(1), playSeason: HL.LATEST_SEASON, daily: false };
+    const cfg = { mode: 'classic', decades: all.slice(), playSeason: HL.LATEST_SEASON, daily: false };
     const years = [];
     for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
     const dailyDone = bestRuns().find(r => r.daily === today());
@@ -578,5 +604,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, fittedAttributes, franchisesIn, loadDecade, posOk, penalty, naturals };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, fittedAttributes, effRating, rating, franchisesIn, loadDecade, posOk, penalty, naturals };
 })();

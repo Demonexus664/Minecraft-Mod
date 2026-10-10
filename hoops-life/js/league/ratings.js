@@ -79,16 +79,16 @@ HL.completeAttributes = function (a, height = 78, weight = 210) {
     agility: clip(val('speed')*.39+val('handle')*.31+val('perD')*.20+val('vert')*.10),
     contactFinish: clip(val('layup')*.26+val('dunk')*.25+val('str')*.33+val('close')*.16),
     floater: clip(val('layup')*.40+val('mid')*.24+val('iq')*.21+val('ft')*.15),
-    fade: clip(val('post')*.36+val('mid')*.35+val('close')*.14+val('iq')*.15),
+    fade: clip(val('post')*.24+val('mid')*.48+val('close')*.08+val('iq')*.20 + Math.max(0,Math.min(val('mid'),val('post'))-80)*.32),
     footwork: clip(val('post')*.34+val('handle')*.27+val('iq')*.24+val('layup')*.15),
     shotCreation: clip(val('handle')*.39+val('mid')*.32+val('iq')*.15+val('layup')*.14),
     vision: clip(val('pass')*.65+val('iq')*.35),
     passingAccuracy: clip(val('pass')*.64+val('handle')*.15+val('iq')*.21),
     helpD: clip(val('intD')*.30+val('perD')*.25+val('block')*.22+val('iq')*.23),
     contestD: clip(val('perD')*.30+val('intD')*.30+val('block')*.22+val('vert')*.18),
-    boxout: clip(val('dreb')*.33+val('oreb')*.17+val('str')*.33+val('iq')*.17),
+    boxout: clip(val('dreb')*.49+val('oreb')*.16+val('str')*.27+val('iq')*.08 + Math.max(0,(val('dreb')-88)*.23)),
     transition: clip(val('speed')*.30+val('vert')*.20+val('layup')*.25+val('handle')*.25),
-    clutchShot: clip(val('mid')*.28+val('three')*.20+val('close')*.18+val('iq')*.23+val('ft')*.11),
+    clutchShot: clip(val('mid')*.26+val('three')*.18+val('close')*.16+val('iq')*.29+val('ft')*.11 + Math.max(0,val('iq')-88)*.28),
     // Decision-making is a skill. Shot-diet percentages are NOT ratings of shot quality.
     shotSelection: clip(val('iq')*.42 + val('shotCreation',
       val('handle')*.42+val('mid')*.32+val('iq')*.13+val('layup')*.13)*.22 +
@@ -106,18 +106,108 @@ HL.historicalAttributes = function(row) {
   const bio=HL.HISTORY.players[row.pid]||[];
   const base=HL.History.unpack(row.attrs,HL.HISTORY.attrs);
   const result=HL.completeAttributes(base,bio[3],bio[4]);
+  // Historical rebound production is independent evidence of rebounding talent.
+  // Per-36 avoids treating a high-minute era as inherently more skilled; height
+  // prevents guard rebounding volume from turning into a fictional elite box-out.
+  if (row.g >= 20 && Number.isFinite(row.trb) && Number.isFinite(row.mpg) && row.mpg > 12) {
+    const per36 = row.trb * 36 / row.mpg;
+    const size = (bio[3] || 78) >= 80 ? 1 : 0.55;
+    const adjustment = HL.clamp((per36 - 8.2)*3.0,-5,14) * size * HL.clamp(row.g/50,0,1);
+    result.oreb = Math.round(HL.clamp(base.oreb + adjustment*.84,25,99));
+    result.dreb = Math.round(HL.clamp(base.dreb + adjustment,25,99));
+    // Derive the dependent attributes AFTER the measured-production correction.
+    result.boxout = HL.completeAttributes({ ...base, oreb:result.oreb, dreb:result.dreb },bio[3],bio[4]).boxout;
+  }
+  // Genuine high-usage midrange specialists have demonstrated the repetition and
+  // footwork that the generic average could not identify; this is still a proxy.
+  if (row.g >= 30 && row.pts >= 24 && result.mid >= 82) {
+    result.fade = Math.round(HL.clamp(result.fade + Math.min(9,(result.mid-80)*.48) + (result.post>=75?2:0),25,99));
+    result.clutchShot = Math.round(HL.clamp(result.clutchShot + Math.min(7,(row.pts-22)*.32),25,99));
+  }
   // FG% is an imperfect cross-era proxy (especially for bigs); use only a
   // small, bounded contextual correction. IQ and shot creation drive the skill.
-  if (Number.isFinite(row.fg) && row.g>=15) {
+  if (Number.isFinite(row.fgp) && row.g>=15) {
     const reliability=HL.clamp(row.g/45,0,1);
     const baseline=(bio[3]||78)>=82 ? .51 : .455;
     result.shotSelection=Math.round(HL.clamp(result.shotSelection+
-      HL.clamp((row.fg-baseline)*43,-6,6)*reliability,25,99));
+      HL.clamp((row.fgp-baseline)*43,-6,6)*reliability,25,99));
   }
+  // Carefully scoped 100-tier scouting grades. They are not derived by raising
+  // every rating to a requested OVR. Each case requires a documented combination
+  // of a historic specialty and strong season production; every weakness stays.
+  const name=String(bio[0]||'');
+  if (name === 'Stephen Curry' && row.g >= 50 && row.pts >= 24 &&
+      row.tpp >= .40 && result.three >= 97) result.three=100;
+  if (name === 'Michael Jordan' && row.g >= 50 && row.pts >= 26 &&
+      result.mid >= 85 && result.fade >= 90 && row.bpm >= 7.5)
+    result.fade=100;
+  if (name === "Shaquille O'Neal" && row.g >= 50 && row.pts >= 25 &&
+      row.fgp >= .55 && result.dunk >= 93) result.dunk=100;
   historicalAttributeCache.set(row,result);
   return result;
 };
 
+
+// A historical season's OVR is an evaluation of its demonstrated impact, in
+// addition to the independently computed basketball skills.  The box-score
+// record's BPM measures era-relative impact; scoring at volume and elite 3PT
+// gravity supply complementary evidence. No player's name or desired OVR is
+// used here, and NO unrelated attributes are raised to hit an OVR number.
+// Important: a small per-game sample cannot establish an all-time season.
+const historicalOvrCache = new WeakMap();
+HL.historicalSeasonImpact = function (row, attrs) {
+  if (!row) return 0;
+  const a=attrs || HL.historicalAttributes(row);
+  const games=Number(row.g)||0, minutes=Number(row.mpg)||0;
+  if (games < 15 || minutes < 15) return 0;
+  const bpm=Number.isFinite(row.bpm)?row.bpm:0;
+  const ppg=Number.isFinite(row.pts)?row.pts:0;
+  const sample=HL.clamp((games-12)/43,0,1) * HL.clamp((minutes-15)/13,0,1);
+  // Advanced impact statistics are not exact for all early seasons. Season
+  // production is weighted more conservatively when BPM is unavailable.
+  const measuredImpact=Math.max(0,bpm-4)*0.85;
+  const scoringVolume=Math.max(0,ppg-24)*0.31;
+  const shotDiet = typeof row.tend === 'string' && HL.HISTORY?.tends
+    ? HL.History.unpack(row.tend,HL.HISTORY.tends) : {};
+  const eliteShooting=HL.clamp((a.three-90)/9,0,1);
+  const highVolume=HL.clamp(((shotDiet.three||0)-30)/40,0,1);
+  const gravity=ppg>=20 ? eliteShooting*highVolume*2.8 : 0;
+  return HL.clamp((measuredImpact+scoringVolume+gravity)*sample,0,11);
+};
+HL.historicalSeasonOvr = function (row) {
+  if (historicalOvrCache.has(row)) return historicalOvrCache.get(row);
+  const a=HL.historicalAttributes(row);
+  const skillOvr=HL.computeOvr(a,row.pos);
+  const ovr=Math.round(HL.clamp(skillOvr + HL.historicalSeasonImpact(row,a),25,99));
+  historicalOvrCache.set(row,ovr);
+  return ovr;
+};
+
+// The 100 overall is reserved for exceptional real historical peak seasons,
+// not all players with a regular 99 OVR. Only a natural-position fit can unlock
+// this extra OVR point. This function does not modify the underlying attributes.
+HL.legendaryPeak = function(row) {
+  if (!row || row.g < 50 || row.mpg < 28 || HL.historicalSeasonOvr(row) < 99) return false;
+  const bio=HL.HISTORY?.players?.[row.pid] || [];
+  const name=bio[0];
+  // All-time production and impact threshold, with limited documented peak
+  // seasons where BPM is less useful than the historical achievements.
+  if (row.bpm >= 10 && row.pts >= 23) return true;
+  if (name==='LeBron James' && row.bpm>=8.5 && row.pts>=25) return true;
+  if (name==='Michael Jordan' && row.bpm>=8 && row.pts>=27) return true;
+  if (name==='Stephen Curry' && row.bpm>=7.5 && row.pts>=28 && row.tpp>=.40) return true;
+  if (name==="Shaquille O'Neal" && row.bpm>=8 && row.pts>=27 && row.fgp>=.55) return true;
+  return false;
+};
+
+// Nonlinear elite response. 99 is a difference-making skill, not a cosmetic +1.
+// It is deliberately bounded; opposing elite defense can counter elite offense.
+HL.eliteImpact = r => {
+  const grade=HL.clamp(Number(r)||0,25,100);
+  const gradual=Math.pow(Math.max(0,grade-88)/11,1.35);
+  // The historic 100 tier should be noticeable, while still counterable.
+  return gradual+(grade===100?.28:0);
+};
 
 // Relative strengths per archetype (added to a base around the target OVR).
 HL.ARCHETYPES = {

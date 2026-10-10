@@ -97,13 +97,16 @@ HL.History = (function () {
   function makePlayer(row, seasonStart, teamId) {
     const bio = H().players[row.pid];
     const [name, nbaId, , height, weight, born, hof, college] = bio;
-    const attrs = HL.completeAttributes(unpack(row.attrs, H().attrs), height, weight);
+    // A new roster player gets an independent mutable copy. The cached historical
+    // scouting record is shared across Skill Draft, 82-0 and Franchise, and must
+    // never be overwritten by training, injury changes, or legendary boosts.
+    const attrs = { ...HL.historicalAttributes(row) };
     const t = unpack(row.tend, H().tends);
     const p = {
       id: HL.nextPlayerId(), hid: row.pid,
       name, pos: row.pos, age: row.age, height, weight, wingspan: height + 3, arch: null,
       born: born || seasonStart - row.age, real: true, nbaId, hof: !!hof, college,
-      attrs, ovr: HL.computeOvr(attrs, row.pos),
+      attrs, ovr: HL.historicalSeasonOvr(row),
       traits: null, teamId, morale: 70, injury: null, contract: null, stats: {}, careerAwards: [], draft: null,
     };
     p.tend = HL.completeTendencies({ ...p, tend: { usage: t.usage, three: t.three, mid: t.mid, drive: t.drive, post: t.post, passFirst: t.passFirst, gamble: t.gamble, crash: t.crash, effort: 75, foulAggr: t.foulAggr, drawFoul: t.drawFoul } });

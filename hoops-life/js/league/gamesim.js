@@ -672,6 +672,18 @@ HL.DEFAULT_RULES = () => ({
         if (pressure === 'trap') { makeP -= .025; if (passer) makeP += .035; }
       }
       if (O.huddle?.remaining > 0) makeP += O.huddle.boost;
+      // Exceptional tools influence both the shot and its contest. A 99 skill
+      // adds meaningful but resistible value, and weaker skills get no free boost.
+      const eliteShot = type === 'rim'
+        ? Math.max(shooter.attrs.close,shooter.attrs.layup,shooter.attrs.dunk,shooter.attrs.post)
+        : type === 'mid' ? Math.max(shooter.attrs.mid,shooter.attrs.fade*.94)
+        : shooter.attrs.three;
+      const eliteStop = type === 'rim' ? Math.max(sDef.attrs.intD,helper.attrs.block)
+        : Math.max(sDef.attrs.perD,sDef.attrs.contestD);
+      makeP += 0.042*HL.eliteImpact(eliteShot) - 0.026*HL.eliteImpact(eliteStop);
+      if (type === 'mid' && !passer) makeP += 0.016*HL.eliteImpact(shooter.attrs.fade);
+      if (type === 'rim') makeP += 0.016*HL.eliteImpact(shooter.attrs.contactFinish);
+      if (clutch) makeP += 0.017*HL.eliteImpact(shooter.attrs.clutchShot);
       makeP -= (teamD - 66) * 0.0052;
       makeP += (teamIQ - 68) * 0.0024;
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
@@ -763,19 +775,19 @@ HL.DEFAULT_RULES = () => ({
 
     function rebound(O, D, rules, type, log) {
       const frameRebound = p => HL.clamp((p.height - 79) * 0.8 + ((p.weight || 215) - 215) * 0.03, -11, 11);
-      const oStr = O.onCourt.reduce((s, p) => s + (eff(O, p, 'oreb') + frameRebound(p) + (p.attrs.boxout-65)*.18) * (0.75 + p.tend.crash / 200), 0) / 5;
-      const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb') + frameRebound(p)+(p.attrs.boxout-65)*.18, 0) / 5;
+      const oStr = O.onCourt.reduce((s, p) => s + (eff(O, p, 'oreb') + frameRebound(p) + (p.attrs.boxout-65)*.18 + 12*HL.eliteImpact(p.attrs.oreb) + 6*HL.eliteImpact(p.attrs.boxout)) * (0.75 + p.tend.crash / 200), 0) / 5;
+      const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb') + frameRebound(p)+(p.attrs.boxout-65)*.18 + 12*HL.eliteImpact(p.attrs.dreb) + 6*HL.eliteImpact(p.attrs.boxout), 0) / 5;
       let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012 + E.orb;
       if (type === 'three') pOff += 0.02;
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
-        const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2) / 50, 1.7) * (0.5 + p.tend.crash / 100));
+        const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2+13*HL.eliteImpact(p.attrs.oreb)) / 50, 1.7) * (0.5 + p.tend.crash / 100));
         O.st[r.id].line.orb++;
         O.lastOreb = r.id;
         log(`Offensive rebound ${r.name}.`, O);
         return { keep: true, transition: false };
       }
-      const r = pickBy(D.onCourt, p => Math.pow(Math.max(25, p.attrs.dreb + frameRebound(p)) / 50, 1.85));
+      const r = pickBy(D.onCourt, p => Math.pow(Math.max(25, p.attrs.dreb + frameRebound(p)+13*HL.eliteImpact(p.attrs.dreb)) / 50, 1.85));
       D.st[r.id].line.drb++;
       // Defensive rebounds sometimes lead to a fast break; fast teams run more.
       return { keep: false, transition: R.chance(0.13 + (D.strat.pace - 50) * 0.002) };

@@ -229,7 +229,7 @@ HL.Career = (function () {
     log(L,'season',`${L.season} season report: ${t.name} ${t.w}-${t.l}; ${(p.stats[String(L.season)]?.pts||0)} total points.`,true);
   }
   function offers(L) {
-    const c=L.career,p=c&&me(L);if(!p||c.retired||p.age>45)return [];
+    const c=L.career,p=c&&me(L);if(!p||c.retired||p.ovr<50)return []; // Ability and roster demand, never a hard age cutoff.
     if(p.teamId!=null&&!(L.phase==='offseason'&&p.contract.exp<=L.season))return [];
     const year=L.phase==='offseason'?L.season+1:L.season;
     return L.teams.slice().sort((a,b)=>a.id-b.id).filter(t=>Object.values(L.players).filter(q=>!q.retired&&q.teamId===t.id&&q.id!==p.id).length<15||t.id===p.teamId).slice(0,8).map(t=>({teamId:t.id,amount:Math.round(Math.max(1.2,HL.estimateSalary(p.ovr,p.age))*HL.salaryScale(year)*1000)/1000,years:2,year,role:Object.values(L.players).filter(q=>q.teamId===t.id&&q.ovr>p.ovr).length<5?'Starter competition':'Rotation competition'}));
@@ -251,7 +251,7 @@ HL.Career = (function () {
     log(L,'retirement',`${p.name} retired from the league. His life and career record remain in this save.`,true);quote(L,`${p.name} steps away from basketball`,'The player ends his current playing contract and keeps his life story open.','I need a new chapter.','retire');return {ok:true};
   }
   function unretire(L) {
-    const c=L.career,p=c&&me(L);if(!c?.retired||p.age>45)return fail('A return is not available at this stage.');
+    const c=L.career,p=c&&me(L);if(!c?.retired)return fail('A return is not available at this stage.');
     c.retired=false;p.retired=null;p.teamId=null;log(L,'return',`${p.name} seeks a return. He needs an actual contract offer before playing.`,true);return {ok:true};
   }
   function advance(L) {

@@ -25,3 +25,16 @@ The long-form career and full-season simulations have not passed a complete brow
 ## Fonts
 
 Font binaries are excluded from this redistribution. Your existing game folder can retain its own installed font files; otherwise the browser uses fallbacks.
+
+## Open-ended careers (October 10, 2026)
+
+**Skill Draft** no longer forces retirement at a set age or because the player falls outside NBA-level rotation talent. Manual retirement is available at any age. NBA contracts remain conditional on ratings and opportunities. Players with 99 longevity, prime duration, and stamina can remain in their prime deep into their 50s, then gradually decline. A season without an offer is an active out-of-league year, not an automatic end. Auto-play advances **ten seasons per click** so exceptional 45+ season careers can be continued without an unbounded browser simulation. A complete Verdict is available when the user chooses retirement.
+
+**Player Career** removes the age-45 ban on contracts and comebacks, retaining role/roster competition. These are deliberately fictional extreme longevity options, not claims about realistic human careers.
+
+## Legendary 100-tier rating & natural-position fit (October 10, 2026)
+
+- Normal attributes and overall remain capped at 99. A curated, evidence-gated 100 specialty is possible for a small number of historic peaks (e.g., 2015 and 2020 Curry three-point shooting, peak Jordan fadeaway, peak Shaq finishing), without boosting unrelated weaknesses.
+- 82-0 natural-position assignment grants +1 OVR. A historically exceptional 99-rated season can reach 100 on a natural position; other 99-rated seasons remain at 99. A legitimate five-position player may qualify across all five positions based on passing, ball control, mobility, defensive size, strength, and IQ.
+- The simulation's nonlinear elite-response curve recognizes 100 as an exceptionally strong tool. Skill Draft preserves inherited 100 ratings through prime progression; rare fictional opponents cannot accidentally downgrade a 100 specialty when boosted.
+- Historical all-time status is an estimated game-design judgment, **not** an official NBA or 2K rating. The full long-career browser regression is still pending.
