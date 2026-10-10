@@ -165,6 +165,7 @@ HL.Challenge = (function () {
   function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   function newRun(cfg) {
+    HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
       skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
@@ -173,15 +174,18 @@ HL.Challenge = (function () {
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
 
   async function spin(what = 'both') {
+    const run=st;
     st.phase = 'reeling';
     const openDecades = st.decades.filter(d => !st.used.includes(d) || st.used.length >= st.decades.length);
     if (what !== 'team') st.decade = R.pick(openDecades.filter(d => d !== st.decade || openDecades.length === 1));
     await loadDecade(st.decade);
+    if(st!==run)return;
     const fr = franchisesIn(st.decade);
     if (what !== 'era' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
     // A rare legendary team REPLACES the team roll (no extra card).
     st.special=null;
     const special = what === 'both' || what === 'all' ? await HL.Legends.rollDraftTeam():null;
+    if(st!==run)return;
     if(special){st.special=special.spec;st.decade=Math.floor(special.spec.year/10)*10;st.team=special.spec.franchise;}
     // Deal the hand now (seeded), reveal it after the reels land.
     const taken = new Set(SLOTS.filter(s => st.lineup[s]).map(s => st.lineup[s].row.pid));
@@ -193,7 +197,8 @@ HL.Challenge = (function () {
     await FX.reels(host, [
       { label: 'Franchise', items: teams.map(a => `<div>${U.logo(teamMeta(a), 62)}</div>`), final: teams.indexOf(st.team) },
       { label: 'Decade', items: decs.map(d => `<div>${d}s</div>`), final: decs.indexOf(st.decade) },
-    ], { colors: [U.teamAccent(teamMeta(st.team)).c, '#ffd84f', '#fff'] });
+    ], { colors: [U.teamAccent(teamMeta(st.team)).c, '#ffd84f', '#fff'] }).catch(()=>U.toast('The reel animation was skipped. Your cards are ready.'));
+    if(st!==run)return;
     st.phase = 'hand';
     render(true);
   }
@@ -204,7 +209,7 @@ HL.Challenge = (function () {
     const oldDna=st.dna;
     st.lineup[slot] = c;
     st.dna=HL.DNA.analyze(SLOTS.filter(x=>st.lineup[x]).map(x=>({pid:st.lineup[x].row.pid,cat:x,row:st.lineup[x].row,season:st.lineup[x].season})),{mode:'team'});
-    const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id)) || st.dna.trios.find(x=>!oldDna?.trios.some(y=>y.id===x.id)) || st.dna.pairs.find(x=>!oldDna?.pairs.some(y=>y.id===x.id));
+    const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id));
     if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
     st.hand = [];
@@ -215,7 +220,7 @@ HL.Challenge = (function () {
     render();
     const el = document.querySelector(`.slot-wrap[data-slot="${slot}"]`);
     if (el) FX.burst(el, FX.tierOf(rating(c)).colors.concat('#fff'), FX.tierIndex(rating(c)) >= 3 ? 30 : 14, 0.6);
-    if(unlocked)setTimeout(()=>HL.DNAFX.reveal(unlocked,{title:unlocked.type==='mutation'||unlocked.type==='evolved'?'LEGENDARY MUTATION':'CHEMISTRY UNLOCKED'}),260);
+    if(unlocked)HL.DNAFX.reveal(unlocked,{title:'LEGENDARY TEAM FUSION'});
     if (pen >= 10) U.toast(`<b>${esc(HL.HISTORY.players[c.row.pid][0])}</b> at ${slot}: −${pen} out of position.`);
   }
   function swap(a, b) { if (['season', 'result', 'playoffs'].includes(st.phase)) return; const t = st.lineup[a]; st.lineup[a] = st.lineup[b]; st.lineup[b] = t; FX.sfx.flip(); render(); }
@@ -352,6 +357,37 @@ HL.Challenge = (function () {
 
   // ---------- Postseason side quest: game by game, four best-of-seven series ----------
   const ROUND_TITLES=['First round','Conference semifinals','Conference finals','NBA Finals'];
+  function createPlayoffSession(dream,guest,rules,home=true){
+    const game=home?HL.createGame(dream,guest,rules):HL.createGame(guest,dream,rules);
+    let pending=false,completed=null,decisionUsed=false;
+    function advance(){
+      if(completed)return {result:completed};
+      if(pending)return {pending:true,snapshot:game.snapshot()};
+      let step;
+      do{
+        step=game.step();
+        if(step.done){completed=step.value;return {result:completed};}
+        const v=game.snapshot(),my=home?v.home:v.away,opp=home?v.away:v.home;
+        if(!decisionUsed&&v.period>=4&&v.seconds>0&&v.seconds<=24&&Math.abs(my.score-opp.score)<=3&&v.possessionTeamId===dream.id){pending=true;return {pending:true,snapshot:v};}
+      }while(!step.done);
+    }
+    function choose(pid,move){
+      if(!pending||!['three','fade','drive','pass'].includes(move))return {ok:false,reason:'No supported closing decision is pending.'};
+      const v=game.snapshot(),on=v.lineups[dream.id],hero=on.find(x=>x.pid===pid);
+      if(!hero||v.out.includes(pid))return {ok:false,reason:'Choose an available player already on the floor.'};
+      if(move==='three'&&!rules.threePoint)return {ok:false,reason:'This era has no three-point line.'};
+      const partner=on.filter(x=>x.pid!==pid).sort((a,b)=>{
+        const pa=dream.players.find(p=>p.id===a.pid),pb=dream.players.find(p=>p.id===b.pid);
+        return (move==='pass'?pb.attrs.three:pb.attrs.pass)-(move==='pass'?pa.attrs.three:pa.attrs.pass);
+      })[0]?.pid;
+      const play=move==='three'?'catchShoot':move==='drive'?'cut':move==='pass'?'driveKick':'isolation';
+      const call={play,pid,...(HL.GAME_PLAYS[play].partner?{partnerId:partner}:{})};
+      const response=game.command(dream.id,'play',call);if(!response.ok)return response;
+      pending=false;decisionUsed=true;
+      const done=advance();return {ok:true,result:done.result,event:response.event,hero:dream.players.find(p=>p.id===pid)?.name,play:HL.GAME_PLAYS[play].label};
+    }
+    return {advance,choose,snapshot:()=>game.snapshot()};
+  }
   function startPlayoffs(){
     const pool=(st.playoffTeams||[]).slice().sort((a,b)=>(b.real?.w||0)-(a.real?.w||0));
     const without=pool.filter(t=>t.id!==999);
@@ -375,58 +411,31 @@ HL.Challenge = (function () {
   }
   function playPlayoffGame(){
     const P=st.playoffs;if(!P||P.completed||P.pending)return;
-    const opp=P.opponents[P.round],players=HL.League.teamPlayers(opp.id);
-    const home=(P.wins+P.losses)%2===0;
-    const guest={...opp,players,customPlayers:players,strategy:opp.strategy||HL.DEFAULT_STRATEGY()};
-    const raw=home?HL.simGame(st.dream,guest,st.playoffRules):HL.simGame(guest,st.dream,st.playoffRules);
-    const me=home?raw.home:raw.away,rival=home?raw.away:raw.home;
-    const game={mine:me.score,theirs:rival.score,opp:opp.name,opponent:opp,raw,home,game:P.history.length+1,hero:null,play:null,made:null};
-    // In close games, one final meaningful offensive possession can matter.
-    // The sim result is held until the selected possession has been resolved.
-    if(Math.abs(game.mine-game.theirs)<=3 && st.dream.players.length){P.pending=game;render();return;}
-    finishPlayoffGame(game);
+    const opp=P.opponents[P.round],players=HL.League.teamPlayers(opp.id),home=(P.wins+P.losses)%2===0;
+    const guest={...opp,players,strategy:opp.strategy||HL.DEFAULT_STRATEGY()};
+    const session=createPlayoffSession(st.dream,guest,st.playoffRules,home),step=session.advance();
+    const raw=step.snapshot||step.result,my=home?raw.home:raw.away,rival=home?raw.away:raw.home;
+    const game={mine:my.score,theirs:rival.score,opp:opp.name,opponent:opp,raw,home,game:P.history.length+1,hero:null,play:null};
+    if(step.pending){P.session=session;P.pending=game;render();return;}
+    consumePlayoffInjuries(game);finishPlayoffGame(game);
+  }
+  function consumePlayoffInjuries(g){
+    for(const p of st.dream.players)if(p.injury?.games>0)p.injury.games--;
+    for(const e of g.raw.injuries||[]){const p=st.dream.players.find(p=>p.id===e.pid);if(p&&e.teamId===st.dream.id)p.injury={name:e.name,games:Math.max(1,e.games||1)};}
   }
   function resolvePlayoffClutch(move){
-    const P=st.playoffs,g=P?.pending;if(!g)return;
-    const sel=document.querySelector('[data-playoff-shooter]'),hero=st.dream.players.find(p=>p.id===+(sel?.value))||st.dream.players[0];
-    const attr=move==='three'?'three':move==='fade'?'fade':move==='pass'?'pass':'contactFinish';
-    const value=move==='three'?3:2,skill=hero.attrs[attr]||65;
-    const defender=HL.League.teamPlayers(g.opponent.id).sort((a,b)=>b.ovr-a.ovr)[0];
-    const d=defender?.attrs?.perD||75;
-    const situational=(hero.dna?.effects?.[move==='three'?'three':move==='fade'?'mid':move==='pass'?'assist':'rim']||0);
-    const odds=HL.clamp(.3+(skill-70)*.006+(hero.attrs.clutchShot-65)*.0012-(d-75)*.0012+situational,.16,.78);
-    const made=R.chance(odds);
-    if(made){g.mine+=value;
-      const myBox=g.home?g.raw.home:g.raw.away;
-      const line=myBox.box[hero.id];if(line){line.pts+=value;line.fgm++;line.fga++;if(value===3){line.tpm++;line.tpa++;}}
-      myBox.score=g.mine;myBox.quarters[myBox.quarters.length-1]+=value;
-    }
-    g.hero=hero.name;g.play=move;g.made=made;g.odds=odds;
-    if (g.mine===g.theirs) {
-      // Ties cannot be recorded as losses; play overtime on the same simulated
-      // possession model and synchronize the visible score/quarter breakdown.
-      const extra=HL.simGame(st.dream,{...g.opponent,players:HL.League.teamPlayers(g.opponent.id)},st.playoffRules);
-      const extraMe=g.home?extra.home:extra.away,extraOpp=g.home?extra.away:extra.home;
-      const margin=extraMe.score-extraOpp.score;
-      const otMine=Math.max(6,Math.round(extraMe.score*.09));
-      let otOpp=Math.max(6,otMine-(margin===0?(R.chance(.5)?2:-2):Math.sign(margin)*2));
-      // Preserve exactly one extra period with a clear winner.
-      g.mine+=otMine;g.theirs+=otOpp;
-      let tieBreak=0;
-      if (g.mine===g.theirs){tieBreak=R.chance(.5)?2:-2; if(tieBreak>0)g.mine+=tieBreak;else g.theirs-=tieBreak;}
-      const myBox=g.home?g.raw.home:g.raw.away,theirBox=g.home?g.raw.away:g.raw.home;
-      myBox.score=g.mine;theirBox.score=g.theirs;
-      myBox.quarters.push(otMine+(tieBreak>0?tieBreak:0));
-      theirBox.quarters.push(otOpp+(tieBreak<0?-tieBreak:0));
-      g.overtime=true;
-    }
-    P.pending=null;finishPlayoffGame(g);
+    const P=st.playoffs,g=P?.pending;if(!g||!P.session)return;
+    const sel=document.querySelector('[data-playoff-shooter]'),pid=+(sel?.value);
+    const decision=P.session.choose(pid,move);if(!decision.ok){U.toast(esc(decision.reason));return;}
+    g.raw=decision.result;const my=g.home?g.raw.home:g.raw.away,opp=g.home?g.raw.away:g.raw.home;
+    g.mine=my.score;g.theirs=opp.score;g.decisionPoints=decision.event.points||0;g.hero=decision.hero;g.play=decision.play;g.overtime=g.raw.ot>0;
+    P.pending=null;P.session=null;consumePlayoffInjuries(g);finishPlayoffGame(g);
   }
   function playoffView(){
     const P=st.playoffs,opp=P.opponents[Math.min(P.round,3)],last=P.last;
     const pending=P.pending;
-    const chooser=pending?`<article class="dna-playoff-clutch"><div class="dna-section-label">THE FINAL POSSESSION</div><h3>One possession can change the series.</h3><p>${esc(pending.opp)} · ${pending.mine}-${pending.theirs}. Choose your closer and move. Matchups, clutch ratings and DNA effects determine the outcome.</p><label>Closer <select data-playoff-shooter>${st.dream.players.slice(0,8).map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.ovr} OVR</option>`).join('')}</select></label><div class="row wrap">${[['three','Deep three'],['fade','Fadeaway'],['drive','Attack the rim'],['pass','Create with a pass']].map(([k,label])=>`<button class="btn" data-final-possession="${k}">${label}</button>`).join('')}</div></article>`:'';
-    return `<div class="stack" style="gap:13px"><section class="block"><div class="body stack"><div class="caps">82-0 · Postseason side quest</div><h2>${P.completed?(P.champion?'NBA CHAMPIONS':'THE RUN ENDS'):ROUND_TITLES[P.round]}</h2><p>${P.completed?'Final postseason report below':`${esc(opp.name)} · series ${P.wins}-${P.losses} · first to four wins`}</p>${!P.completed&&!pending?'<button class="btn go big" data-playoff-game>Sim next playoff game</button>':''}${chooser}${last?`<div class="dossier-honor"><div class="caps">Last playoff game · ${esc(last.round)}</div><h3>${last.winner?'WIN':'LOSS'} ${last.mine}-${last.theirs} vs ${esc(last.opp)}</h3>${last.hero?`<p>${esc(last.hero)} ${last.made?'made':'missed'} the final ${esc(last.play)} attempt (${Math.round(last.odds*100)}% modeled chance).</p>`:''}</div>`:''}</div></section><section class="block"><header><h3>Playoff game log</h3></header><div class="body"><div class="scouting-games">${P.history.map((g,i)=>`<div class="kv"><span>${i+1}. ${esc(g.round)} vs ${esc(g.opp)}</span><b>${g.winner?'W':'L'} ${g.mine}-${g.theirs}</b></div>`).join('')||'<p>Your first playoff game awaits.</p>'}</div></div></section>${HL.DNA.board(st.dna,{compact:true})}${P.completed?`<button class="btn go" data-finish-playoffs>Return to your season Verdict</button>`:''}</div>`;
+    const chooser=pending?`<article class="dna-playoff-clutch"><div class="dna-section-label">THE FINAL POSSESSION</div><h3>One possession can change the series.</h3><p>${esc(pending.opp)} · ${pending.mine}-${pending.theirs}. Choose your closer and move. Matchups, clutch ratings and DNA effects determine the outcome.</p><label>Closer <select data-playoff-shooter>${st.dream.players.filter(p=>pending.raw.lineups[st.dream.id].some(x=>x.pid===p.id)&&!pending.raw.out.includes(p.id)).map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.ovr} OVR</option>`).join('')}</select></label><div class="row wrap">${[['three','Set up a three'],['fade','Create a fade'],['drive','Attack the rim'],['pass','Drive and pass']].filter(([k])=>k!=='three'||st.playoffRules.threePoint).map(([k,label])=>`<button class="btn" data-final-possession="${k}">${label}</button>`).join('')}</div></article>`:'';
+    return `<div class="stack" style="gap:13px"><section class="block"><div class="body stack"><div class="caps">82-0 · Postseason side quest</div><h2>${P.completed?(P.champion?'NBA CHAMPIONS':'THE RUN ENDS'):ROUND_TITLES[P.round]}</h2><p>${P.completed?'Final postseason report below':`${esc(opp.name)} · series ${P.wins}-${P.losses} · first to four wins`}</p>${!P.completed&&!pending?'<button class="btn go big" data-playoff-game>Sim next playoff game</button>':''}${chooser}${last?`<div class="dossier-honor"><div class="caps">Last playoff game · ${esc(last.round)}</div><h3>${last.winner?'WIN':'LOSS'} ${last.mine}-${last.theirs} vs ${esc(last.opp)}</h3>${last.hero?`<p>${esc(last.hero)} calls ${esc(last.play)}. The actual possession produces ${last.decisionPoints||0} points; the remaining game and any overtime finish on the possession simulator.</p>`:''}</div>`:''}</div></section><section class="block"><header><h3>Playoff game log</h3></header><div class="body"><div class="scouting-games">${P.history.map((g,i)=>`<div class="kv"><span>${i+1}. ${esc(g.round)} vs ${esc(g.opp)}</span><b>${g.winner?'W':'L'} ${g.mine}-${g.theirs}</b></div>`).join('')||'<p>Your first playoff game awaits.</p>'}</div></div></section>${HL.DNA.board(st.dna,{compact:true})}${P.completed?`<button class="btn go" data-finish-playoffs>Return to your season Verdict</button>`:''}</div>`;
   }
 
   // ---------- achievements ----------
@@ -529,7 +538,7 @@ HL.Challenge = (function () {
         <section class="block"><header><h3>Best runs</h3></header><div class="body">${bestRuns().slice(0, 5).map(r => `<div class="kv"><span>${r.daily ? `<span class="tag">Daily ${esc(r.daily)}</span> ` : ''}${r.five.slice(0, 2).map(esc).join(', ')}…</span><b>${r.w}-${r.l}</b></div>`).join('') || '<div class="t3 sm">No runs yet.</div>'}</div></section>
       </div></div></div></div>`;
     bind();
-    if (revealHand) FX.flipIn(document.querySelectorAll('.hand .gcard'));
+    if (revealHand) {const cards=[...document.querySelectorAll('.hand .gcard')];FX.flipIn(cards).catch(()=>cards.forEach(c=>{c.classList.remove('down','charging');c.classList.add('up');}));}
   }
 
   function machineView(reveal) {
@@ -723,5 +732,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, fittedAttributes, effRating, rating, franchisesIn, loadDecade, posOk, penalty, naturals };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, fittedAttributes, effRating, rating, franchisesIn, loadDecade, posOk, penalty, naturals, createPlayoffSession };
 })();

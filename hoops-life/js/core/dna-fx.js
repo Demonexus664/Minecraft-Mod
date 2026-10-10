@@ -1,28 +1,41 @@
-// Distinct deterministic VFX: each DNA ID gets a stable color/shape/motion.
-// Only composite-friendly opacity/transform animates; reduced motion is respected.
+// Staged card fusion: composite-friendly choreography and no simulation randomness.
 window.HL=window.HL||{};
 HL.DNAFX=(function(){
- const reduced=()=>matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
- const hash=s=>{let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0;};
- let active=null;
- async function reveal(effect,{title='CHEMISTRY REVEALED'}={}){
-  if(!effect||!document.body)return;
-  active?.remove(); const seed=hash(effect.id),colors=effect.colors||['#74cfff','#d7a6ff'];
-  const patterns=['orbit','pulse','comet','shards','crown','wave'];
-  const layer=document.createElement('div');layer.className='dna-reveal';
-  layer.dataset.pattern=patterns[seed%patterns.length];
-  layer.style.setProperty('--dna-a',colors[0]);layer.style.setProperty('--dna-b',colors[1]);
-  const particles=Array.from({length:reduced()?0:Math.min(30,14+(seed%12))},(_,i)=>{
-   const angle=(i/24*Math.PI*2)+(seed%100)/60,d=95+(i*31+seed)%180;
-   const ch=['✦','◆','●','✧','◈'][seed%5];
-   return `<i class="dna-particle" style="--dx:${Math.cos(angle)*d}px;--dy:${Math.sin(angle)*d}px;--delay:${i*18}ms;--sz:${6+i%5*3}px">${ch}</i>`;
+ const seen=new Set();let active=null;
+ const reduced=()=>typeof matchMedia==='function'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ const esc=s=>HL.DNA.esc(s);
+ function close(){active?.cleanup();active=null;}
+ function reset(){close();seen.clear();}
+ function family(e){return e.family==='defense'?'defense':['contact','post','glass'].includes(e.family)?'interior':e.family==='flight'?'flight':'shooting';}
+ function cards(effect){
+  const groups=new Map();for(const e of effect.ingredients||[]){const k=`${e.pid}:${e.season}`,g=groups.get(k)||{...e,cats:[]};g.cats.push(e.cat);groups.set(k,g);}
+  return [...groups.values()].slice(0,5).map(e=>{
+   const bio=HL.HISTORY.players[e.pid]||[HL.DNA.STARS[e.pid]?.name||e.pid],club=e.row?.stints?.[0]?.[0],fr=HL.Challenge?.LINEAGE?.[club]||club,team=HL.TEAMS.find(t=>t.abbr===fr);
+   const keys=[...new Set([...Object.keys(effect.roleTools?.[e.pid]||{}),...e.cats.flatMap(c=>HL.DNA.CATEGORY_ATTRS[c]||[])])],a=e.attrs||{};
+   const values=keys.slice(0,3).map(k=>[k.toUpperCase(),a[k]??'—']);
+   return `<div class="dna-fusion-input">${HL.Cards.card({pid:e.pid,name:bio[0],nbaId:bio[1],season:e.season,team,pos:e.row?.pos,rating:e.row?HL.historicalSeasonOvr(e.row):99,meta:e.season?`${e.season}-${String(+e.season+1).slice(-2)}`:'Inherited DNA',stat:values})}<b>${esc(e.cats.join(' · '))}</b></div>`;
   }).join('');
-  layer.innerHTML=`<div class="dna-reveal-bg"></div><div class="dna-aura" aria-hidden="true"><i></i><i></i><i></i></div><div class="dna-reveal-core"><small>${HL.DNA.esc(title)}</small><span class="dna-reveal-glyph">${effect.type==='mutation'||effect.type==='evolved'?'✦':effect.type.includes('trio')?'Ⅲ':'Ⅱ'}</span><h2>${HL.DNA.esc(effect.name)}</h2><p>${HL.DNA.esc(Object.entries(effect.bonus).map(([k,v])=>`${k} +${(v*100).toFixed(1)}%`).join(' · '))}</p><button class="btn go" data-dna-dismiss>Continue</button></div>${particles}`;
-  layer.querySelector('[data-dna-dismiss]').onclick=()=>{layer.remove();if(active===layer)active=null;};
-  document.body.appendChild(layer);active=layer;
-  if(HL.FX?.sfx && !reduced()) HL.FX.sfx.fanfare();
-  if(reduced())layer.classList.add('dna-no-motion');
+ }
+ async function reveal(effect,{title='LEGENDARY TRANSFORMATION',resultPlayer=null,replay=false}={}){
+  if(!effect||!['mutation','evolved'].includes(effect.type)||!document.body||(!replay&&seen.has(effect.id)))return;
+  close();seen.add(effect.id);
+  const before=document.activeElement,layer=document.createElement('div'),timers=[];
+  layer.className='dna-reveal dna-fusion';layer.dataset.family=family(effect);layer.dataset.stage='ingredients';
+  layer.setAttribute('role','dialog');layer.setAttribute('aria-modal','true');layer.setAttribute('aria-labelledby','dna-fusion-title');
+  const colors=effect.colors||HL.DNA.PALETTE.arc;layer.style.setProperty('--dna-a',colors[0]);layer.style.setProperty('--dna-b',colors[1]);
+  const target=effect.ingredients?.find(e=>e.pid===effect.target)||effect.ingredients?.[0],bio=target&&HL.HISTORY.players[target.pid];
+  const resultCard=resultPlayer&&HL.GFX?.jerseyCard?HL.GFX.jerseyCard(resultPlayer,null,{sub:'Transformed build'}):target?HL.Cards.card({pid:target.pid,name:bio?.[0]||effect.name,nbaId:bio?.[1],season:target.season,rating:target.row?HL.historicalSeasonOvr(target.row):99,meta:'TRANSFORMED IDENTITY',pos:target.row?.pos}):'';
+  layer.innerHTML=`<div class="dna-fusion-atmosphere" aria-hidden="true"></div><div class="dna-fusion-window"><header><span>${esc(title)}</span><button class="btn small" data-dna-skip>Skip animation</button><button class="btn small" data-dna-dismiss aria-label="Close fusion">Close</button></header><div class="dna-fusion-status" aria-live="polite">The qualifying cards</div>
+   <div class="dna-fusion-stage"><div class="dna-fusion-ingredients">${cards(effect)}</div><div class="dna-fusion-court" aria-hidden="true"><i class="dna-arc arc-one"></i><i class="dna-arc arc-two"></i><i class="dna-ball"></i><i class="dna-impact impact-one"></i><i class="dna-impact impact-two"></i><div class="dna-lockdown">${'<i></i>'.repeat(6)}</div><div class="dna-flight-trails">${'<i></i>'.repeat(3)}</div></div><div class="dna-fusion-output" aria-hidden="true">${resultCard}</div></div>
+   <div class="dna-fusion-result" hidden><h2 id="dna-fusion-title">${esc(effect.name)}</h2><p>${esc(effect.description)}</p><details open><summary>Why these cards qualified</summary><p>${esc(effect.qualification)}</p></details><div class="dna-fusion-activation"><b>On the court</b><p>${esc(effect.activation)}</p></div><button class="btn go" data-dna-continue>Use this transformation</button></div><p class="dna-fusion-evidence">${esc(effect.qualification)}</p></div>`;
+  const labels={ingredients:'The qualifying cards',interact:'Their tools interact',climax:'A new basketball identity',result:'Transformation complete'};
+  function stage(value){if(!layer.isConnected)return;layer.dataset.stage=value;layer.querySelector('.dna-fusion-status').textContent=labels[value];if(value==='result'){layer.querySelector('.dna-fusion-result').hidden=false;layer.querySelector('.dna-fusion-evidence').hidden=true;layer.querySelector('.dna-fusion-output').setAttribute('aria-hidden','false');layer.querySelector('[data-dna-skip]').hidden=true;layer.querySelector('[data-dna-continue]').focus();}}
+  function cleanup(){timers.forEach(clearTimeout);document.removeEventListener('keydown',keys);layer.remove();if(before?.isConnected)before.focus();}
+  function keys(e){if(e.key==='Escape'){e.preventDefault();close();}else if(e.key==='Tab'){const items=[...layer.querySelectorAll('button,summary')].filter(x=>x.offsetParent!==null),first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}}
+  layer.querySelector('[data-dna-skip]').onclick=()=>{timers.forEach(clearTimeout);stage('result');};layer.querySelector('[data-dna-dismiss]').onclick=close;layer.querySelector('[data-dna-continue]').onclick=close;
+  document.body.appendChild(layer);active={layer,cleanup};document.addEventListener('keydown',keys);layer.querySelector('[data-dna-skip]').focus();
+  if(reduced()){layer.classList.add('dna-no-motion');stage('result');}else{for(const [value,ms]of [['interact',950],['climax',2150],['result',3400]])timers.push(setTimeout(()=>stage(value),ms));HL.FX?.sfx?.fanfare();}
   return layer;
  }
- return {reveal};
+ return {reveal,reset,close};
 })();

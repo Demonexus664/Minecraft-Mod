@@ -115,6 +115,7 @@ HL.FX = (function () {
   // ---------- cards ----------
   async function flipIn(cards, opts = {}) {
     const list = Array.from(cards);
+    if(reduced()){for(const c of list){c.classList.remove('down','charging');c.classList.add('up');}return;}
     for (const c of list) {
       const tier = +(c.dataset.tier || 0);
       // Rare pulls get a beat of suspense and a glow before they turn.

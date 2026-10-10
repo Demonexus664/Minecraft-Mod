@@ -22,6 +22,19 @@ test('missing card evidence and unrelated skill categories cannot grant private 
  const d=HL.DNA.analyze([entry('curryst01','ft')]);
  assert.ok(!d.signatures.some(s=>s.mechanics?.gravity||s.mechanics?.relocation));
 });
+test('historical skill chemistry requires a relevant tool from each partner',()=>{
+ const irrelevant=HL.DNA.analyze([entry('curryst01','ft'),entry('thompkl01','three')]);
+ assert.ok(!irrelevant.pairs.some(x=>x.name==='Splash Brothers'));
+ const relevant=HL.DNA.analyze([entry('curryst01','three'),entry('thompkl01','jumper')]);
+ assert.ok(relevant.pairs.some(x=>x.name==='Splash Brothers'));
+});
+test('every inspectable discovered ability is active without additive stacking',()=>{
+ const cats=Object.keys(HL.DNA.CATEGORY_ATTRS),ps=cats.map(cat=>entry('jamesle01',cat,2012));
+ const d=HL.DNA.analyze(ps);
+ assert.equal(d.active.length,d.signatures.length+d.pairs.length+d.trios.length+d.mutations.length);
+ const build=HL.DNA.applyBuild({},d);
+ assert.ok(Object.values(build.mechanics).every(x=>x<=1.65));
+});
 test('historical Bay trio transforms only its verified peak seasons, and explains activation',()=>{
  const good=[entry('curryst01','PG'),entry('thompkl01','SG'),entry('greendr01','PF')];
  const d=HL.DNA.analyze(good,{mode:'team'}),m=d.mutations.find(x=>x.id==='mutation:bay-motion');

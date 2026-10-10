@@ -10,7 +10,7 @@ test('Different real players carry different usable signatures',()=>{
 test('Known duo and trio chemistry is stronger and instantly active',()=>{
  const duo=HL.DNA.analyze([mk('curryst01','three'),mk('thompkl01','jumper')]);
  assert.equal(duo.pairs[0].name,'Splash Brothers');assert.ok(duo.active.some(e=>e.type==='historical-duo'));
- const trio=HL.DNA.analyze([mk('curryst01','three'),mk('thompkl01','jumper'),mk('greendr01','intD')]);
+ const trio=HL.DNA.analyze([mk('curryst01','three'),mk('thompkl01','three'),mk('greendr01','iq')]);
  assert.ok(trio.trios.some(e=>e.name==='The Bay Blueprint'));
  assert.ok(HL.DNA.mergeMechanics(trio.active).relocation>0);
 });

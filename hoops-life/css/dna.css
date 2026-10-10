@@ -18,9 +18,48 @@
    width. Never rely on percentage card width alone: it collapses to 0px. */
 .hand > .dna-card-shell{flex:0 0 168px;width:168px;max-width:100%;box-sizing:border-box}
 .hand > .dna-card-shell > .gcard{width:100%;display:block}
+.cols.c-main>.stack{min-width:0}
 @media(max-width:760px){.hand > .dna-card-shell{flex-basis:128px;width:128px}}
 
 .dna-card-hint{color:var(--dna-a);font-size:11px;font-weight:800;text-align:center;padding:7px 5px;max-width:180px;margin:auto;line-height:1.4}
+.dna-effect details{font-size:12px;line-height:1.6;color:#cbd4e2}.dna-effect summary{cursor:pointer;color:var(--dna-a);padding:4px 0}.dna-effect details p{margin:8px 0}
+/* Card choreography uses arcs, ground impacts, defensive shutters and flight lanes. */
+.dna-fusion{overflow:auto;background:#050810f5;padding:20px}
+.dna-fusion-atmosphere{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--dna-a) 20%,transparent),transparent 65%)}
+.dna-fusion-window{position:relative;width:min(1050px,100%);margin:auto;border:1px solid var(--dna-a);border-radius:24px;background:linear-gradient(145deg,#182133,#080c14);padding:22px;box-shadow:0 20px 100px #0009}
+.dna-fusion-window>header{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--dna-a);letter-spacing:.14em;font-weight:900}.dna-fusion-window>header>span{margin-right:auto}
+.dna-fusion-status{text-align:center;font-size:18px;font-weight:800;margin:18px 0;color:#e8edf5}
+.dna-fusion-stage{position:relative;min-height:350px;display:grid;place-items:center;overflow:hidden;perspective:1100px}
+.dna-fusion-ingredients{display:flex;justify-content:center;gap:22px;width:100%;position:relative;z-index:2}
+.dna-fusion-input{flex:0 1 168px;min-width:0;text-align:center;transition:transform 1s cubic-bezier(.2,.7,.3,1),opacity .8s}
+.dna-fusion-input .gcard{width:100%;height:260px}.dna-fusion-input>b{display:block;font-size:12px;color:var(--dna-a);padding-top:9px}
+.dna-fusion-output{position:absolute;top:0;bottom:0;display:grid;place-items:center;opacity:0;transform:scale(.6) rotateY(-90deg);transition:transform .7s,opacity .5s;z-index:4}
+.dna-fusion-output>.gcard{width:178px;height:276px}.dna-fusion-output>.gfx{width:210px;max-height:310px}
+.dna-fusion-result{max-width:740px;margin:0 auto;text-align:center;color:#e7edf5}.dna-fusion-result h2{font-size:clamp(25px,4vw,38px);line-height:1.1;margin:6px 0 14px}.dna-fusion-result p{font-size:14px;line-height:1.65}.dna-fusion-result details{background:#ffffff07;border-radius:12px;padding:10px;text-align:left;font-size:13px}.dna-fusion-result summary{cursor:pointer;color:var(--dna-a)}
+.dna-fusion [hidden]{display:none!important}
+.dna-fusion-activation{margin:15px 0;padding:13px 18px;border-left:3px solid var(--dna-a);border-radius:12px;text-align:left;background:#ffffff08}.dna-fusion-activation p{margin:6px 0 0}
+.dna-fusion-evidence{text-align:center;color:#bec9d8;font-size:13px;line-height:1.6;margin:10px auto;max-width:70ch}
+.dna-fusion-court{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
+.dna-fusion[data-stage=interact] .dna-fusion-court,.dna-fusion[data-stage=climax] .dna-fusion-court{opacity:1}
+.dna-fusion[data-stage=climax] .dna-fusion-input{opacity:0;transform:translateY(50px) scale(.45)}
+.dna-fusion[data-stage=result] .dna-fusion-ingredients{visibility:hidden}.dna-fusion[data-stage=result] .dna-fusion-output{opacity:1;transform:scale(1) rotateY(0)}
+.dna-arc{display:none;position:absolute;left:15%;top:20%;width:70%;height:45%;border-top:3px dashed var(--dna-a);border-radius:50%;transform:rotate(-8deg)}.dna-arc.arc-two{top:40%;transform:rotate(13deg);border-color:var(--dna-b)}
+.dna-ball{display:none;position:absolute;top:40%;left:15%;height:15px;width:15px;border-radius:50%;background:#ffc263;box-shadow:0 0 18px #ffd294}
+.dna-fusion[data-family=shooting][data-stage=interact] .dna-fusion-input:nth-child(odd){transform:translateY(-22px) rotate(-5deg)}.dna-fusion[data-family=shooting][data-stage=interact] .dna-fusion-input:nth-child(even){transform:translateY(20px) rotate(5deg)}
+.dna-fusion[data-family=shooting] .dna-arc,.dna-fusion[data-family=shooting] .dna-ball{display:block}.dna-fusion[data-family=shooting][data-stage=interact] .dna-ball{animation:dna-shot-trail 1.2s ease-in-out both}
+@keyframes dna-shot-trail{0%{transform:translate(0,55px)}45%{transform:translate(280px,-90px)}100%{transform:translate(590px,40px)}}
+.dna-impact{display:none;position:absolute;left:20%;top:56%;width:60%;height:30%;border:5px solid var(--dna-a);border-radius:50%;transform:scale(.1);opacity:0}
+.dna-fusion[data-family=interior] .dna-impact{display:block}.dna-fusion[data-family=interior][data-stage=interact] .dna-fusion-input:first-child{transform:translateX(30px) rotateY(20deg)}.dna-fusion[data-family=interior][data-stage=interact] .dna-fusion-input:last-child{transform:translateX(-30px) rotateY(-20deg)}
+.dna-fusion[data-family=interior][data-stage=climax] .dna-impact{animation:dna-floor-impact .85s ease-out both}.dna-fusion[data-family=interior][data-stage=climax] .impact-two{animation-delay:.2s;border-color:var(--dna-b)}
+@keyframes dna-floor-impact{0%{opacity:1;transform:scale(.15)}100%{opacity:0;transform:scale(1.65)}}
+.dna-lockdown{display:none;position:absolute;inset:5% 10%;gap:12px;grid-template-columns:repeat(6,1fr)}.dna-lockdown i{border:2px solid var(--dna-a);background:linear-gradient(#2cdda920,transparent);border-radius:12px;transform:scaleY(0);transform-origin:bottom}
+.dna-fusion[data-family=defense] .dna-lockdown{display:grid}.dna-fusion[data-family=defense][data-stage=interact] .dna-lockdown i{animation:dna-block-lane .7s ease both}.dna-lockdown i:nth-child(2n){animation-delay:.3s!important;transform-origin:top}.dna-fusion[data-family=defense][data-stage=interact] .dna-fusion-input:nth-child(odd){transform:translateX(20px) rotateY(-16deg)}.dna-fusion[data-family=defense][data-stage=interact] .dna-fusion-input:nth-child(even){transform:translateX(-20px) rotateY(16deg)}
+@keyframes dna-block-lane{to{transform:scaleY(1)}}
+.dna-flight-trails{display:none;position:absolute;inset:5%}.dna-flight-trails i{position:absolute;left:10%;top:30%;width:70%;height:3px;background:linear-gradient(90deg,transparent,var(--dna-b));transform:rotate(-22deg)}.dna-flight-trails i:nth-child(2){top:50%}.dna-flight-trails i:nth-child(3){top:70%}
+.dna-fusion[data-family=flight] .dna-flight-trails{display:block}.dna-fusion[data-family=flight][data-stage=interact] .dna-fusion-input{transform:translateY(-28px) rotate(-12deg)}
+@media(max-width:600px){.dna-fusion{padding:8px}.dna-fusion-window{padding:12px;border-radius:16px}.dna-fusion-window>header{flex-wrap:wrap;font-size:10px}.dna-fusion-window>header>span{flex-basis:100%}.dna-fusion-ingredients{gap:7px;flex-wrap:wrap}.dna-fusion-input{flex-basis:104px;max-width:128px}.dna-fusion-input .gcard{height:185px}.dna-fusion-input .gc-name{font-size:13px}.dna-fusion-input .gc-stats{display:none}.dna-fusion-input>b{font-size:10px}.dna-fusion-stage{min-height:300px}.dna-fusion-output .gcard{height:260px}.dna-fusion-result p{font-size:13px}.dna-fusion .gc-meta{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.dna-fusion *,.gcard .gc-inner{animation:none!important;transition:none!important}.dna-fusion-court{display:none}}
+@media(max-width:600px){.reels{gap:6px}.reels .reel{min-width:0;flex:1 1 0}.reels .reel .txt{font-size:14px}}
 .dna-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:9px}
 .dna-choice{cursor:pointer;color:#f3f5ff;display:flex;justify-content:space-between;gap:9px;text-align:left;align-items:center;background:linear-gradient(135deg,#182338,#131820);border:1px solid #4b5871;border-radius:10px;padding:13px}
 .dna-choice:hover,.dna-choice:focus-visible{border-color:#edca72;background:linear-gradient(125deg,#4a3852,#1a233d)}
