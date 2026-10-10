@@ -20,7 +20,7 @@ HL.FX = (function () {
   // ---------- sound (WebAudio blips, no files) ----------
   let ctx=null,master=null;
   function volume(){
-    try{const raw=+localStorage.getItem('hl-volume');return Number.isFinite(raw)?Math.max(0,Math.min(1,raw)):.75;}
+    try{const stored=localStorage.getItem('hl-volume');if(stored==null)return .75;const raw=+stored;return Number.isFinite(raw)?Math.max(0,Math.min(1,raw)):.75;}
     catch{return .75;}
   }
   function setVolume(level){
