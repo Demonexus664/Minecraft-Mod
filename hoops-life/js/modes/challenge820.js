@@ -425,7 +425,7 @@ HL.Challenge = (function () {
       if (!won && l === 1) {
         const status=q('.ticker .status');if(status){status.textContent=`First loss · Game ${g+1} vs ${opp.name}`;status.classList.add('over');}
         FX.shake(q('.ticker'),0.8);
-        if(q('.ticker')){
+        if(st.mission==='perfect'&&q('.ticker')){
           const decision=document.createElement('div');decision.className='dna-first-loss';
           decision.innerHTML=`<b>The perfect season is over.</b><p>Continue chasing 73 wins, a championship and your team's legacy, or restart the challenge?</p><button class="btn go" data-keep>Continue the season</button> <button class="btn" data-restart>Restart</button>`;
           q('.ticker').appendChild(decision);
@@ -437,6 +437,17 @@ HL.Challenge = (function () {
         }
       }
       if (q('.ticker .sub')) q('.ticker .sub').textContent = `${(pf / (g + 1)).toFixed(1)} PPG · ${(pa / (g + 1)).toFixed(1)} allowed · ${streak > 1 ? `${streak}-game win streak` : streak === 1 ? 'won the last one' : 'lost the last one'}`;
+      const matchup=q('.ticker .broadcast-matchup');
+      if(matchup){
+        matchup.textContent='GAME '+(g+1)+' / '+games+' · '+(home?'HOME':'AWAY')+' vs '+
+          opp.name+' · '+(won?'W':'L')+' '+mine.score+'-'+theirs.score;
+        matchup.classList.toggle('win',won);matchup.classList.toggle('loss',!won);
+      }
+      const event=q('.ticker .broadcast-event');
+      if(event)event.textContent=marqueeIds.has(opp.id)?
+        ('MARQUEE · '+opp.name+' · '+(won?'STATEMENT WIN':'RIVAL TAKES THE GAME')):
+        (Math.abs(mine.score-theirs.score)<=3?'CLUTCH FINISH · '+Math.abs(mine.score-theirs.score)+' POINTS':
+          streak>=5?'ON FIRE · '+streak+' STRAIGHT WINS':'MISSION · '+(CHALLENGES[st.mission]?.title||'THE IMPOSSIBLE'));
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
       if(st!==run)return;
@@ -447,6 +458,7 @@ HL.Challenge = (function () {
       mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
+    if(st.result.mission.completed)FX.sfx.achievement?.();
     st.result.unlocked = achievements();
     saveBest();
     const [tier, line] = verdict(w, games);
@@ -667,7 +679,9 @@ HL.Challenge = (function () {
     const games = S ? Math.max(...S.teams.map(t => t[2] + t[3])) : 82;
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div><div class="ticker">
       <div class="caps">${yrLabel(st.playSeason)} season · live</div>
-      <div class="rec">0-0</div><div class="status">Perfect season alive</div>
+      <div class="rec">0-0</div><div class="status">${st.mission==='perfect'?'Perfect season alive':'MISSION · '+esc(CHALLENGES[st.mission]?.title||'The Impossible')}</div>
+      <div class="broadcast-matchup" aria-live="polite">TIP-OFF · SEASON START</div>
+      <div class="broadcast-event">THE SEASON BEGINS</div>
       <div class="dots" style="grid-template-columns:repeat(${Math.ceil(games / 2)},1fr)">${'<i></i>'.repeat(games)}</div>
       <div class="sub">Tip-off…</div></div></section>`;
   }
