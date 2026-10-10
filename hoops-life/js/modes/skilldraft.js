@@ -1201,7 +1201,8 @@ HL.SkillDraft = (function () {
   }
 
   function builtView() {
-    return `<section class="block"><div class="body stack"><h3>Your player is built</h3>
+    const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
+    return `${HL.DNA.powerMap(dna)}<section class="block"><div class="body stack"><h3>Your player is built</h3>
       <div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div>
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
       <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
