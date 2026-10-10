@@ -60,7 +60,7 @@ HL.FilmIQ=(function(){
        'No extreme box-score weakness stood out. Single-game variance and matchups still matter.',
        'Compare several games before changing the whole scheme.',1);
    flags.sort((a,b)=>b.weight-a.weight);
-   return {my,them,measures,flags:flags.slice(0,3),
+   return {my,them,measures,flags:flags.slice(0,6),
      scheme:{pace:plan.pace??null,focus:plan.focus??null,defense:plan.defense??null,crash:plan.crash??null}};
  }
  function seasonFilm(games,schemes={}){
