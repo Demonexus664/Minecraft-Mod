@@ -866,3 +866,20 @@ html:not([data-era]) .live-score-stage { background: radial-gradient(ellipse at 
 .player-post-created b { font:800 32px var(--display); }
 [data-era="60s"] .player-post-photo, [data-era="70s"] .player-post-photo { filter:grayscale(1); }
 @media(max-width:600px) { .player-post-card > header { flex-wrap:wrap; }.player-post-copy blockquote { font-size:23px; } }
+
+/* Public choices and private conversations share the same personal, rounded stage. */
+.media-composer label { display:block;margin:14px 0;color:var(--text-2);font-weight:600; }
+.media-composer select,.media-composer textarea,.media-composer input,.media-conversation textarea,[data-media-reply] { width:100%;min-width:0;box-sizing:border-box;border-radius:14px;margin-top:7px;padding:12px;border:1px solid var(--rule);background:var(--surface-2);color:var(--text);font:inherit; }
+.media-composer textarea { resize:vertical;line-height:1.5; }
+.media-compose-pair { display:grid;grid-template-columns:1fr 1fr;gap:16px; }
+.media-composer [hidden] { display:none; }
+.media-action-note,.media-full-source,.media-conversation { padding:14px;background:var(--surface);border:1px solid var(--rule);border-radius:16px;line-height:1.5; }
+.media-full-source summary,.media-conversation summary { cursor:pointer;font-weight:600; }
+.media-source-warning,.media-excerpt { border-left:3px solid #ffaf38;padding:10px 14px;border-radius:0 12px 12px 0;background:#c7861614;font-size:13px;line-height:1.5; }
+.media-fact-strip { display:flex;justify-content:space-between;gap:8px;padding:10px 0;font:700 14px var(--display); }
+.media-person-answer { margin-left:14px;padding-left:12px;border-left:2px solid var(--team,#ffaf38); }
+.player-post-private { border-color:#619dc7; }
+.media-empty { padding:36px;max-width:600px;border-radius:28px;background:radial-gradient(at top left,#a2692530,transparent 70%),var(--surface-2); }
+.media-empty > b { font:800 38px var(--display); }
+.player-post-copy blockquote,.player-post-comments p,.media-conversation p,.media-full-source p { overflow-wrap:anywhere; }
+@media(max-width:600px) { .media-compose-pair { grid-template-columns:1fr;gap:0; }.player-post-room > header { flex-wrap:wrap;gap:12px; }.media-empty { padding:22px; } }

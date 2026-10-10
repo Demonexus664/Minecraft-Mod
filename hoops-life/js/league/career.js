@@ -106,7 +106,7 @@ HL.Career = (function () {
     const mate=key==='teammate'&&L.players[params.pid];
     if(key==='teammate'&&(!mate||mate.id===p.id||mate.retired||mate.teamId!==p.teamId))return fail('Choose an active teammate.');
     const tones={humble:'I still have a lot to learn. I will keep working.',confident:'I will score at least 20 in our next game. Hold me to it.',deflect:'Tonight was about the team. I am keeping the next step private.'};
-    if(key==='presser'&&(!c.pendingPress||!tones[params.tone]))return fail('Answer an available postgame interview.');
+    if(key==='presser'&&(!c.pendingPress||(!tones[params.tone]&&params.tone!=='custom')||(params.text!=null&&(typeof params.text!=='string'||params.text.length>2000))||(params.tone==='custom'&&!params.text?.trim())))return fail('Answer an available postgame interview with your words or a valid tone.');
     refresh(L);if(key!=='presser')c.decisions--;
     let response,publicEvent=false;
     if(key==='train'){c.energy-=15;gain(L,params.focus,.35);response=`You put in a focused ${HL.ATTRS.find(a=>a.key===params.focus).label} session. Progress is earned over repeated practice.`;}
@@ -128,8 +128,8 @@ HL.Career = (function () {
       else{const fee=Math.round(5000*HL.salaryScale(L.season)*(c.fame/10));c.cash+=fee;c.earnings+=fee;c.endorsementSeason=L.season;response=`Your agent secures a fictional local endorsement for $${fee}.`;publicEvent=true;quote(L,`${p.name} earns an endorsement`,`${p.name} agrees to a local endorsement for $${fee}. The offer reflects his current fame and reputation.`,'I want to represent the partnership well.','life.shoe_deal');}
     }
     if(key==='presser'){
-      const scene=c.pendingPress;c.pendingPress=null;response=tones[params.tone];publicEvent=true;
-      if(params.tone==='confident')c.watches.push({kind:'prediction',target:20,season:L.season,resolved:false});else if(params.tone==='humble')c.reputation=clamp(c.reputation+2);
+      const scene=c.pendingPress;c.pendingPress=null;response=params.text?.trim()?params.text:HL.PublicVoices?.presser(L,p,params.tone,scene)||tones[params.tone];publicEvent=true;
+      if(params.tone==='confident'&&!params.text?.trim())c.watches.push({kind:'prediction',target:20,season:L.season,resolved:false});else if(params.tone==='humble')c.reputation=clamp(c.reputation+2);
       quote(L,`${p.name} addresses the next step`,`${p.name} after ${scene.pts} points in ${scene.min.toFixed(1)} minutes: “${response}”`,response,'career.presser');
       HL.Interviews && HL.Interviews.record(L,p.id,params.tone,response,{gid:scene.gid,pts:scene.pts,min:scene.min});
     }

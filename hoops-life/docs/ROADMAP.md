@@ -117,3 +117,18 @@ The scenario ledger remains 27 implemented and 4 partial; these foundations do n
 - New checks: `node --test tools/test-interviews.js`, `node tools/test-interviews-browser.cjs`, `node tools/test-portraits-browser.cjs`. Provenance and exact scope live in IMAGE_SOURCES.md and portrait-sources.json.
 
 The scenario ledger remains unchanged; these foundations do not complete all 1,140 proposals. Keep developing richer relationships/life events, realistic player posts and interview branches, accepted trade-request chains, staff/pick rights, and postseason Live Game. Current modes are playable, but the broader game is still unfinished.
+
+## Player voices checkpoint and required overhaul
+Actual-game posts, named-fixture follow-ups, saved public replies and original speaker/team/number snapshots are integrated. Verified with 100 domain checks, 34 event assertions and Career/Franchise/save/mobile browser runs. Thirteen star portraits were upgraded to original 1040×760 NBA bust cutouts; all 600 added portraits passed source-hash and browser-decoding checks.
+
+The user rejected the limited four-topic composer, repetitive quotes and generic reactions. These are not the desired finished media system. The next milestone removes artificial posting/reply cooldowns, adds custom words and targets, public/private sources, selective clips and context, and makes responses depend on the relationship and actual save events.
+
+## Media freedom repair after user quality feedback
+
+The previous four-topic design was rejected. PlayerPosts now accepts exact authored words, named targets, outlet choices, private messages, recruitment/callouts/apologies/role and trade demands, scheduled point/win pledges, exact recorded-source excerpts, intentional fabricated attributions and full-context publishing. Valid posts and continued replies have no artificial cooldown; bounded daily numerical consequences prevent reward farming. A callout followed by recruiting the same player produces a response acknowledging that history. Private messages do not go into public news; deliberately exposing them damages trust. Fabricated attributions are labeled unsourced and corrected through the actual-game hook. Actual pledges retain fixture ownership, DNPs, cancellation and saved outcomes.
+
+The composer includes own words, named-person search, grouped intent/outlet/source selection and highlighted exact excerpts. Source/team/name/number snapshots and photo cards remain. Franchise and Career interviews accept authored complete answers. Scene-aware default answers vary; generic friendly continuations no longer turn automatically argumentative. Reply discussions update one story rather than copying all reactions into repeated feed entries.
+
+Independent review reproduced six defects (including two regraded Important for believable people/source fidelity): custom loyalty answers framed as leaving, untracked Franchise confident numerical pledges, interview RNG consumption, friendly dialogue becoming arguments, Career self-dialogue and changing source identity after rename. Each received a failing reproduction and fix. Final proof: 121 domain tests, 34 event assertions, free-composer/source/private/reply/save/mobile/actual-Career-pledge and updated interview browser flows.
+
+This is an extensible authored system with explicit intents, not unrestricted natural-language understanding or a finished full game. Staff/league investigations, accepted Career trade requests, deeper life paths and the wider sandbox still require implementation. BUILD_VS_REQUEST.md records those mismatches. The latest jersey-fit complaint is under investigation separately: garment collars differ substantially across templates, so person-only offsets cannot solve all combinations.

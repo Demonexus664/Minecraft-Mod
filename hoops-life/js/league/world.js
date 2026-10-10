@@ -15,7 +15,7 @@ HL.World = (function () {
   function club(L, tid) { const w = world(L); return w.teams[tid] || (w.teams[tid] = { fans: 50, owner: 50, memories: [] }); }
   function memory(L, target, kind, text, delta = {}) {
     for (const k of ['like', 'respect', 'trust', 'fans', 'owner']) if (delta[k]) target[k] = clamp(target[k] + delta[k]);
-    const entry = { season: L.season, day: L.day, kind, text, delta };
+    const entry = { season: L.season, day: L.day, kind, text, delta, public: delta.private !== true };
     target.memories.push(entry); target.memories = target.memories.slice(-24);
     const w = world(L); w.timeline.push(entry); w.timeline = w.timeline.slice(-300);
   }
@@ -129,6 +129,6 @@ HL.World = (function () {
     L.world.watches = L.world.watches.filter(w => !w.resolved || L.season <= w.season + 1).slice(-200);
   }
   function onInterview(L,p,text,delta) { memory(L,club(L,p.teamId??L.userTeamId),'interview_context',text,{fans:delta.fans||0});memory(L,person(L,p.id),'interview_context',text,{trust:delta.trust||0}); }
-  function onPublicPost(L,p,text,delta,tid=p.teamId) { memory(L,club(L,tid),'player_post',text,{fans:delta.fans||0});memory(L,person(L,p.id),'player_post',text,{trust:delta.trust||0}); }
+  function onPublicPost(L,p,text,delta,tid=p.teamId) { if(!delta.private)memory(L,club(L,tid),'player_post',text,{fans:delta.fans||0});memory(L,person(L,p.id),'player_post',text,{trust:delta.trust||0,private:delta.private===true}); }
   return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame, onInterview, onPublicPost };
 })();

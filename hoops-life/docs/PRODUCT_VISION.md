@@ -108,3 +108,9 @@ Real headshots must stay visible. Replace drawn player bodies/uniform overlays w
 ## Ongoing steering: immersive what-ifs and media context
 
 The user reaffirmed broad freedom, a world that remembers changes, realistic player posting and greater alternate-history depth in Franchise and Career. Prioritize organized actions with actual consequences and consistent timeline ownership. Add full interview statements, misleading excerpts and visible original context, then responses/corrections and delayed public judgments. Real photos may support fictional in-save scenes; generated quotes/posts must not masquerade as statements made by the real person outside the game. Modern screens should feel less square/flat: rounded personal choices combined with layered sports stages and satisfying reveals, retaining era adaptation.
+
+## Quality correction: freedom, voices and portrait fitting
+
+The user rejected four media presets, posting/reply cooldowns, repeated stock quotes and generic consequences. These conflict with the intended product, even if their tests passed. Compare actual behavior with BUILD_VS_REQUEST.md and continue correcting the gaps. Valid communication choices should remain available; prevent numerical farming through bounded consequences rather than suppressing conversations. Original words, named relationships, source evidence, actual games and past actions should drive responses.
+
+The user also rejected a player-only jersey fit reused for every photo/team. Correct fitting must account for the exact source photograph and the selected garment, whose collar geometry differs. Inspect diverse bodies, poses, teams and scales before describing the result as fixed; do not imply all artwork is correct after checking a single person.
