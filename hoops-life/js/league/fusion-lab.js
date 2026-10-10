@@ -55,11 +55,10 @@ HL.FusionLab=(function(){
  const pairKey=(a,b)=>[a.id,b.id].sort().join('|');
  function preview(a,b){
   if(!a||!b)return null;
-  const base=rating(a,b),repeats=tries[pairKey(a,b)]||0;
-  // Repeated research brings a small bounded stabilization benefit. No pairing
-  // becomes guaranteed and paradoxical specimens remain difficult.
-  const chance=Math.round(clamp(base.chance+Math.min(12,repeats*1.4),.5,93)*10)/10;
-  return {...base,chance,display:chance.toFixed(1)+'%',repeats,rare:chance<=8};
+  // Odds are fixed by the two actual basketball profiles. Failed rolls never
+  // improve the probability of a later experiment.
+  const chance=Math.round(clamp(base.chance,.5,89)*10)/10;
+  return {...base,chance,display:chance.toFixed(1)+'%',rare:chance<=8};
  }
  // Basketball genetics: strengths require actual complementary tools. A success
  // never simply takes BOTH parents' best number in every category.
@@ -97,10 +96,15 @@ HL.FusionLab=(function(){
    Object.assign(out,{rimIntimidation:1.5,rotations:1.4,laneDisruption:1.3});
   return out;
  }
- function attempt(a,b,{roll=Math.random,frame='blend'}={}){
-  if(!a||!b)throw Error('Select both fusion sources');
+ function attempt(a,b,{roll=Math.random,frame='blend',spent=null}={}){
+  if(!a||!b||!a.id||!b.id||a.id===b.id)throw Error('Choose two different drafted players or creations');
+  const key=pairKey(a,b);
+  if(spent){
+    if(spent[key])throw Error('ONE ATTEMPT per pair: this pairing has already been tried in this run.');
+    spent[key]=true; // The roll is permanently consumed before success/failure is evaluated.
+  }
   const p=preview(a,b),r=clamp(Number(roll()),0,.9999999),ok=r<p.chance/100;
-  tries[pairKey(a,b)]=(tries[pairKey(a,b)]||0)+1;
+  tries[key]=(tries[key]||0)+1;
   const res={ok,chance:p.chance,roll:r,family:p.family,sourceA:a.name,sourceB:b.name,
    outcome:ok?(p.rare?'miracle':'stabilized'):r>.9?'unstable-echo':'fracture'};
   if(!ok){
@@ -148,6 +152,20 @@ HL.FusionLab=(function(){
    year:picked.year,ovr:HL.historicalSeasonOvr(picked.row),tags:tags({pid,attrs}),photo,
    depth:0,ancestry:[pid],tier:'archive'};
  }
+
+ function fromDraftCard(card){
+  const pid=card?.row?.pid,bio=HL.HISTORY?.players?.[pid];
+  if(!pid||!bio)throw Error('No eligible historical draft card');
+  const year=+card.season||0,attrs=HL.historicalAttributes(card.row);
+  let photo='';
+  try{photo=HL.UI?.photo({name:bio[0],real:true,nbaId:bio[1]},null,year)?.src||'';}catch{}
+  return {
+    id:'draft:'+pid+':'+year+':'+String(card.club||''),pid,name:bio[0],nbaId:bio[1],photo,
+    attrs,height:bio[3]||78,weight:bio[4]||200,pos:card.row.pos||'SF',
+    year,ovr:HL.historicalSeasonOvr(card.row),tags:tags({pid,attrs}),depth:0,
+    ancestry:[pid],tier:'archive'
+  };
+ }
  function project(build,node){
   if(!node)return build;
   const attrs={...build.attrs};
@@ -180,6 +198,6 @@ HL.FusionLab=(function(){
  const reset=()=>{creations=[];history=[];tries={};serial=0;save();};
  const status=()=>({creations:creations.length,experiments:history.length,persisted:typeof localStorage!=='undefined'});
 
- return {tags,overall,rating,preview,attempt,historical,project,search,find,reset,
+ return {tags,overall,rating,preview,attempt,historical,fromDraftCard,project,search,find,reset,
   creations:()=>creations,history:()=>history,status,save,restore};
 })();
