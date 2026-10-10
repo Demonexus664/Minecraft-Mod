@@ -1,0 +1,44 @@
+name: Hoops Life game regression checks
+
+on:
+  push:
+    branches: [hoops-overhaul-2026-10]
+    paths:
+      - 'hoops-life/**'
+      - '.github/workflows/hoops-life-overhaul.yml'
+  pull_request:
+    paths:
+      - 'hoops-life/**'
+      - '.github/workflows/hoops-life-overhaul.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  gameplay:
+    name: Simulation and UI integration tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hoops-life
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JS syntax
+        run: |
+          node --check js/modes/challenge820.js
+          node --check js/modes/skilldraft.js
+          node --check js/core/fx.js
+      - name: Test draft modes, generated leagues, longevity, gameplay and presentation
+        run: |
+          node --test \
+            tools/test-overhaul-batch1.js \
+            tools/test-overhaul-batch2.js \
+            tools/test-skilldraft-freechoice.js \
+            tools/test-skilldraft-future.js \
+            tools/test-dna-longevity.js \
+            tools/test-rare-and-overhaul.js
