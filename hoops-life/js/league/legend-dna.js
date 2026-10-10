@@ -437,7 +437,7 @@ HL.DNA = (function () {
 
   // Live combination visualization: show exactly which borrowed ingredients
   // connected, which powers activate, and what a possession can actually do.
-  function powerMap(dna){
+  function powerMap(dna,{compact=false}={}){
     if(!dna)return '';
     const active=[...(dna.mutations||[]),...(dna.trios||[]),...(dna.pairs||[]),...(dna.signatures||[])];
     const sorted=active.slice().sort((a,b)=>{
