@@ -11,7 +11,9 @@ Every real player-season gets:
     later seasons.
   - 21 attributes from the matching stats, as z-scores within that season (so eras compare
     fairly), then shifted together so the computed OVR (same formula as js/league/ratings.js)
-    matches the target.
+    matches the target in the first-stage build; recalibrate-history.py then
+    adjusts individual skills from available production and applies independent
+    OVR computation without blindly inflating unrelated attributes.
   - Tendencies from the real shot diet and usage.
 Season "YYYY" in the source = the season ending in YYYY. Hoops Life labels seasons by the
 starting year, so source 2026 -> season 2025 (2025-26).
@@ -478,3 +480,6 @@ with open(os.path.join(OUT, 'index.js'), 'w') as f:
     }, separators=(',', ':')) + ';\n')
 total = sum(os.path.getsize(os.path.join(OUT, 'seasons', p)) for p in os.listdir(os.path.join(OUT, 'seasons')))
 print(f'{len(season_list)} seasons, {len(index_players)} players, seasons dir {total/1e6:.1f} MB, index {os.path.getsize(os.path.join(OUT, "index.js"))/1e6:.2f} MB')
+# Explicit second pass. This also runs against already generated data without source CSVs.
+import subprocess
+subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), 'recalibrate-history.py')], check=True)

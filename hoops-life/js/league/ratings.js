@@ -24,9 +24,100 @@ HL.ATTRS = [
   ['str', 'Strength', 'Athleticism'],
   ['stam', 'Stamina', 'Athleticism'],
   ['dur', 'Durability', 'Athleticism'],
+  // Estimated basketball traits, not official measured tracking values.
+  ['accel', 'Acceleration', 'Athleticism'],
+  ['lateral', 'Lateral Quickness', 'Defense'],
+  ['releaseSpeed', 'Release Speed (est.)', 'Shooting Mechanics'],
+  ['releaseHeight', 'Release Height (est.)', 'Shooting Mechanics'],
+  ['shotArc', 'Shot Arc & Touch (est.)', 'Shooting Mechanics'],
+  ['contested', 'Contested Shot', 'Scoring'],
+  ['screen', 'Screen Setting', 'Finishing'],
+  ['hustle', 'Hustle', 'Athleticism'],
+  ['burst', 'Explosiveness', 'Athleticism'],
+  ['agility', 'Change of Direction', 'Athleticism'],
+  ['contactFinish', 'Contact Finishing', 'Finishing'],
+  ['floater', 'Floater & Touch', 'Finishing'],
+  ['fade', 'Post & Turnaround Fade', 'Scoring'],
+  ['footwork', 'Footwork', 'Finishing'],
+  ['shotCreation', 'Shot Creation', 'Scoring'],
+  ['vision', 'Passing Vision', 'Playmaking'],
+  ['passingAccuracy', 'Pass Accuracy', 'Playmaking'],
+  ['helpD', 'Help Defense', 'Defense'],
+  ['contestD', 'Shot Contest', 'Defense'],
+  ['boxout', 'Box Out', 'Rebounding'],
+  ['transition', 'Transition Threat', 'Athleticism'],
+  ['clutchShot', 'Late-game Shotmaking', 'Scoring'],
+  ['shotSelection', 'Shot Decision-Making (est.)', 'Scoring'],
 ].map(([key, label, group]) => ({ key, label, group }));
 
 HL.ATTR_KEYS = HL.ATTRS.map(a => a.key);
+HL.CORE_ATTR_KEYS = HL.ATTR_KEYS.filter(k => !['accel','lateral','releaseSpeed','releaseHeight','shotArc','contested','screen','hustle','burst','agility','contactFinish','floater','fade','footwork','shotCreation','vision','passingAccuracy','helpD','contestD','boxout','transition','clutchShot','shotSelection'].includes(k));
+HL.ADV_ATTR_KEYS = HL.ATTR_KEYS.filter(k => !HL.CORE_ATTR_KEYS.includes(k));
+
+// The historical box-score database contains the core 21 skills. No release-time or
+// jump-height tracking exists for many old seasons. These additional values are scouting
+// estimates derived independently from relevant traits and player dimensions.
+// Keep them separate from accuracy and mark them as modeled in every detail screen.
+HL.completeAttributes = function (a, height = 78, weight = 210) {
+  const h=Number.isFinite(height)?height:78, w=Number.isFinite(weight)?weight:210;
+  const val = (key, fallback=65) => Number.isFinite(a[key]) ? a[key] : fallback;
+  const clip = x => Math.round(HL.clamp(x,25,99));
+  const result={...a};
+  const derived={
+    accel: clip(val('speed')*.69+val('handle')*.19+val('vert')*.12),
+    lateral: clip(val('perD')*.44+val('speed')*.34+val('steal')*.22),
+    releaseSpeed: clip(val('three')*.33+val('mid')*.25+val('handle')*.22+val('iq')*.20),
+    // A release score describes elevation relative to frame and skill, not raw height alone.
+    // The matchup system already handles the player's absolute physical reach.
+    releaseHeight: clip(50+(h-70)*1.35+(val('vert')-65)*.18+
+      (Math.max(val('mid'),val('three'))-65)*.25+(val('iq')-65)*.04),
+    shotArc: clip(val('ft')*.36+val('mid')*.30+val('three')*.20+val('iq')*.14),
+    contested: clip(val('mid')*.28+val('close')*.18+val('handle')*.20+val('iq')*.20+val('str')*.14),
+    screen: clip(val('str')*.58+val('iq')*.22+val('post')*.2+(w-215)*.05),
+    hustle: clip(val('stam')*.38+val('dur')*.16+val('oreb')*.18+val('perD')*.14+val('iq')*.14),
+    burst: clip(Math.max(val('vert')*.62+val('speed')*.38, val('dunk')*.42+val('vert')*.35+val('speed')*.23)),
+    agility: clip(val('speed')*.39+val('handle')*.31+val('perD')*.20+val('vert')*.10),
+    contactFinish: clip(val('layup')*.26+val('dunk')*.25+val('str')*.33+val('close')*.16),
+    floater: clip(val('layup')*.40+val('mid')*.24+val('iq')*.21+val('ft')*.15),
+    fade: clip(val('post')*.36+val('mid')*.35+val('close')*.14+val('iq')*.15),
+    footwork: clip(val('post')*.34+val('handle')*.27+val('iq')*.24+val('layup')*.15),
+    shotCreation: clip(val('handle')*.39+val('mid')*.32+val('iq')*.15+val('layup')*.14),
+    vision: clip(val('pass')*.65+val('iq')*.35),
+    passingAccuracy: clip(val('pass')*.64+val('handle')*.15+val('iq')*.21),
+    helpD: clip(val('intD')*.30+val('perD')*.25+val('block')*.22+val('iq')*.23),
+    contestD: clip(val('perD')*.30+val('intD')*.30+val('block')*.22+val('vert')*.18),
+    boxout: clip(val('dreb')*.33+val('oreb')*.17+val('str')*.33+val('iq')*.17),
+    transition: clip(val('speed')*.30+val('vert')*.20+val('layup')*.25+val('handle')*.25),
+    clutchShot: clip(val('mid')*.28+val('three')*.20+val('close')*.18+val('iq')*.23+val('ft')*.11),
+    // Decision-making is a skill. Shot-diet percentages are NOT ratings of shot quality.
+    shotSelection: clip(val('iq')*.42 + val('shotCreation',
+      val('handle')*.42+val('mid')*.32+val('iq')*.13+val('layup')*.13)*.22 +
+      val('layup')*.13+val('pass')*.10+
+      Math.max(val('mid'),val('three'),val('close'))*.13)
+  };
+  for(const k of HL.ADV_ATTR_KEYS) if(!Number.isFinite(result[k]))result[k]=derived[k];
+  return result;
+};
+// Use the exact same historical attribute projection for Skill Draft, 82-0,
+// exhibition games and Franchise. Never invent packed data fields.
+const historicalAttributeCache = new WeakMap();
+HL.historicalAttributes = function(row) {
+  if (historicalAttributeCache.has(row)) return historicalAttributeCache.get(row);
+  const bio=HL.HISTORY.players[row.pid]||[];
+  const base=HL.History.unpack(row.attrs,HL.HISTORY.attrs);
+  const result=HL.completeAttributes(base,bio[3],bio[4]);
+  // FG% is an imperfect cross-era proxy (especially for bigs); use only a
+  // small, bounded contextual correction. IQ and shot creation drive the skill.
+  if (Number.isFinite(row.fg) && row.g>=15) {
+    const reliability=HL.clamp(row.g/45,0,1);
+    const baseline=(bio[3]||78)>=82 ? .51 : .455;
+    result.shotSelection=Math.round(HL.clamp(result.shotSelection+
+      HL.clamp((row.fg-baseline)*43,-6,6)*reliability,25,99));
+  }
+  historicalAttributeCache.set(row,result);
+  return result;
+};
+
 
 // Relative strengths per archetype (added to a base around the target OVR).
 HL.ARCHETYPES = {
@@ -55,13 +146,26 @@ HL.OVR_WEIGHTS = {
   C:  { close: 4, mid: 1.5, three: 1.5, ft: 0.8, layup: 2, dunk: 3, post: 2.5, handle: 0.5, pass: 1.5, iq: 3, perD: 1, intD: 4, steal: 0.5, block: 3.5, oreb: 3, dreb: 4, speed: 1, vert: 2, str: 3, stam: 1 },
 };
 
+// Each position gets a small supporting weight for specialist movement and
+// shot creation. Core ratings retain most of the OVR influence.
+for (const [pos,w] of Object.entries(HL.OVR_WEIGHTS)) {
+  Object.assign(w, {
+    accel: ['PG','SG'].includes(pos) ? 1.0 : .5,
+    lateral: ['PG','SG','SF'].includes(pos) ? .8 : .5,
+    releaseSpeed: ['PG','SG','SF'].includes(pos) ? .7 : .35,
+    releaseHeight: ['PF','C'].includes(pos) ? .55 : .4,
+    shotArc: .35, shotSelection: .65, contested: .7, screen: ['PF','C'].includes(pos) ? .7 : .25,
+    hustle: .45, burst: .75, agility: .35, contactFinish: .4, floater: .2, fade: .2, footwork: .3, shotCreation: .5, vision: .35, passingAccuracy: .3, helpD: .4, contestD: .4, boxout: .25, transition: .35, clutchShot: .15
+  });
+}
+
 // OVR = weighted average blended with top-attribute peaks, so specialists still rate well.
 HL.computeOvr = function (a, pos) {
   const w = HL.OVR_WEIGHTS[pos] || HL.OVR_WEIGHTS.SF;
   let sum = 0, wsum = 0;
-  for (const k in w) { sum += a[k] * w[k]; wsum += w[k]; }
+  for (const k in w) { sum += (Number.isFinite(a[k]) ? a[k] : 65) * w[k]; wsum += w[k]; }
   const avg = sum / wsum;
-  const top = HL.ATTR_KEYS.filter(k => k !== 'dur' && k !== 'stam').map(k => a[k]).sort((x, y) => y - x).slice(0, 6);
+  const top = HL.CORE_ATTR_KEYS.filter(k => k !== 'dur' && k !== 'stam').map(k => Number.isFinite(a[k]) ? a[k] : 65).sort((x, y) => y - x).slice(0, 6);
   const topAvg = top.reduce((s, v) => s + v, 0) / top.length;
   // Strengths drive OVR (like 2K), so stars keep real weaknesses.
   const raw = avg * 0.45 + topAvg * 0.55;
@@ -88,7 +192,7 @@ HL.buildAttributes = function (targetOvr, pos, heightIn, arch, opts = {}) {
   const amp = 1 + Math.max(0, targetOvr - 72) * 0.045;
   const hm = heightMods(heightIn);
   const raw = {};
-  for (const k of HL.ATTR_KEYS) {
+  for (const k of HL.CORE_ATTR_KEYS) {
     raw[k] = 60 + (prof[k] || 0) * 1.25 * amp + (hm[k] || 0) + R.normal(0, opts.noise ?? 4.5);
   }
   raw.stam = 70 + R.normal(0, 6);
@@ -98,7 +202,7 @@ HL.buildAttributes = function (targetOvr, pos, heightIn, arch, opts = {}) {
   let attrs = {};
   // Iteratively shift until computed OVR matches target.
   for (let i = 0; i < 12; i++) {
-    for (const k of HL.ATTR_KEYS) {
+    for (const k of HL.CORE_ATTR_KEYS) {
       const k2 = k === 'dur' ? 0 : k === 'stam' ? 0.4 : 1;
       attrs[k] = Math.round(HL.clamp(raw[k] + shift * k2, 25, 99));
     }
@@ -106,7 +210,7 @@ HL.buildAttributes = function (targetOvr, pos, heightIn, arch, opts = {}) {
     if (diff === 0) break;
     shift += diff * 0.9;
   }
-  return attrs;
+  return HL.completeAttributes(attrs, heightIn, Math.round(185 + (heightIn - 76) * 7));
 };
 
 // Age curve: growth until ~26, plateau, decline after ~30.
@@ -126,18 +230,20 @@ HL.progressionDelta = function (age, potentialGap, workEthic, difficultyMult = 1
   if (base > 0) base *= HL.clamp(potentialGap / 10, 0.2, 1.6) * difficultyMult;
   // Work ethic helps young players grow and slows the decline of veterans.
   base += (workEthic - 50) / (base < 0 ? 60 : 40);
-  // Variance: breakouts, busts and sudden drops.
-  return HL.clamp(base + R.normal(0, age >= 30 ? 0.8 : 1.5), age >= 30 ? -3.2 : -2.5, age >= 30 ? 1.5 : 4.5);
+  // A rare breakout is possible, but routine offseasons shouldn't randomly erase stars.
+  // Physical decline can remain steeper than skill decline in applyProgression.
+  const noise = R.normal(0, age >= 30 ? 0.8 : 1.5);
+  return HL.clamp(base + noise, age >= 30 ? -3.2 : -2.5, age >= 30 ? 1.5 : 4.5);
 };
 
 HL.applyProgression = function (p, delta) {
-  const physical = new Set(['speed', 'vert', 'stam']);
+  const physical = new Set(['speed', 'vert', 'accel', 'lateral', 'stam']);
   for (const k of HL.ATTR_KEYS) {
     if (k === 'dur') continue;
     let d = delta + HL.RNG.normal(0, 0.65);
-    // Athleticism fades faster with age; skills hold up.
+    // Old players lose burst first; shooting touch, technique and court vision endure.
     if (delta < 0 && physical.has(k)) d *= 1.45;
-    if (delta < 0 && ['three','mid','ft','iq','pass','post','handle'].includes(k)) d *= 0.25;
+    if (delta < 0 && ['three','mid','ft','iq','pass','post','handle','releaseSpeed','shotArc'].includes(k)) d *= 0.25;
     if (delta > 0 && k === 'iq') d += 0.5;
     const cap = (p.caps && p.caps[k]) || 99;
     p.attrs[k] = Math.round(HL.clamp(p.attrs[k] + d, 25, cap));

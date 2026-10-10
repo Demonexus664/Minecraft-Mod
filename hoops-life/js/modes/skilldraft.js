@@ -5,24 +5,33 @@ window.HL = window.HL || {};
 HL.SkillDraft = (function () {
   const U = HL.UI, esc = U.esc, R = HL.RNG, FX = HL.FX;
   const C = () => HL.Challenge;
-  // Separate explosive guard traits from raw strength. All categories transfer actual ratings.
+  // Every rolled card represents one independently useful basketball tool.
+  // All 29 player ratings have an owning category, so the final build cannot
+  // silently drop a trait or average away a star's strength.
   const CATS = [
-    ['inside','Inside & finishing',['close','layup','dunk','post']],
-    ['mid','Mid-range shooting',['mid']],
-    ['three','Three-point shooting',['three']],
+    ['inside','Inside & contact',['close','layup','dunk','post','contactFinish','floater','footwork']],
+    ['mid','Mid-range & fade',['mid','fade']],
+    ['three','Three-point accuracy',['three']],
     ['ft','Free throws',['ft']],
-    ['pass','Playmaking',['pass']],
-    ['handle','Ball handling',['handle']],
-    ['perD','Perimeter defense',['perD']],
-    ['intD','Interior & block',['intD','block']],
-    ['steal','Steals',['steal']],
-    ['reb','Rebounding',['oreb','dreb']],
-    ['speed','Speed',['speed']],
-    ['vert','Vertical leap',['vert']],
-    ['strength','Strength',['str']],
+    ['pass','Passing & vision',['pass','vision','passingAccuracy']],
+    ['handle','Handle & creation',['handle','shotCreation']],
+    ['perD','Perimeter defense',['perD','lateral','agility']],
+    ['intD','Interior & help defense',['intD','block','helpD','contestD']],
+    ['steal','Steal skill',['steal']],
+    ['reb','Rebounding & boxout',['oreb','dreb','boxout']],
+    ['speed','Speed & acceleration',['speed','accel','transition']],
+    ['vert','Vertical & explosiveness',['vert','burst']],
+    ['strength','Strength & screens',['str','screen']],
+    ['jumper','Jump shot mechanics',['releaseSpeed','releaseHeight','shotArc']],
+    ['contested','Tough & clutch shots',['contested','clutchShot']],
     ['iq','Basketball IQ',['iq']],
-    ['motor','Stamina & longevity',['dur','stam']],
+    ['motor','Stamina & hustle',['dur','stam','hustle']],
     ['body','Body (height & frame)',[]],
+    ['tendScorer','Scorer mentality',['usage','shotHunt','iso','pullUp','lateGame']],
+    ['tendShot','Shot decisions & preferences',['three','mid','drive','post','catchShoot','transition','attackMismatch']],
+    ['tendTeam','Team & defense habits',['passFirst','moveBall','riskyPass','crash','crashGlass','gamble','contest','foulAggr','drawFoul','foulDiscipline','effort']],
+    ['longevity','Longevity',[]],
+    ['primeLength','Prime duration',[]],
   ];
   const catOf = id => CATS.find(c => c[0] === id);
   const avgOf = (attrs, keys) => keys.length ? Math.round(keys.reduce((s, k) => s + attrs[k], 0) / keys.length) : 0;
@@ -36,8 +45,8 @@ HL.SkillDraft = (function () {
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
-  const SHORT = { inside: 'INSIDE', mid: 'MID', three: '3PT', ft: 'FT', pass: 'PASS', handle: 'HANDLE', perD: 'PER D', intD: 'RIM D', reb: 'REB',steal: 'STEAL',speed:'SPEED',vert:'VERT',strength:'POWER', iq: 'IQ', motor: 'MOTOR', body: 'BODY' };
-  // BODY measures frame independently from skill or overall.
+  const SHORT={inside:'INSIDE',mid:'MID',three:'3PT',ft:'FT',pass:'VISION',handle:'HANDLE',perD:'PER D',intD:'RIM D',steal:'STEAL',reb:'BOARDS',speed:'SPEED',vert:'VERT',strength:'POWER',jumper:'RELEASE',contested:'TOUGH',iq:'IQ',motor:'MOTOR',body:'FRAME',tendScorer:'USAGE',tendShot:'SHOT IQ',tendTeam:'HABITS',longevity:'LONGEVITY',primeLength:'PRIME'};
+  // The BODY category is a physical frame measure, never a disguised OVR.
   const skillValue = (c, cat) => C().skillValue(c, cat);
 
   // Spin the three reels (team, decade, skill), deal a hand of five from that club and decade, flip it.
@@ -48,7 +57,8 @@ HL.SkillDraft = (function () {
     await C().loadDecade(st.decade);
     const fr = C().franchisesIn(st.decade);
     if (what === 'all' || what === 'team' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
-    // Use the same best-five team/decade hand as 82-0.
+    // The five highest skill scores in the drawn team/era, ordered best-first.
+    // Never substitute high overall players or draw random reserves.
     st.hand = C().dealSkillHand(st.team, st.decade, catOf(st.cat));
     render();
     const host = document.querySelector('#reels');
@@ -78,25 +88,37 @@ HL.SkillDraft = (function () {
     if (!remaining().length) setTimeout(() => { const prime = buildPrime(); const ovr = HL.computeOvr(prime.attrs, prime.pos); FX.banner(`${ovr} OVR`, `Your ${prime.pos} is built: ${HL.fmtHeight(prime.height)}, ${prime.weight} lb.`, { tier: ovr >= 95 ? 4 : ovr >= 90 ? 3 : ovr >= 82 ? 2 : 1, kicker: 'Ceiling', ms: 2200 }); }, 350);
   }
 
-  function rowAttrs(row) { return HL.History.unpack(row.attrs, HL.HISTORY.attrs); }
+  function rowAttrs(row) { return HL.historicalAttributes(row); }
 
   // ---------- build the player from the picks ----------
   function buildPrime() {
     const attrs = {};
     for (const [id, , keys] of CATS) {
       const pk = st.picks[id];
-      if (!pk || !keys.length) continue;
+      if (!pk || !keys.length || id.startsWith('tend')) continue;
       const a = rowAttrs(pk.row);
       for (const k of keys) attrs[k] = a[k];
     }
+    // Shot-decision skill follows the shot-preference player, but preference
+    // percentages are kept separately so 25% three-point frequency is not 25 OVR.
+    if (st.picks.tendShot) attrs.shotSelection=rowAttrs(st.picks.tendShot.row).shotSelection;
+    const tendencies={};
+    for(const [id,,keys] of CATS) if(id.startsWith('tend') && st.picks[id]) {
+      const t=HL.historicalTendencies(st.picks[id].row);
+      for(const key of keys) tendencies[key]=t[key];
+    }
+    // Historical cards contribute abilities, never partial or undefined attributes.
+    for(const k of HL.ATTR_KEYS) if(!Number.isFinite(attrs[k])) attrs[k]=65;
+    const longevity=HL.careerTraitFor(st.picks.longevity.row.pid).longevity;
+    const primeLength=HL.careerTraitFor(st.picks.primeLength.row.pid).primeLength;
     const body = st.picks.body;
     const bio = HL.HISTORY.players[body.row.pid];
     const height = bio[3], weight = bio[4];
-    // Position: whichever spot this body could play where the skill set rates best.
+    // Auto estimates the best position, but the player can explicitly choose all five spots.
     const fits = { PG: [0, 77], SG: [74, 79], SF: [77, 81], PF: [79, 83], C: [80, 99] };
     const open = Object.keys(fits).filter(k => height >= fits[k][0] && height <= fits[k][1]);
-    const pos = st.pos && st.pos!=='auto' ? st.pos : (open.length ? open : [height < 74 ? 'PG' : 'C']).sort((a,b)=>HL.computeOvr(attrs,b)-HL.computeOvr(attrs,a))[0];
-    return { attrs, height, weight, pos };
+    const pos = st.pos && st.pos !== 'auto' ? st.pos : (open.length ? open : [height < 74 ? 'PG' : 'C']).sort((a,b)=>HL.computeOvr(attrs,b)-HL.computeOvr(attrs,a))[0];
+    return { attrs, height, weight, pos, tendencies, longevity, primeLength };
   }
 
   // ---------- career engine ----------
@@ -140,28 +162,36 @@ HL.SkillDraft = (function () {
   const realWp = t => t.real.w / Math.max(1, t.real.w + t.real.l);
   const byRecord = L => L.teams.slice().sort((a, b) => realWp(a) - realWp(b));
 
-  // Ratings by age: physical tools arrive early, skills grow until ~26, decline after 29.
-  // Work ethic ("reach") decides how close he gets to the prime he was built for.
-  // The acquired attributes are reachable at prime. Work ethic controls speed to prime, not a secret ceiling.
+  // A draft pick transfers the REAL attribute, including its 99-rated strengths.
+  // Prime is achievable, not a misleading ceiling permanently diluted by "reach".
+  // Work ethic determines how quickly the player develops; prime is exact at 28-29.
+  function primeWindow(c) {
+    const seasons=HL.clamp(Math.round(2+(c.prime.primeLength-30)/7.5),2,12);
+    const start=28-Math.floor((seasons-1)/2);
+    return {start,end:start+seasons-1,seasons};
+  }
   function ratingsAt(c, age) {
-    const out = {};
-    const yearsToPrime = HL.clamp(7-(c.me.traits.workEthic-50)/22,5,9);
-    const growth = HL.clamp((age-19)/yearsToPrime,0,1);
-    const fullPrime = age >= 28 && age <= 29;
-    const decline = age<=29 ? 0 : (age-29)*(age>=33 ? 2.6 : 1.6);
-    for (const k of HL.ATTR_KEYS) {
-      const target = c.prime.attrs[k];
-      if (fullPrime) {out[k]=target;continue;}
-      const gap = ['speed','vert','str','dur','stam'].includes(k)?4:13;
-      const fade = ['speed','vert','stam'].includes(k)?1.5:['iq','ft','pass'].includes(k)?0.3:1;
-      const variation = age<28?(c.noise?.[k]||0)*(1-growth):0;
-      out[k] = Math.round(HL.clamp(target-gap*(1-growth)-decline*fade+variation,25,99));
+    const out={}, w=primeWindow(c);
+    const work=(c.me.traits?.workEthic??60);
+    // Reach the exact player-built ceiling throughout the chosen prime window.
+    const buildUp=HL.clamp((age-19)/Math.max(3,w.start-19-(work-60)/100),0,1);
+    const decline=age>w.end?(age-w.end)*(1.15+(99-c.prime.longevity)*.032):0;
+    for(const k of HL.ATTR_KEYS) {
+      const goal=Number.isFinite(c.prime.attrs[k]) ? c.prime.attrs[k] : 65;
+      const physical=['speed','vert','burst','accel','agility','stam','transition'].includes(k);
+      const skillFade=['iq','ft','pass','vision','passingAccuracy','shotArc','shotSelection'].includes(k)?.38:1;
+      const fade=decline*(physical?1.45:skillFade);
+      const gap=physical?5:13;
+      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,99));
     }
     return out;
   }
   function setAge(c, age) {
     const me = c.me;
-    me.age = age; me.attrs = ratingsAt(c, age); me.ovr = HL.computeOvr(me.attrs, me.pos); me.tend = HL.defaultTendencies(me);
+    me.age = age; me.attrs = ratingsAt(c, age); me.ovr = HL.computeOvr(me.attrs, me.pos);
+    // Rebuild shot diet from the combined skills: a borrowed elite 3PT rating
+    // actively increases 3PA, while Shaq's frame stays with that same player.
+    me.tend = HL.completeTendencies({...me,tend:{...HL.defaultTendencies(me),...c.prime.tendencies}});
   }
 
   function newCareer() {
@@ -260,7 +290,7 @@ HL.SkillDraft = (function () {
     const pend = { type: 'season', from, to: ovr, offers: [], notes: [] };
     const cur = c.franchise && !c.minors ? L.teams.find(t => fr(t) === c.franchise) : null;
     if (c.franchise && !c.minors && !cur) pend.notes.push(`The ${c.teamMeta.city} ${c.teamMeta.name} no longer exist. He is a free agent.`);
-    if (c.age >= 45 || (ovr < 58 && c.age >= 24)) return end(c, ovr < 58 ? 'No team wanted him any more' : 'Retired at 44');
+    if (c.age >= HL.clamp(Math.round(40+c.prime.longevity/12),43,49) || (ovr < 58 && c.age >= 24)) return end(c, ovr < 58 ? 'No team wanted him any more' : 'Retired at 44');
     if (ovr < 62) {
       if (c.age >= 30) return end(c, c.minors ? 'Never made it back to the league' : `Fell out of the league at ${c.age - 1}`);
       pend.type = 'minors';
@@ -285,7 +315,11 @@ HL.SkillDraft = (function () {
       const lo = ovr >= 82 ? 0 : Math.floor(pool.length * 0.25);
       picks.push(pool.splice(R.int(lo, pool.length - 1), 1)[0]);
     }
-    if (cur && R.chance(c.seasons.slice(-3).some(s=>s.champion&&s.team.bref===c.teamMeta?.bref) ? 0.995 : ovr>=72 ? .95 : ovr>=66 ? .6 : .3)) picks.unshift(teams.find(x => x.t.id === cur.id));
+    // Contending teams should make an offer to retain proven champions, even in decline.
+    const recent=c.seasons.filter(s=>!s.minors).slice(-2);
+    const franchiseSuccess=recent.filter(s=>fr(s.team)===c.franchise).some(s=>s.champion || s.w/Math.max(1,s.w+s.l)>=.67);
+    const retention=franchiseSuccess ? .995 : ovr>=72 ? .95 : ovr>=66 ? .60 : .30;
+    if (cur && R.chance(retention)) picks.unshift(teams.find(x => x.t.id === cur.id));
     return picks.map(x => offerFrom(c, L, x.t, teams.indexOf(x), teams.length, cur && x.t.id === cur.id));
   }
   function offerFrom(c, L, t, strengthRank, nTeams, isCur) {
@@ -334,16 +368,22 @@ HL.SkillDraft = (function () {
     const p = c.pending;
     if (!p) return;
     if (p.type === 'minors') return decide(c, { type: c.age < 27 ? 'minors' : 'retire' });
-    if ((c.age >= 35 && c.me.ovr < 72 && R.chance(0.5)) || c.age >= 41) return decide(c, { type: 'retire' });
+    if ((c.age >= 35 && c.me.ovr < 72 && R.chance(0.5)) || c.age >= HL.clamp(Math.round(39+c.prime.longevity/12),41,48)) return decide(c, { type: 'retire' });
     if (p.type === 'fa') {
       const cur = p.offers.findIndex(o => o.isCur);
-      const recent=c.seasons.filter(s=>!s.minors && s.team?.bref===c.teamMeta?.bref).slice(-3);
-      const ringRun=recent.filter(s=>s.champion).length;
+      // Winning multiple titles rewrites free-agency incentives in this alternate history.
+      const recent=c.seasons.filter(s=>!s.minors && fr(s.team)===c.franchise).slice(-3);
+      const champions=recent.filter(s=>s.champion).length;
       const winning=recent.length ? recent.reduce((a,s)=>a+s.w/Math.max(1,s.w+s.l),0)/recent.length : 0;
-      if (cur >= 0 && (ringRun>=2 || winning>=.73 && c.me.traits.loyalty>=40 || c.me.traits.loyalty>78))
+      if (cur >= 0 && (champions>=2 || (winning>=.73 && c.me.traits.loyalty>=40) || c.me.traits.loyalty>78))
         return decide(c, {type:'sign',i:cur});
       const tierScore = { Contender: 3, 'Playoff team': 2, Fringe: 1, Rebuilding: 0 };
-      const score = o => (o.isCur ? ringRun*12+Math.max(0,c.me.traits.loyalty-50)/3 : 0)+(c.me.ovr>=80?tierScore[o.tier]*9:tierScore[o.tier]*3)+(o.role==='Number one option'?7:0)+o.amount/HL.salaryScale(c.yr)*.23;
+      const score = o => {
+        const legacyFit=o.isCur && champions ? 20 + champions * 10 : o.isCur && winning>=.60 ? 8 : 0;
+        const loyaltyFit=o.isCur ? Math.max(0,(c.me.traits.loyalty-50)/3) : 0;
+        const roleFit=o.role==='Number one option' ? 8 : o.role==='Star role' ? 5 : 0;
+        return legacyFit + loyaltyFit + roleFit + (c.me.ovr>=80 ? tierScore[o.tier]*9 : tierScore[o.tier]*3) + o.amount / HL.salaryScale(c.yr)*.23;
+      };
       let best = 0;
       p.offers.forEach((o, i) => { if (score(o) > score(p.offers[best])) best = i; });
       return decide(c, { type: 'sign', i: best });
@@ -547,14 +587,15 @@ HL.SkillDraft = (function () {
   function verdict(c) {
     const lg = c.legacy, n = c.seasons.filter(s => !s.minors).length;
     if (!n) return ['NEVER MADE IT', `${c.pick ? `Drafted #${c.pick}, but` : 'Undrafted, and'} never played an NBA game. ${c.seasons.length} season${c.seasons.length === 1 ? '' : 's'} in the minors and overseas.`];
-    const report=HL.Legacy.careerReport(c);
-    if(lg.rank===1 && report.goatQualified)
-      return ['GOAT FRONT-RUNNER', 'First in the historical legacy model, with the sustained MVP, title and playoff resume to support the case. The cross-era debate stays open.'];
-    if(lg.rank<=3 && report.goatQualified)
-      return ['GOAT CONTENDER', 'An elite historical rank backed by meaningful championships, production and longevity.'];
+    const dossier=HL.Legacy.careerReport(c);
+    const strongest=HL.HISTORY.players[lg.top.pid][0];
+    if(lg.rank===1 && dossier.goatQualified)
+      return ['GOAT FRONT-RUNNER', `The historical model places this career first, ahead of ${strongest}. The championships, elite seasons and sustained production make a formidable case, though eras and teammates keep the debate open.`];
+    if(lg.rank<=3 && dossier.goatQualified)
+      return ['GOAT CONTENDER', `Top ${lg.rank} by career impact, with enough peak dominance, longevity and playoff success for a genuine all-time argument.`];
     if(lg.rank===1)
-      return ['HISTORIC PEAK', 'First in the legacy model, but one rank does not settle the all-time debate.'];
-    if(lg.rank<=10)return ['ALL-TIME GREAT', 'A career worthy of a detailed, era-aware comparison with the legends.'];
+      return ['HISTORIC PEAK', `First in the legacy model, but a GOAT verdict requires a longer, more complete résumé. Historical rank and overall greatness are not the same question.`];
+    if(lg.rank <= 10) return ['ALL-TIME GREAT', `#${lg.rank} on the historical model. A basketball icon with a résumé worth weighing across eras.`];
     if (lg.rank <= 75) return ['HALL OF FAMER', `#${lg.rank} all-time. First-ballot.`];
     if (lg.rank <= 160) return ['SUPERSTAR', `#${lg.rank} all-time. A borderline Hall of Fame career.`];
     if (lg.rank <= 350) return ['ALL-STAR', `#${lg.rank} all-time. A very good career.`];
@@ -613,11 +654,20 @@ HL.SkillDraft = (function () {
     return `<section class="block"><header><h3>Your build</h3><span class="ml-auto t3 sm">${CATS.length - remaining().length}/${CATS.length}</span>${prime && !hide ? `<span>${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body"><div class="board">${tiles}</div></div></section>`;
   }
 
+  function buildDetail(prime) {
+    const groups = [...new Set(HL.ATTRS.map(a=>a.group))];
+    return `<details class="skill-detail" open><summary>Full rating breakdown · ${prime.pos} · ${HL.computeOvr(prime.attrs,prime.pos)} OVR</summary><div class="skill-ratings">${groups.map(g=>`<div class="skill-rating-group"><b>${esc(g)}</b>${HL.ATTRS.filter(a=>a.group===g).map(a=>`<div class="skill-rating-row"><span>${esc(a.label)}</span><strong>${prime.attrs[a.key] ?? 25}</strong></div>`).join('')}</div>`).join('')}</div><div class="skill-ratings">${Object.entries(prime.tendencies).map(([k,v])=>`<div class="skill-rating-row"><span>${esc(k)}</span><strong>${v}</strong></div>`).join('')}</div><p class="t3 sm">Advanced ratings such as shot decision-making and release elevation are modeled scouting estimates. Shot-diet and usage numbers are frequency preferences on a 0–100 scale, <b>not skill grades</b>; low post or three-point frequency is not a weakness by itself. The simulation uses both separately.</p></details>`;
+  }
+
   function builtView() {
     return `<section class="block"><div class="body stack"><h3>Your player is built</h3>
       <div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div>
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
-      <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Changes lineup role, positional OVR and matchups. All five spots are available for unusual builds.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto · best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p}</option>`).join('')}</select></div><div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim the whole career</button></div>
+      <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
+      ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and retirement opportunity</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
+      ${buildDetail(buildPrime())}
+      <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim the whole career</button></div>
+      <div class="t3 sm">Every drafted attribute contributes to the same player on the court. Body determines height and weight, while shooting, finishing, defense and athleticism interact in the simulation. Prime is fully attainable throughout your selected prime-duration window.</div>
       <div class="t3 sm">Season by season: see every season's numbers, awards and playoff run, then choose free agency offers, ask for trades or retire. Simming the whole career makes those calls for you.</div>
     </div></section>`;
   }
@@ -712,6 +762,7 @@ HL.SkillDraft = (function () {
     const extras = [cnt.g40 ? plural(cnt.g40, '40-point game') : '', cnt.g50 ? plural(cnt.g50, '50-point game') : '', cnt.td ? plural(cnt.td, 'triple-double') : '', cnt.dd ? plural(cnt.dd, 'double-double') : ''].filter(Boolean);
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
+      <details><summary>${s.yr<1979?'No 3-point line · ':''}${yrLabel(s.yr)} era rules</summary><div class="t3 sm">${HL.eraContext(s.yr).facts.map(esc).join(' · ')}</div></details>
       <div class="cols c2"><div class="stack" style="gap:6px">
           <div class="caps">Team</div>
           <div><b class="num" style="font-size:26px">${s.w}-${s.l}</b> <span class="t2">${ordinal(s.seed)} best record of ${s.nTeams} teams</span></div>
@@ -765,18 +816,42 @@ HL.SkillDraft = (function () {
       <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>`;
   }
 
-  function careerNarrative(c) {
-    const d=HL.Legacy.careerReport(c), P=c.ptotals||{},T=c.totals||{},top=c.seasons.filter(s=>!s.minors).slice().sort((a,b)=>(b.ppg||0)-(a.ppg||0)).slice(0,3);
-    const honors=d.honors.length ? d.honors.map(x=>'<article class="dossier-honor"><div class="caps">Career identity earned</div><h3>'+esc(x.name)+'</h3><p>'+esc(x.why)+'</p></article>').join('') : '<article class="dossier-honor"><h3>A meaningful career</h3><p>No specialty award was earned just for having a high attribute. Production matters.</p></article>';
-    const moments=top.map(s=>'<article class="dossier-honor"><div class="caps">'+s.yr+'-'+(s.yr+1)+' · '+esc(s.team.name)+'</div><h3>'+(s.ppg||0).toFixed(1)+' PPG</h3><p>'+(s.rpg||0).toFixed(1)+' rebounds · '+(s.apg||0).toFixed(1)+' assists</p></article>').join('');
-    const doubt=(d.ts<.54?'Efficiency leaves room for criticism. ':'Production supports the case. ')+(c.rings>=3?'A dynasty requires teammates and circumstances too.':'Team success is one part of the historical argument.');
-    return '<section class="block dossier"><header><h3>The full career verdict</h3><span class="ml-auto t3 sm">Evidence · specialization · storytelling</span></header><div class="body stack">'+
-      '<div class="dossier-lead">'+esc(d.chapters[0])+'</div>'+
-      '<div class="dossier-grid">'+honors+'</div>'+
-      '<div class="dossier-two"><article class="dossier-honor"><div class="caps">The strongest argument</div><h3>Prime and longevity</h3><p>'+esc(d.chapters[1])+'</p></article><article class="dossier-honor"><div class="caps">What critics would say</div><h3>The counterargument</h3><p>'+esc(doubt)+'</p></article></div>'+
-      d.chapters.slice(2).map(t=>'<p class="dossier-chapter">'+esc(t)+'</p>').join('')+
-      (moments?'<div class="caps">Signature scoring seasons</div><div class="dossier-grid">'+moments+'</div>':'')+
-      '<details><summary>How honors are decided</summary><p>Historical legacy rank is a weighted comparison with real players. Specialty titles require enough NBA years, actual simulated production and, where noted, scouting strengths. Neither a 99 rating nor the highest numerical score automatically makes a player the GOAT.</p></details></div></section>';
+  function careerDeepReport(c) {
+    const active=c.seasons.filter(s=>!s.minors&&s.g>0);
+    const best=active.slice().sort((a,b)=>(b.ppg||0)-(a.ppg||0))[0];
+    const w=primeWindow(c), yrs=active.length, total=c.totals;
+    const ts=total.fga+ .44*total.fta ? (100*total.pts/(2*(total.fga+.44*total.fta))).toFixed(1)+'%' : '—';
+    const threes=total.fga? (100*total.tpa/total.fga).toFixed(1)+'%' : '—';
+    const ctx=HL.eraContext(c.debut), t=c.me.tend;
+    return `<section class="block"><header><h3>Scouting & career analytics</h3></header><div class="body stack">
+      <div class="cols c2"><div class="stack"><div class="kv"><span>Seasons played</span><b>${yrs}</b></div><div class="kv"><span>Prime designed</span><b>${w.start}–${w.end} (${w.seasons} years)</b></div><div class="kv"><span>Longevity grade</span><b>${c.prime.longevity}/99</b></div><div class="kv"><span>Career true shooting</span><b>${ts}</b></div></div><div class="stack"><div class="kv"><span>3-point attempt rate</span><b>${threes}</b></div><div class="kv"><span>Shot mentality</span><b>${t.shotHunt}/100 · usage ${t.usage}/100</b></div><div class="kv"><span>Playmaking inclination</span><b>${t.passFirst}/100 · move ball ${t.moveBall}/100</b></div><div class="kv"><span>Highest scoring season</span><b>${best?`${yrLabel(best.yr)} · ${(best.ppg||0).toFixed(1)} PPG`:'—'}</b></div></div></div>
+      <details><summary>Era rulebook and scouting interpretation</summary><p class="t2 sm">Entered ${yrLabel(c.debut)}. ${ctx.facts.map(esc).join(' · ')}. Early-era seasons do not award three-point baskets regardless of the player's shooting range. Stats and rankings compare real seasons rather than artificially converting every generation into 2025-26.</p></details>
+      </div></section>`;
+  }
+  function verdictDossier(c) {
+    const a=HL.Legacy.careerReport(c), m=a.metrics, nba=c.seasons.filter(s=>!s.minors&&s.g>0);
+    const year=y=>yrLabel(y);
+    const side=(c.legacy.rank<=3 ? 'Elite against the model’s career-score baseline. ' : 'Outside the very top tier of the model. ') +
+      (m.ts<.54?'Efficiency gives critics an argument. ':'Shooting efficiency strengthens the case. ') +
+      (c.rings>=3?'Team circumstances contributed to a strong title résumé.':'The ring count leaves a team-success question.');
+    const prove=a.titles.filter(t=>t.name!=='Respected Pro');
+    const titleCards=prove.length ? prove.map(t=>`<article class="dossier-honor"><div class="caps">Career identity</div><h3>${esc(t.name)}</h3><p>${esc(t.description)}</p><div class="t3 sm">Evidence: ${esc(t.basis)}</div></article>`).join('') :
+      `<article class="dossier-honor"><h3>A career with its own identity</h3><p>Not every career clears historical specialty thresholds. Individual seasons and team impact still matter.</p></article>`;
+    const top=nba.slice().sort((x,y)=>(y.ppg||0)-(x.ppg||0)).slice(0,3);
+    const turns=[...nba.filter(s=>s.champion).slice(0,2).map(s=>`Won the ${year(s.yr)} championship with ${esc(s.team.name)} while averaging ${(s.ppg||0).toFixed(1)} points.`),
+      ...nba.filter(s=>s.awards?.some(x=>awardName(x)==='MVP')).slice(0,1).map(s=>`Claimed MVP honors in ${year(s.yr)} with a ${s.w}-${s.l} club.`),
+      ...c.log.filter(l=>/Signed with|Traded to|Re-signed with/.test(l.text)).slice(0,2).map(l=>`${year(l.yr)}: ${esc(l.text)}.`)].slice(0,5);
+    const changed=c.altered.length;
+    return `<section class="block dossier"><header><h3>The case for this career</h3><span class="ml-auto t3 sm">Beyond the legacy score</span></header>
+      <div class="body stack"><div class="dossier-lead">${esc(a.chapters[0]||'The journey began with a dream.')}</div>
+      <div class="dossier-two"><article><div class="caps">The strongest argument</div><h3>${esc(prove[0]?.name||'Longevity and production')}</h3><p>${esc(a.chapters[1]||'Every season contributed to the final story.')}</p></article>
+      <article><div class="caps">The counterargument</div><h3>What the numbers leave out</h3><p>${esc(side)}</p></article></div>
+      <div class="caps">Basketball identities earned on the floor</div><div class="dossier-grid">${titleCards}</div>
+      <div class="caps">The full story</div>${a.chapters.slice(2).map(t=>`<p class="dossier-chapter">${esc(t)}</p>`).join('')}
+      ${top.length?`<div class="caps">The most explosive scoring years</div><div class="dossier-grid">${top.map(s=>`<article class="dossier-honor"><div class="caps">${year(s.yr)} · ${esc(s.team.name)}</div><h3>${(s.ppg||0).toFixed(1)} PPG</h3><p>${(s.rpg||0).toFixed(1)} rebounds · ${(s.apg||0).toFixed(1)} assists · ${s.w}-${s.l} record</p></article>`).join('')}</div>`:''}
+      ${turns.length?`<div class="caps">Turning points</div><div class="dossier-turns">${turns.map((x,i)=>`<div class="dossier-turn"><b>${String(i+1).padStart(2,'0')}</b><span>${x}</span></div>`).join('')}</div>`:''}
+      <details><summary>How this verdict was judged</summary><p>Historical rank compares weighted awards and long-term production to real NBA career baselines. Special titles require actual simulated output, sustained seasons and, where noted, modeled scouting traits. Neither an individual 99 rating nor first place on a single score automatically establishes GOAT status.</p><p>${changed} historical award or title outcomes changed. Seasons beyond the latest verified archive replay that archive’s league and are alternate-history projections, not actual historical results.</p></details>
+    </div></section>`;
   }
 
   function resultView() {
@@ -804,8 +879,9 @@ HL.SkillDraft = (function () {
           </div></div>
           <div class="row"><button class="btn go" data-new>Build another</button></div>
         </div></section>
-      ${careerNarrative(c)}
-      ${c.seasons.length ? `<details class="dossier-data"><summary>Expand all ${c.seasons.length} seasons of statistics and awards</summary>${careerTable(c)}</details>` : ''}
+      ${verdictDossier(c)}
+      ${careerDeepReport(c)}
+      ${c.seasons.length ? `<details class="dossier-data"><summary>Full ${c.seasons.length}-season statistics and award ledger</summary>${careerTable(c)}</details>` : ''}
       ${c.log.length ? timeline(c) : ''}`;
   }
 
@@ -833,7 +909,7 @@ HL.SkillDraft = (function () {
     app.querySelectorAll('.hand .gcard').forEach(card => card.onclick = () => { if (!card.classList.contains('down')) take(+card.dataset.hand); });
     FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
-    const position=app.querySelector('[data-position]'); if(position) position.onchange=()=>{st.pos=position.value;render();};
+    const position = app.querySelector('[data-position]'); if (position) position.onchange = () => { st.pos=position.value; render(); };
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
     app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
@@ -909,11 +985,11 @@ HL.SkillDraft = (function () {
         <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button>
         <button class="btn" data-skip="stat" ${st.skips.stat && st.phase === 'hand' ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button></div>
       ${show ? `<div class="result">${esc(cat[1])} from the ${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
-    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Top ${st.hand.length} by ${esc(cat[1].toLowerCase())} · best-first. Tap a card to select.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
+    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Top ${st.hand.length} by ${esc(cat[1].toLowerCase())} · best-rated first. Tap a card to choose.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
       <div class="hand">${st.hand.map((c, i) => { const bio = HL.HISTORY.players[c.row.pid]; const r = c.row; const v = skillValue(c, cat);
-        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: cat[0] === 'body' ? 'FRAME' : SHORT[cat[0]], meta: `#${i + 1} · ${yrLabel(c.season)} · ${c.club}`,
-          stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
-    const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Sixteen distinct skills build one player.</p>' : '';
+        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: SHORT[cat[0]], meta: `#${i + 1} IN ${esc(cat[1].toUpperCase())} · ${yrLabel(c.season)} · ${c.club}`,
+          stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : ['longevity','primeLength'].includes(cat[0]) ? [['YRS', HL.careerTraitFor(r.pid).playedYears], ['PEAK', HL.careerTraitFor(r.pid).peakYears]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
+    const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Each draftable tool, habit and career trait builds your player.</p>' : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reels}${intro}${controls}${cards}</section>`;
   }
 
@@ -924,7 +1000,7 @@ HL.SkillDraft = (function () {
       U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">Skill Draft Career</button></div></div></div>
       <div class="page" style="max-width:900px"><div class="page-title"><h2>Skill Draft Career</h2></div>
       <section class="block"><div class="body stack">
-        <p class="t2" style="margin:0">Build one player out of real players' skills. Each spin gives a franchise, a decade and a skill (inside scoring, three-point shooting, rebounding, your body…). Take that skill from anyone who played there. Then the game simulates your whole career in the real league and ranks it against every real NBA career. Broken, GOAT, all-time great… or a bust.</p>
+        <p class="t2" style="margin:0">Build one player out of real players' skills. Each spin gives a franchise, a decade and a skill (inside scoring, three-point shooting, rebounding, your body…). Choose from the five best available specialists for that exact skill and their best matching season. Then the game simulates your whole career in the real league and ranks it against every real NBA career. Broken, GOAT, all-time great… or a bust.</p>
         <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides the ratings.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], mode)}</div>
         <div class="row"><button class="btn go big ml-auto" data-go>Start</button></div>
       </div></section></div></div>`;
@@ -948,5 +1024,5 @@ HL.SkillDraft = (function () {
     return { ...c, verdict: verdict(c) };
   }
 
-  return { open: () => { st = null; cache = null; render(); }, CATS, simulate, ratingsAt };
+  return { open: () => { st = null; cache = null; render(); }, CATS, simulate, ratingsAt, primeWindow, evaluateCareer: c => ({ verdict: verdict(c), specialties: HL.Legacy.careerReport(c) }) };
 })();

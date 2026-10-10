@@ -21,7 +21,17 @@ HL.Career = (function () {
       attrs.speed=HL.clamp(attrs.speed-Math.round(Math.max(0,c.weight-205)/18),25,90);
       attrs.block=HL.clamp(attrs.block+Math.round((c.wingspan-c.height-3)*1.1),25,90);
       attrs.perD=HL.clamp(attrs.perD+Math.round((c.wingspan-c.height-3)*.4),25,90);
-      return {ok:true,player:{...c,attrs,ovr:HL.computeOvr(attrs,c.pos)}};
+      // Every attribute has its own editable potential ceiling, independent of OVR.
+      // Never change unrelated skills merely to hit a preset overall.
+      const caps={};
+      for(const k of HL.ATTR_KEYS){
+        const requested=c.caps?.[k];
+        if(c.caps && (typeof c.caps!=='object'||Array.isArray(c.caps)))return fail('Potential caps must be an attribute map.');
+        if(requested!==undefined && (!Number.isInteger(requested)||requested<attrs[k]||requested>99))
+          return fail(`Potential for ${HL.ATTRS.find(a=>a.key===k).label} must be between ${attrs[k]} and 99.`);
+        caps[k]=requested===undefined?Math.min(94,attrs[k]+(k==='dur'?0:22)):requested;
+      }
+      return {ok:true,player:{...c,attrs,caps,potential:HL.computeOvr(caps,c.pos),ovr:HL.computeOvr(attrs,c.pos)}};
     }finally{HL.RNG.setSeed(seed);}
   }
   function log(L,kind,text,publicEvent=false) {
@@ -50,7 +60,7 @@ HL.Career = (function () {
     const p=HL.createPlayer({name:config.name.trim(),pos:config.pos,age:config.age,height:config.height,ovr:config.ovr,arch:`${config.arch}+${config.secondary}`,real:false,season:config.season});
     p.attrs={...config.attrs};p.ovr=config.ovr;p.weight=config.weight;p.wingspan=config.wingspan;p.hand=config.hand;p.number=config.number;p.yearsPro=0;p.userRosterMove=true;
     Object.assign(p.traits,PERSONALITIES[config.personality]);
-    p.caps=Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,Math.min(94,p.attrs[k]+(k==='dur'?0:22))]));p.potential=HL.computeOvr(p.caps,p.pos);p.tend=HL.defaultTendencies(p);
+    p.caps={...config.caps};p.potential=HL.computeOvr(p.caps,p.pos);p.tend=HL.defaultTendencies(p);
     const teams=L.teams.slice().sort((a,b)=>a.real.w/Math.max(1,a.real.w+a.real.l)-b.real.w/Math.max(1,b.real.w+b.real.l));
     const pick=HL.clamp(Math.round(42-(p.ovr-60)*2),1,teams.length*2),t=teams[(pick-1)%teams.length];
     p.teamId=t.id;p.draft={year:L.season,pick,round:pick<=teams.length?1:2,teamId:t.id};
@@ -59,7 +69,7 @@ HL.Career = (function () {
     const roster=HL.League.teamPlayers(t.id).sort((a,b)=>a.ovr-b.ovr);
     if(roster.length>=15){const cut=roster[0];cut.teamId=null;L.deadCap=[...(L.deadCap||[]),{teamId:t.id,pid:cut.id,name:cut.name,amount:cut.contract.amount,start:L.season,exp:cut.contract.exp}];}
     L.players[p.id]=p;L.userTeamId=t.id;L.mode='career';
-    L.career={version:1,pid:p.id,identity:{...config,attrs:undefined},energy:85,happiness:70,fame:10,reputation:50,cash:25000,earnings:0,taxes:0,possessions:[],people:{coach:{like:50,respect:50,trust:50},agent:{like:50,respect:50,trust:50},family:{like:70,respect:50,trust:50}},week:null,decisions:3,progress:{},timeline:[],watches:[],gameLog:[],seasons:[],seen:[],pendingPress:null,retired:false,role:'Development'};
+    L.career={version:2,pid:p.id,identity:{...config,attrs:undefined},level:1,xp:0,skillPoints:0,totalSkillPoints:0,lastGameXP:0,lastGamePoints:0,energy:85,happiness:70,fame:10,reputation:50,cash:25000,earnings:0,taxes:0,possessions:[],people:{coach:{like:50,respect:50,trust:50},agent:{like:50,respect:50,trust:50},family:{like:70,respect:50,trust:50}},week:null,decisions:3,progress:{},timeline:[],watches:[],gameLog:[],seasons:[],seen:[],pendingPress:null,retired:false,role:'Development'};
     L.nextPid=HL.nextPlayerId();role(L);
     log(L,'draft',`${p.name} enters the ${L.season} league at pick ${pick} with the ${t.city} ${t.name}. ${config.route==='college'?'College':'International'} route, ${config.pos}, age ${p.age}.`,true);
     quote(L,`${t.name} welcome rookie ${p.name}`,`Pick ${pick} brings ${p.name} to ${t.city}. The coach offers an earned ${p.realMpg}-minute role, with competition still ahead.`,'I want to earn my place, one day at a time.','career.arrival');
@@ -69,9 +79,45 @@ HL.Career = (function () {
     const c=L.career,key=`${L.season}:${Math.floor(L.day/7)}`;
     if(c.week!==key){c.week=key;c.decisions=3;}
   }
-  function gain(L,key,credit) {
-    const c=L.career,p=me(L);c.progress[key]=(c.progress[key]||0)+credit;
-    if(c.progress[key]>=1&&p.attrs[key]<p.caps[key]){p.attrs[key]=Math.min(p.caps[key],p.attrs[key]+Math.floor(c.progress[key]));c.progress[key]%=1;p.ovr=HL.computeOvr(p.attrs,p.pos);log(L,'development',`${HL.ATTRS.find(a=>a.key===key).label} improves to ${p.attrs[key]} through practice and game use.`);}
+  function initializeGrowth(c){
+    if(!Number.isInteger(c.level)||c.level<1)c.level=1;
+    if(!Number.isFinite(c.xp)||c.xp<0)c.xp=0;
+    if(!Number.isInteger(c.skillPoints)||c.skillPoints<0)c.skillPoints=0;
+    if(!Number.isInteger(c.totalSkillPoints)||c.totalSkillPoints<0)c.totalSkillPoints=c.skillPoints;
+  }
+  const xpNeeded=level=>120+Math.round((level-1)*23);
+  const upgradeCost=value=>value>=90?4:value>=80?2:1;
+  function earnXP(L,amount){
+    const c=L.career;initializeGrowth(c);
+    if(!Number.isFinite(amount)||amount<=0)return 0;
+    c.xp+=Math.round(amount);
+    let earned=0;
+    while(c.xp>=xpNeeded(c.level)){
+      c.xp-=xpNeeded(c.level);c.level++;c.skillPoints+=2;earned+=2;
+    }
+    c.totalSkillPoints+=earned;
+    if(earned)log(L,'development',`Reached development level ${c.level}; earned ${earned} skill points to allocate.`);
+    return earned;
+  }
+  function gain(L,key,credit){
+    const c=L.career;
+    c.progress[key]=(c.progress[key]||0)+credit;
+    // Training improves how quickly points are EARNED; allocation stays the user's choice.
+    return earnXP(L,credit*90);
+  }
+  function upgrade(L,key){
+    if(HL.LiveGame?.active(L))return fail('Finish the current game before allocating skill points.');
+    const c=L.career,p=c&&me(L);
+    if(!p||!HL.ATTR_KEYS.includes(key))return fail('Choose a valid attribute.');
+    initializeGrowth(c);
+    const ceiling=p.caps?.[key]??p.attrs[key];
+    if(p.attrs[key]>=ceiling)return fail('This attribute has reached its chosen potential ceiling.');
+    const cost=upgradeCost(p.attrs[key]);
+    if(c.skillPoints<cost)return fail(`You need ${cost} skill point${cost===1?'':'s'} for this upgrade.`);
+    c.skillPoints-=cost;p.attrs[key]++;p.ovr=HL.computeOvr(p.attrs,p.pos);
+    p.potential=HL.computeOvr(p.caps,p.pos);
+    log(L,'development',`${HL.ATTRS.find(a=>a.key===key).label} upgraded to ${p.attrs[key]} (${cost} points).`);
+    role(L);return {ok:true,cost,value:p.attrs[key],ovr:p.ovr};
   }
   function setTendencies(L,values) {
     if(HL.LiveGame?.active(L))return fail('Use your live-game approach controls until the final whistle.');
@@ -109,8 +155,8 @@ HL.Career = (function () {
     if(key==='presser'&&(!c.pendingPress||(!tones[params.tone]&&params.tone!=='custom')||(params.text!=null&&(typeof params.text!=='string'||params.text.length>2000))||(params.tone==='custom'&&!params.text?.trim())))return fail('Answer an available postgame interview with your words or a valid tone.');
     refresh(L);if(key!=='presser')c.decisions--;
     let response,publicEvent=false;
-    if(key==='train'){c.energy-=15;gain(L,params.focus,.35);response=`You put in a focused ${HL.ATTRS.find(a=>a.key===params.focus).label} session. Progress is earned over repeated practice.`;}
-    if(key==='film'){gain(L,'iq',.35);c.people.coach.trust=clamp(c.people.coach.trust+2);response='Your preparation gets noticed. The coach trusts your attention to detail.';}
+    if(key==='train'){c.energy-=15;gain(L,params.focus,.35);response=`You put in a focused ${HL.ATTRS.find(a=>a.key===params.focus).label} session and earn development XP. You choose when to spend skill points.`;}
+    if(key==='film'){gain(L,'iq',.35);c.people.coach.trust=clamp(c.people.coach.trust+2);response='You study game film and earn development XP. Spend earned skill points in the Basketball tab.';}
     if(key==='recover'){c.energy=clamp(c.energy+25);c.happiness=clamp(c.happiness+3);response='You make room for recovery. Energy improves; injuries still need their real recovery time.';}
     if(key==='role'){role(L);response=c.people.coach.trust<45?'Coach: “Earn the trust before asking for more minutes.”':`Coach: “Your current place in this roster supports ${p.realMpg} minutes. Keep showing me why you deserve them.”`;}
     if(key==='trade'){c.people.coach.trust=clamp(c.people.coach.trust-4);response=p.contract.exp>L.season?'Agent: “You are under contract. The club has declined a move for now; we can revisit your options when the deal expires.”':'Agent: “We can compare your offers this offseason. A request does not guarantee a destination.”';}
@@ -147,7 +193,23 @@ HL.Career = (function () {
     const income=g.playoff?0:Math.round(p.contract.amount*1e6/Math.max(1,L.games)),tax=Math.round(income*.35);c.cash+=income-tax;c.earnings+=income;c.taxes+=tax;
     c.energy=clamp(c.energy-Math.round(min*.4));
     c.gameLog.push({season:L.season,gid:g.gid,day:L.day,min,pts,reb:(b.orb||0)+(b.drb||0),ast:b.ast||0,tov:b.tov||0,won:side.score>opp.score,score:`${side.score}–${opp.score}`,opponent:opp.teamId,playoff:!!g.playoff});c.gameLog=c.gameLog.slice(-300);
-    if(min>0){c.fame=clamp(c.fame+(pts>=20?2:pts>=10?1:0));c.people.coach.trust=clamp(c.people.coach.trust+((b.tov||0)>5?-2:1));gain(L,(b.tpa||0)>0?'three':'layup',.06);gain(L,'iq',.03);c.pendingPress={gid:g.gid,pts,min};}
+    // Only the real, deduplicated box score earns XP. Reward useful all-around
+    // production, efficiency, and team results. Minutes alone never make a DNP grow.
+    let gameXP=0,gamePoints=0;
+    if(min>0){
+      c.fame=clamp(c.fame+(pts>=20?2:pts>=10?1:0));
+      c.people.coach.trust=clamp(c.people.coach.trust+((b.tov||0)>5?-2:1));
+      const reb=(b.orb||0)+(b.drb||0);
+      const fga=b.fga||0,fgm=b.fgm||0,fta=b.fta||0,ftm=b.ftm||0;
+      const misses=Math.max(0,fga-fgm)+Math.max(0,fta-ftm);
+      gameXP=Math.round(HL.clamp(min*.55+pts*1.4+reb*2.2+(b.ast||0)*3.0+
+        (b.stl||0)*5+(b.blk||0)*5+(side.score>opp.score?7:0)-
+        (b.tov||0)*2.5-misses*.55,5,150));
+      gamePoints=earnXP(L,gameXP);
+      c.pendingPress={gid:g.gid,pts,min};
+    }
+    c.lastGameXP=gameXP;c.lastGamePoints=gamePoints;
+    const entry=c.gameLog.at(-1);if(entry){entry.xp=gameXP;entry.skillPoints=gamePoints;}
     for(const w of c.watches){
       if(w.resolved)continue;w.resolved=true;
       if(w.kind==='prediction'){
@@ -201,5 +263,5 @@ HL.Career = (function () {
     if(p.age>=31)for(const k of ['speed','vert','stam'])p.attrs[k]=Math.max(25,p.attrs[k]-(p.age>=36?2:1));
     p.ovr=HL.computeOvr(p.attrs,p.pos);c.pendingPress=null;role(L);log(L,'season_start',`A new season begins at age ${p.age}. Training and game use continue to determine growth.`);return {ok:true};
   }
-  return {defaults,ACTIONS,preview,create,act,setTendencies,beforeDay,afterGame,offseason,offers,sign,retire,unretire,advance};
+  return {defaults,ACTIONS,preview,create,act,upgrade,upgradeCost,xpNeeded,earnXP,setTendencies,beforeDay,afterGame,offseason,offers,sign,retire,unretire,advance};
 })();

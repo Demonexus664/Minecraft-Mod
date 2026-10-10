@@ -262,7 +262,7 @@ Jericho Sims|C|27|82|66|rimbig
 Andre Jackson Jr.|SG|24|78|65|defguard
 Amir Coffey|SF|28|79|66|3d`,
 
-  MIN: `Anthony Edwards|SG|24|76|93|scorer+slasher|45.6
+  MIN: `Anthony Edwards|SG|24|76|95|scorer+slasher|45.6
 Julius Randle|PF|30|81|83|scorer|33.3
 Rudy Gobert|C|33|85|84|defbig|35.0
 Jaden McDaniels|SF|24|81|80|3d|23.0

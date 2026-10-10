@@ -24,10 +24,11 @@ HL.GFX = (function () {
 
   // Keep the legacy card API while replacing the drawn uniform with typography.
   function jersey(team, number) { return `<div class="gfx-identity-number">${esc(number)}</div>`; }
-  // Real player portraits are kept intact, without synthetic jerseys.
+  // Real portraits are shown as-is: no synthetic uniform crop or composite layers.
   function figure(p, team, opts = {}) {
     const { c } = teamColors(team);
     const source = U.photo(p, team, opts.season ?? HL.League.get()?.season);
+    // Never paint a fake team uniform over an authentic player photo.
     return `<div class="gfx-figure" style="--c:${c}"><div class="gfx-head"><div class="gfx-placeholder"><b>${esc(U.initials(p))}</b><span>Photo unavailable</span></div>${U.photoImage(p, source)}</div>${source.src ? `<span class="gfx-photo-credit">${esc(source.label)}</span>` : ''}</div>`;
   }
   function rays() { return '<div class="gfx-light" aria-hidden="true"></div>'; }

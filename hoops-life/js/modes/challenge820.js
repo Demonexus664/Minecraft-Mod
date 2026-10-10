@@ -52,36 +52,56 @@ HL.Challenge = (function () {
     const taken = new Set(excluded);
     return R.shuffle(candidates(franchise, dec).filter(c => !taken.has(c.row.pid)).slice(0, HAND));
   }
-  // For Skill Draft, select the best qualifying season of each player FOR THE ROLLED SKILL.
+  // A player's best 3PT season may not be their highest OVR season. Search every
+  // qualifying season, pick their strongest season FOR the drawn skill, then deal.
+  function bodyValue(c) {
+    const bio = HL.HISTORY.players[c.row.pid];
+    // Frame rating, not an overall basketball or athleticism rating.
+    return Math.round(HL.clamp(38 + (bio[3] - 69) * 2.6 + (bio[4] - 175) * 0.12, 25, 99));
+  }
   function skillValue(c, category) {
-    if (category[0] === 'body') {
-      const bio = HL.HISTORY.players[c.row.pid];
-      return Math.round(HL.clamp(38+(bio[3]-69)*2.6+(bio[4]-175)*0.12,25,99));
+    if (category[0] === 'body') return bodyValue(c);
+    if (category[0] === 'longevity' || category[0] === 'primeLength')
+      return HL.careerTraitFor(c.row.pid)[category[0]];
+    if (category[0] === 'tendShot') {
+      // Higher shot frequencies are not better decisions. Rank the card by
+      // actual estimated shot-choice quality, while importing its shot diet.
+      return HL.historicalAttributes(c.row).shotSelection;
     }
-    const a = HL.History.unpack(c.row.attrs, HL.HISTORY.attrs);
-    return Math.round(category[2].reduce((n,k)=>n+a[k],0)/category[2].length);
+    if (category[0] === 'tendTeam') {
+      const a=HL.historicalAttributes(c.row);
+      return Math.round((a.iq+a.vision+a.passingAccuracy+a.helpD+a.hustle)/5);
+    }
+    if (category[0].startsWith('tend')) {
+      const t=HL.historicalTendencies(c.row);
+      return Math.round(category[2].reduce((n,k)=>n+(t[k]??50),0)/category[2].length);
+    }
+    const a = HL.historicalAttributes ? HL.historicalAttributes(c.row) : HL.History.unpack(c.row.attrs, HL.HISTORY.attrs);
+    return Math.round(category[2].reduce((n, k) => n + a[k], 0) / category[2].length);
   }
   const skillCache = new Map();
-  function skillCandidates(franchise,dec,category) {
-    const key = franchise+':'+dec+':'+category[0];
-    if (skillCache.has(key)) return skillCache.get(key);
+  function skillCandidates(franchise, dec, category) {
+    const ck = `${franchise}:${dec}:${category[0]}`;
+    if (skillCache.has(ck)) return skillCache.get(ck);
     const best = new Map();
     for (const k of HL.HISTORY.seasons) {
-      if (k.includes('-') || Math.floor(+k/10)*10 !== dec || !HL.HISTORY_SEASONS[k]) continue;
+      if (k.includes('-') || Math.floor(+k / 10) * 10 !== dec || !HL.HISTORY_SEASONS[k]) continue;
       for (const r of HL.History.seasonRows(k)) {
-        const club = r.stints.find(s=>LINEAGE[s[0]]===franchise && s[1]>=20);
+        const club = r.stints.find(s => LINEAGE[s[0]] === franchise && s[1] >= 20);
         if (!club) continue;
-        const c={row:r,season:+k,club:club[0]}, old=best.get(r.pid);
-        if (!old || skillValue(c,category)>skillValue(old,category) ||
-            (skillValue(c,category)===skillValue(old,category)&&r.ovr>old.row.ovr)) best.set(r.pid,c);
+        const c = { row: r, season: +k, club: club[0] };
+        const old = best.get(r.pid);
+        if (!old || skillValue(c, category) > skillValue(old, category) ||
+          (skillValue(c, category) === skillValue(old, category) && c.row.ovr > old.row.ovr)) best.set(r.pid, c);
       }
     }
-    const sorted=[...best.values()].sort((a,b)=>skillValue(b,category)-skillValue(a,category)||b.row.ovr-a.row.ovr);
-    skillCache.set(key,sorted);return sorted;
+    const ranked = [...best.values()].sort((a, b) => skillValue(b, category) - skillValue(a, category) || b.row.ovr - a.row.ovr);
+    skillCache.set(ck, ranked);
+    return ranked;
   }
-  function dealSkillHand(franchise,dec,category,excluded=[]) {
-    const taken=new Set(excluded);
-    return skillCandidates(franchise,dec,category).filter(c=>!taken.has(c.row.pid)).slice(0,HAND);
+  function dealSkillHand(franchise, dec, category, excluded = []) {
+    const taken = new Set(excluded);
+    return skillCandidates(franchise, dec, category).filter(c => !taken.has(c.row.pid)).slice(0, HAND);
   }
   function franchisesIn(dec) {
     const set = new Set();
@@ -112,11 +132,20 @@ HL.Challenge = (function () {
     return Math.round([0, 2, 6, 11, 16][d] + (d ? size : 0));
   }
   const rating = c => c.row.ovr;
-  const effRating = (c, slot) => rating(c) - penalty(c, slot);
+  function fittedAttributes(c, slot, original) {
+    const out = { ...original }, pen = penalty(c, slot);
+    if (!pen) return out;
+    const role = ['PG', 'SG'].includes(slot) ? ['handle', 'pass', 'perD', 'steal', 'iq'] :
+      ['PF', 'C'].includes(slot) ? ['intD', 'block', 'oreb', 'dreb', 'post', 'iq'] :
+      ['handle', 'pass', 'perD', 'intD', 'iq'];
+    for (const k of role) out[k] = Math.max(25, out[k] - pen);
+    return out;
+  }
+  const effRating = (c, slot) => HL.computeOvr(fittedAttributes(c, slot, (HL.historicalAttributes ? HL.historicalAttributes(c.row) : HL.History.unpack(c.row.attrs, HL.HISTORY.attrs))), slot);
 
   // ---------- run ----------
   function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   function newRun(cfg) {
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
@@ -180,9 +209,9 @@ HL.Challenge = (function () {
       const c = st.lineup[slot];
       const p = HL.History.makePlayer(c.row, c.season, 999);
       if (STARTERS.includes(slot)) p.pos = slot;
-      // Out of position: every rating drops by the penalty (Shaq at the point is not Shaq).
-      const pen = penalty(c, slot);
-      if (pen) for (const k in p.attrs) p.attrs[k] = Math.max(25, p.attrs[k] - pen);
+      // Position changes cost decision-making and role execution, not God-given height,
+      // shooting touch or strength. Bigs running PG lose creation, not their post game.
+      p.attrs = fittedAttributes(c, slot, p.attrs);
       p.realMpg = minutes[slot];
       if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
       p.ovr = HL.computeOvr(p.attrs, p.pos);
@@ -198,35 +227,49 @@ HL.Challenge = (function () {
       players.push(b);
     }
     dream.players = players;
-    dream.strategy.starters = players.slice(0,5).map(p=>p.id);
+    dream.strategy.starters = players.slice(0, 5).map(p => p.id);
+    // Game plans alter real possessions: tempo, shot priorities, defensive coverage and glass.
     const tactical=HL.Legacy.gamePlans[st.plan] || HL.Legacy.gamePlans.balanced;
-    Object.assign(dream.strategy,{focus:tactical.focus,pace:tactical.pace,defense:tactical.defense,crash:tactical.crash});
+    Object.assign(dream.strategy,{ focus:tactical.focus, pace:tactical.pace, defense:tactical.defense, crash:tactical.crash });
     const opps = L.teams;
+    // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
+    const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
     for (const p of players) lines[p.id] = HL.blankStatLine();
-    const log = [],gameLog=[],injuriesLog=[];
+    // Injuries last across the full schedule. This prevents eight legends from
+    // being fully healthy at every tip-off regardless of what happened last night.
     const absences=Object.fromEntries(players.map(p=>[p.id,0]));
+    const injuriesLog=[];
+    const log = [], gameLog=[];
     const q = sel => document.querySelector(sel);
     const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
-      const opp = opps[g % opps.length];
+      const opp = schedule[g];
       const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: HL.League.teamPlayers(opp.id) };
-      for(const p of players) {if(p.injury?.games>0)absences[p.id]++;else p.injury=null;}
+      for (const p of players) {
+        if(p.injury?.games>0) { absences[p.id]++; }
+        else p.injury=null;
+      }
       const home = g % 2 === 0;
       const res = home ? HL.simGame(dream, oppObj, rules) : HL.simGame(oppObj, dream, rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
-      for(const p of players) if(p.injury?.games>0)p.injury.games--;
-      for(const injury of res.injuries||[]) if(injury.teamId===dream.id) {
-        const victim=players.find(p=>p.id===injury.pid);
-        if(victim){victim.injury={name:injury.name||'Injury',games:Math.max(1,Math.round(injury.games||1))};
-          injuriesLog.push({g:g+1,player:victim.name,reason:victim.injury.name,games:victim.injury.games});}
+      // Injury duration is consumed after the player actually misses a game.
+      for (const p of players) if(p.injury?.games>0) p.injury.games--;
+      // Treat in-game injuries as future-game absences; only our players persist.
+      for (const event of res.injuries||[]) {
+        if(event.teamId!==dream.id) continue;
+        const victim=players.find(p=>p.id===event.pid);
+        if(!victim) continue;
+        const duration=Math.max(1,Math.round(event.games||1));
+        victim.injury={name:event.name||'Injury', games:duration};
+        injuriesLog.push({g:g+1,name:victim.name,injury:victim.injury.name,games:duration});
       }
       const won = mine.score > theirs.score;
-      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
       if (won) { w++; streak++; best = Math.max(best, streak); } else { l++; streak = 0; }
       pf += mine.score; pa += theirs.score;
+      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
       if (!won) { log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 }); if (!firstLoss) firstLoss = { g: g + 1, opp }; }
       // Live ticker.
@@ -239,8 +282,8 @@ HL.Challenge = (function () {
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss,gameLog,injuriesLog,absences };
-    st.result.identity=HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog };
+    st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
     st.result.unlocked = achievements();
     saveBest();
     const [tier, line] = verdict(w, games);
@@ -312,7 +355,7 @@ HL.Challenge = (function () {
       const pen = c ? penalty(c, s) : 0;
       return `<div class="spot slot-wrap" data-slot="${s}" style="left:${spots[s][0]}%;top:${spots[s][1]}%">
         ${c ? cardFor(c, { cls: 'mini placed', attrs: `data-from="${s}"`, rating: hide ? rating(c) : effRating(c, s) }) : `<div class="slot" data-drop="${s}">${s}</div>`}
-        ${c ? `<span class="fit ${pen >= 6 ? 'bad' : pen ? '' : 'ok'}">${s}${pen ? ` −${pen}` : ' fit'}</span>` : ''}</div>`;
+        ${c ? `<span class="fit ${pen >= 6 ? 'bad' : pen ? '' : 'ok'}">${s}${hide ? '' : pen ? ` −${pen}` : ' fit'}</span>` : ''}</div>`;
     };
     const bench = BENCH.map((s, i) => {
       const c = st.lineup[s];
@@ -358,9 +401,8 @@ HL.Challenge = (function () {
     const reel = (label, inner, landed) => `<div class="reel ${landed ? 'landed' : ''}"><div class="reel-label">${label}</div><div class="reel-win"><div class="reel-item" style="height:96px">${inner}</div></div></div>`;
     const showResult = fm && st.phase !== 'reeling' && st.phase !== 'spin';
     const reelHost = `<div id="reels"><div class="reels">${reel('Franchise', showResult ? U.logo(fm, 62) : '?', showResult)}${reel('Decade', showResult ? `${st.decade}s` : '?', showResult)}</div></div>`;
-    const gameplan=st.phase==='ready'?'<div class="gameplan-select"><b>Coaching identity</b><div class="gameplan-grid">'+Object.entries(HL.Legacy.gamePlans).map(([key,plan])=>'<button class="gameplan-option '+(st.plan===key?'active':'')+'" data-gameplan="'+key+'"><b>'+esc(plan.title)+'</b></button>').join('')+'</div><p class="t3 sm">Your scheme changes possessions and era fit.</p></div>':'';
     const controls = done
-      ? `<div class="stack" style="align-items:center;gap:8px;margin-top:16px"><div class="result">Your team is set</div><div class="t2 sm">Drag cards between spots to fix the fit, then play the ${yrLabel(st.playSeason)} season.</div>${gameplan}<button class="btn spin" data-play>Play the season</button></div>`
+      ? `<div class="stack" style="align-items:center;gap:8px;margin-top:16px"><div class="result">Your team is set</div><div class="t2 sm">Drag cards between spots, choose your game plan, then play the ${yrLabel(st.playSeason)} season.</div><div class="gameplan-select"><div class="caps">Your coaching identity</div><div class="gameplan-grid">${Object.entries(HL.Legacy.gamePlans).map(([key,plan])=>`<button class="gameplan-option ${st.plan===key?'active':''}" data-gameplan="${key}"><b>${esc(plan.title)}</b><small>${esc(plan.caption)}</small></button>`).join('')}</div><p class="t3 sm">Game plan changes tempo, offensive focus, defensive scheme and rebounding. No three-point bonus applies before 1979-80.</p></div><button class="btn spin" data-play>Play the season</button></div>`
       : `<div class="row" style="justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap">
           <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${st.round === 0 ? 'Spin' : `Spin pick ${st.round + 1}`}</button>
           <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
@@ -382,24 +424,31 @@ HL.Challenge = (function () {
   }
 
   function identityReport(r) {
-    const d=r.identity || HL.Legacy.teamReport(r,st.playSeason,st.plan);
-    return '<section class="block"><header><h3>Season film: your team identity</h3></header><div class="body stack">'+
-      '<p class="dossier-lead">'+esc(r.w===r.games?'A perfect season, earned one game at a time.':r.w>=70?'A historic juggernaut, but far from invincible.':r.w>=55?'A contender shaped by schemes and matchups.':'A team whose fit was tested every night.')+'</p>'+
-      d.badges.map(x=>'<article class="dossier-honor"><h3>'+esc(x.name)+'</h3><p>'+esc(x.proof)+'</p></article>').join('')+
-      '<p>Close games: '+d.closeWins+'-'+(d.closeGames-d.closeWins)+' · 20-point blowouts: '+d.blowouts+' · Average scoring margin: '+d.margin.toFixed(1)+'.</p>'+
-      '<p>Shot selection: '+(d.threeRate*100).toFixed(1)+'% of attempts from three; '+(d.ts*100).toFixed(1)+'% true shooting; '+d.assists.toFixed(1)+' assists per game.</p>'+
-      '<p>Scheme: '+esc(d.plan.title)+'. In '+yrLabel(st.playSeason)+', the opponent context and era rules change the value of those strengths.</p>'+
-      '<details><summary>Availability and injuries ('+(r.injuriesLog||[]).length+')</summary>'+
-      (r.injuriesLog||[]).map(x=>'<p>Game '+x.g+': '+esc(x.player)+' · '+esc(x.reason)+' ('+x.games+' games).</p>').join('')+'</details>'+
-      '<details><summary>Every game ('+(r.gameLog||[]).length+')</summary><div class="scouting-games">'+
-      (r.gameLog||[]).map(g=>'<div class="kv"><span>#'+g.g+' vs '+esc(g.opp)+'</span><b>'+(g.win?'W ':'L ')+g.for+'-'+g.against+'</b></div>').join('')+'</div></details>'+
-    '</div></section>';
+    const report=r.identity || HL.Legacy.teamReport(r,st.playSeason,st.plan);
+    const m=report.metrics;
+    const chapter=(heading,body)=>`<article class="dossier-chapter"><div class="caps">${esc(heading)}</div><p>${esc(body)}</p></article>`;
+    const listed=report.labels.map(a=>`<article class="dossier-honor"><div class="caps">Team identity unlocked</div><h3>${esc(a.name)}</h3><p>${esc(a.why)}</p></article>`).join('');
+    const swings=[report.biggestWin&&`Biggest blowout: ${esc(report.biggestWin.opp)}, ${report.biggestWin.for}-${report.biggestWin.against}.`,report.worst&&`Toughest loss or closest scare: ${esc(report.worst.opp)}, ${report.worst.for}-${report.worst.against}.`,report.mostPoints&&`Highest scoring night: ${report.mostPoints.for} vs ${esc(report.mostPoints.opp)}.`].filter(Boolean);
+    return `<section class="block dossier"><header><h3>The 82-0 Season Film</h3><span class="ml-auto t3 sm">Team DNA · era context · signature moments</span></header><div class="body stack">
+      <div class="dossier-lead">${esc(report.summary)}</div><div class="caps">What this team became</div><div class="dossier-grid">${listed}</div>
+      ${report.narrative.map((x,i)=>chapter(['The bigger picture','Compared with the era','Under pressure','Rules changed the game'][i]||'Film-room note',x)).join('')}
+      <div class="dossier-two"><article class="dossier-honor"><div class="caps">The offense</div><h3>${(100*m.ts).toFixed(1)}% TS</h3><p>${(m.assists).toFixed(1)} assists and ${(m.threes).toFixed(1)} made threes per game. ${(m.threeRate*100).toFixed(1)}% of all shots from distance.</p></article>
+      <article class="dossier-honor"><div class="caps">The defense</div><h3>${r.pa.toFixed(1)} allowed</h3><p>${m.blocks.toFixed(1)} blocks, ${m.steals.toFixed(1)} steals per game. Margin: ${m.margin>=0?'+':''}${m.margin.toFixed(1)}.</p></article></div>
+      <div class="caps">Signature nights</div><div class="dossier-turns">${swings.map((x,i)=>`<div class="dossier-turn"><b>${String(i+1).padStart(2,'0')}</b><span>${x}</span></div>`).join('')}</div>
+      <details><summary>Season health and availability (${r.injuriesLog?.length||0} injuries)</summary>
+        <p>Availability matters in a full schedule. Healthy replacements are used when drafted starters and reserves cannot play.</p>
+        ${(r.injuriesLog||[]).length ? r.injuriesLog.slice(0,30).map(e=>`<p>Game ${e.g}: ${esc(e.name)} · ${esc(e.injury)} · ${e.games} projected missed games.</p>`).join('') : '<p>No recorded injuries to your drafted team this season.</p>'}
+        <div class="dossier-grid">${r.players.slice(0,8).filter(p=>r.absences?.[p.id]).map(p=>`<div class="dossier-honor"><b>${esc(p.name)}</b><p>${r.absences[p.id]} games unavailable</p></div>`).join('')}</div>
+      </details>
+      <details><summary>How these team titles are earned</summary><p>Each identity is based on actual simulated attempts, makes, assists, stops, margins or role traits. Thresholds change with rules and, when available, real league baselines. The era is ${yrLabel(st.playSeason)}. Game-plan identity: ${esc(report.plan.title)}. An undefeated record is never guaranteed.</p></details>
+    </div></section>`;
   }
+
   function resultView() {
     const r = st.result;
     const [tier, line] = verdict(r.w, r.games);
     const posterTeam = { abbr: 'YOU', city: 'The', name: 'Five', color: '#c9a227', color2: '#111111', espn: null };
-    const rows = r.players.slice(0, SLOTS.length).map(p => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${p.slot.startsWith('B') ? 'Bench' : p.slot}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${l.fga ? (l.fgm / l.fga * 100).toFixed(1) : '-'}</td></tr>`; }).join('');
+    const rows = r.players.slice(0, SLOTS.length).map(p => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${p.slot.startsWith('B') ? 'Bench' : p.slot}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl/g).toFixed(1)}</td><td>${(l.blk/g).toFixed(1)}</td><td>${(l.tpa/g).toFixed(1)}</td><td>${l.fga+.44*l.fta ? (100*l.pts/(2*(l.fga+.44*l.fta))).toFixed(1) : '-'}</td></tr>`; }).join('');
     const k = Math.round(r.w / r.games * 10);
     const share = `${r.games}-0 Challenge${st.daily ? ` · Daily ${st.date}` : ''} · ${yrLabel(st.playSeason)}\n${r.w}-${r.l} · ${tier}\n${'🟩'.repeat(k)}${'🟥'.repeat(10 - k)}\n${STARTERS.map(s => `${s} ${HL.HISTORY.players[st.lineup[s].row.pid][0]}`).join(' · ')}`;
     return `<div class="stack" style="gap:14px">${HL.GFX.championPoster(posterTeam, r.players.slice(0, 5), '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
@@ -411,7 +460,13 @@ HL.Challenge = (function () {
       </div></section>
       ${identityReport(r)}
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
-      <section class="block"><header><h3>Season stats</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th></tr></thead><tbody>${rows}</tbody></table></div></div></section>
+      <section class="block"><header><h3>Season scouting report</h3></header><div class="body stack">
+        <div class="cols c2"><div><div class="kv"><span>Net points / game</span><b>${(r.pf-r.pa).toFixed(1)}</b></div><div class="kv"><span>Season efficiency (TS%)</span><b>${(() => {const a=Object.values(r.lines).reduce((t,b)=>({pts:t.pts+b.pts,fga:t.fga+b.fga,fta:t.fta+b.fta}),{pts:0,fga:0,fta:0});return a.fga+.44*a.fta ? (100*a.pts/(2*(a.fga+.44*a.fta))).toFixed(1)+'%' : '—';})()}</b></div></div><div><div class="kv"><span>Era environment</span><b>${yrLabel(st.playSeason)}</b></div><div class="kv"><span>Schedule</span><b>${r.games} games · ${r.w} wins</b></div></div></div>
+        <details><summary>Rule differences in this era</summary><p class="t2 sm">${HL.eraContext(st.playSeason).facts.map(esc).join(' · ')}</p></details>
+        <details><summary>Every game result (${r.gameLog.length})</summary><div class="scouting-games">${r.gameLog.map(g=>`<div class="kv"><span>#${g.g} · ${esc(g.opp)} ${g.home?'HOME':'AWAY'}</span><b class="${g.win?'win':'loss'}">${g.win?'W':'L'} ${g.for}-${g.against}</b></div>`).join('')}</div></details>
+        <div class="t3 sm">All eight players keep their recorded historical shot preferences and a separate skill profile. Skill differences interact through defense, size, pace, team context and era rules.</div>
+      </div></section>
+      <section class="block"><header><h3>Season stats</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>3PA</th><th>TS%</th></tr></thead><tbody>${rows}</tbody></table></div></div></section>
       <textarea hidden data-share-text>${esc(share)}</textarea></div>`;
   }
 
@@ -523,5 +578,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, franchisesIn, loadDecade, posOk, penalty, naturals };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, fittedAttributes, franchisesIn, loadDecade, posOk, penalty, naturals };
 })();

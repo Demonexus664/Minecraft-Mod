@@ -69,6 +69,7 @@ HL.History = (function () {
     return o;
   }
 
+  // Avoid rebuilding thousands of rows on every card search or award comparison.
   const rowCache = new Map();
   function seasonRows(key) {
     const S = HL.HISTORY_SEASONS[key];
@@ -96,7 +97,7 @@ HL.History = (function () {
   function makePlayer(row, seasonStart, teamId) {
     const bio = H().players[row.pid];
     const [name, nbaId, , height, weight, born, hof, college] = bio;
-    const attrs = unpack(row.attrs, H().attrs);
+    const attrs = HL.completeAttributes(unpack(row.attrs, H().attrs), height, weight);
     const t = unpack(row.tend, H().tends);
     const p = {
       id: HL.nextPlayerId(), hid: row.pid,
@@ -105,7 +106,7 @@ HL.History = (function () {
       attrs, ovr: HL.computeOvr(attrs, row.pos),
       traits: null, teamId, morale: 70, injury: null, contract: null, stats: {}, careerAwards: [], draft: null,
     };
-    p.tend = { usage: t.usage, three: t.three, mid: t.mid, drive: t.drive, post: t.post, passFirst: t.passFirst, gamble: t.gamble, crash: t.crash, effort: 75, foulAggr: t.foulAggr, drawFoul: t.drawFoul };
+    p.tend = HL.completeTendencies({ ...p, tend: { usage: t.usage, three: t.three, mid: t.mid, drive: t.drive, post: t.post, passFirst: t.passFirst, gamble: t.gamble, crash: t.crash, effort: 75, foulAggr: t.foulAggr, drawFoul: t.drawFoul } });
     const R = HL.RNG;
     p.traits = {
       workEthic: HL.clamp(Math.round(R.normal(60, 14)), 10, 99),
