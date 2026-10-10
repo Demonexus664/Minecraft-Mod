@@ -135,6 +135,8 @@ HL.Challenge = (function () {
   }
   // Out-of-position cost in rating points: distance between spots, plus how far his size is from the spot's.
   function penalty(c, slot) {
+    const assigned=slotForCard(c),hybrid=assigned&&fusionAt(assigned);
+    if(hybrid)return fusionFit(hybrid,slot);
     if (!STARTERS.includes(slot)) return 0;
     const d = Math.min(...naturals(c).map(n => Math.abs(n - POSI[slot])));
     const ht = HL.HISTORY.players[c.row.pid][3] || TYPICAL_HT[slot];
@@ -154,6 +156,8 @@ HL.Challenge = (function () {
   // Offensive impact survives a natural-position assignment, but is reduced
   // when the player is forced into a significantly different position.
   const effRating = (c, slot) => {
+    const assigned=slotForCard(c),hybrid=assigned&&fusionAt(assigned);
+    if(hybrid)return Math.max(25,hybrid.ovr-fusionFit(hybrid,slot));
     const pen=penalty(c,slot);
     // 82-0 uses the same season rating as Skill Draft and the historical roster.
     // Matching a natural spot is a +1 bonus, never an inexplicable demotion.
@@ -221,7 +225,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[], gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[],fusionSlots:{},pendingFusionId:null,gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -256,12 +260,75 @@ HL.Challenge = (function () {
     render(true);
   }
 
+
+  // A Genesis hybrid is a replacement for one of the eight drafted players.
+  // It retains its own ratings, frame and mechanics. The original source is
+  // not secretly still contributing its historical team DNA.
+  const fusionAllowed=()=>!!st&&!st.daily&&st.mode!=='hoopiq'&&st.phase==='ready';
+  function fusionAt(slot){
+    const id=st?.fusionSlots?.[slot];
+    return id&&HL.FusionLab?.find(id)||null;
+  }
+  const slotForCard=c=>st&&SLOTS.find(slot=>st.lineup[slot]===c);
+  function teamDnaEntries(){
+    return SLOTS.filter(slot=>st.lineup[slot]&&!fusionAt(slot)).map(slot=>({
+      pid:st.lineup[slot].row.pid,cat:slot,row:st.lineup[slot].row,season:st.lineup[slot].season
+    }));
+  }
+  function refreshTeamDna(){st.dna=HL.DNA.analyze(teamDnaEntries(),{mode:'team'});}
+  function assignFusion(slot,node){
+    if(!fusionAllowed()||!SLOTS.includes(slot)||!st.lineup[slot]||!node||!HL.FusionLab.find(node.id))return false;
+    // Identical hybrids can't play twice at once; move instead of cloning.
+    for(const key of Object.keys(st.fusionSlots))if(st.fusionSlots[key]===node.id)delete st.fusionSlots[key];
+    st.fusionSlots[slot]=node.id;st.pendingFusionId=null;refreshTeamDna();return true;
+  }
+  function clearFusion(slot){
+    if(!fusionAllowed()||!fusionAt(slot))return false;
+    delete st.fusionSlots[slot];refreshTeamDna();return true;
+  }
+  function fusionFit(node,slot) {
+    if(!STARTERS.includes(slot))return 0;
+    const natural=POSI[node.pos]??2,distance=Math.abs(natural-POSI[slot]);
+    const size=Math.max(0,Math.abs((node.height||78)-TYPICAL_HT[slot])-4)*.8;
+    return Math.round([0,2,6,11,16][distance]+(distance?size:0));
+  }
+  function genesisPanel(){
+    if(!fusionAllowed())return '';
+    const pending=HL.FusionLab?.find(st.pendingFusionId);
+    const records=SLOTS.filter(slot=>fusionAt(slot)).map(slot=>({slot,node:fusionAt(slot)}));
+    const ancestry=records.map(({slot,node})=>{
+      const img=HL.FusionUI?.portrait(
+        {photo:node.images?.[0]||'',name:node.heads?.[0]||'Parent A'},
+        {photo:node.images?.[1]||'',name:node.heads?.[1]||'Parent B'},true)||'';
+      return '<article class="genesis-roster-entry">'+img+
+        '<div><span class="caps">'+slot+' · GEN '+node.depth+'</span><b>'+esc(node.name)+'</b>'+
+        '<small>'+node.ovr+' OVR · '+esc(node.family)+' · '+
+        esc(Object.keys(node.mechanics||{}).slice(0,4).join(' / '))+'</small></div>'+
+        '<button class="btn small" data-fusion-remove="'+slot+'">Restore original</button></article>';
+    }).join('');
+    return '<section class="block genesis-820-panel"><header><h3>GENESIS FUSION LABORATORY</h3>'+
+      '<span class="ml-auto t3 sm">Exclusive to 82-0 · Custom rosters</span></header>'+
+      '<div class="body stack"><p class="t2 sm">Experiment with any two historical players. Success creates a new basketball identity; failure creates no playable hybrid. Keep combining successful hybrids for unlimited generations. Replace any drafted player with your creation before the season.</p>'+
+      '<button class="btn go big" data-fusion-open>OPEN GENESIS WORKSTATION</button>'+
+      (pending?'<div class="genesis-assignment"><span class="caps">CREATION READY · '+esc(pending.name)+
+        ' · '+pending.ovr+' OVR</span><h3>Choose the roster spot to replace</h3>'+
+        '<div class="genesis-slot-grid">'+SLOTS.filter(slot=>st.lineup[slot]).map(slot=>
+          '<button class="genesis-slot-choice" data-fusion-assign="'+slot+'"><b>'+slot+'</b><span>'+
+          esc(HL.HISTORY.players[st.lineup[slot].row.pid][0])+'</span><small>'+
+          (fusionAt(slot)?'Replaces '+esc(fusionAt(slot).name):'Original card')+'</small></button>').join('')+
+        '</div><button class="btn small" data-fusion-cancel>Cancel assignment</button></div>':'')+
+      '<div class="caps">EQUIPPED HYBRIDS · '+records.length+' / 8</div>'+
+      (ancestry||'<p class="t3 sm">No hybrids equipped. Your drafted eight remain unchanged until you assign a fusion.</p>')+
+      '<p class="t3 sm">Custom fusion teams are excluded from standardized Daily and HoopIQ runs. Stats, size and actual on-court DNA mechanics transfer into the season; the original card does not remain as a hidden bonus.</p>'+
+      '</div></section>';
+  }
+
   function place(handIdx, slot) {
     const c = st.hand[handIdx];
     if (!c || st.lineup[slot] || st.phase !== 'hand') return;
     const oldDna=st.dna;
     st.lineup[slot] = c;
-    st.dna=HL.DNA.analyze(SLOTS.filter(x=>st.lineup[x]).map(x=>({pid:st.lineup[x].row.pid,cat:x,row:st.lineup[x].row,season:st.lineup[x].season})),{mode:'team'});
+    refreshTeamDna();
     const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id));
     if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
@@ -279,7 +346,10 @@ HL.Challenge = (function () {
   function swap(a,b){
     if(['season','result','playoffs'].includes(st.phase)||!SLOTS.includes(a)||!SLOTS.includes(b))return;
     const t=st.lineup[a];st.lineup[a]=st.lineup[b];st.lineup[b]=t;
-    st.dna=HL.DNA.analyze(SLOTS.filter(k=>st.lineup[k]).map(k=>({pid:st.lineup[k].row.pid,cat:k,row:st.lineup[k].row,season:st.lineup[k].season})),{mode:'team'});
+    const fusionA=st.fusionSlots[a],fusionB=st.fusionSlots[b];
+    if(fusionB)st.fusionSlots[a]=fusionB;else delete st.fusionSlots[a];
+    if(fusionA)st.fusionSlots[b]=fusionA;else delete st.fusionSlots[b];
+    refreshTeamDna();
     FX.sfx.flip();render();
   }
 
