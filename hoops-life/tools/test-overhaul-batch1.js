@@ -8,7 +8,7 @@ const vm=require('node:vm');
 const {load,ctx}=require('./load');
 
 const HL=load(['js/core/rng.js','data/history/index.js','data/history/career-traits.js',
-  'js/league/ratings.js','js/league/legend-dna.js']);
+  'js/league/ratings.js','js/league/player.js','js/league/legend-dna.js']);
 HL.UI={esc:s=>String(s??''),app:()=>({}),setEra:()=>{},applyTeamTheme:()=>{}};
 HL.FX={sfx:{pop(){},clutch(){},rival(){}},reduced:()=>true};
 const fullSkill=fs.readFileSync(path.join(__dirname,'../js/modes/skilldraft.js'),'utf8');
@@ -18,10 +18,10 @@ const challengeReturn='return { open: () => { st = null; render(); }';
 assert.ok(fullSkill.includes(skillReturn));
 assert.ok(full82.includes(challengeReturn));
 vm.runInContext(full82.replace(challengeReturn,
-  'return { __overhaul:{newRun,missionStatus,COACHES,CHALLENGES,state:()=>st}, open: () => { st = null; render(); }'),
+  'return { __overhaul:{newRun,missionStatus,COACHES,CHALLENGES,gauntletSchedule,state:()=>st}, open: () => { st = null; render(); }'),
   ctx,{filename:'challenge820.js'});
 vm.runInContext(fullSkill.replace(skillReturn,
-  'return { __overhaul:{TRAINING,trainSummer,trainingView,milestoneView,ratingsAt}, open: () => { st = null; cache = null; render(); }'),
+  'return { __overhaul:{TRAINING,trainSummer,trainingView,milestoneView,ratingsAt,ROLES,AGENDAS,customizeRole,finishAgenda,rolePanel}, open: () => { st = null; cache = null; render(); }'),
   ctx,{filename:'skilldraft.js'});
 
 function career(){
@@ -115,4 +115,60 @@ test('Arena Edition registers a visual layer, motion accessibility and material 
   assert.match(fx,/achievement:/);
   assert.match(fx,/clutch:/);
   assert.match(fx,/rival:/);
+});
+
+test('Legend Gauntlet schedules four honest high-strength NBA opponents',()=>{
+  const h=HL.Challenge.__overhaul;
+  const teams=Array.from({length:10},(_,i)=>({id:i,name:'Team '+i,
+    customPlayers:Array.from({length:7},()=>({ovr:70+i}))}));
+  const schedule=Array.from({length:82},(_,i)=>teams[i%10]);
+  const before=teams.map(t=>t.customPlayers[0].ovr);
+  const bosses=h.gauntletSchedule(teams,schedule);
+  assert.equal(bosses.length,4);
+  assert.equal(bosses[0].g,21);
+  assert.equal(bosses[3].g,82);
+  assert.deepEqual(bosses.map(b=>b.id),[9,8,7,6]);
+  assert.ok(bosses.every(b=>schedule[b.g-1].id===b.id));
+  assert.deepEqual(teams.map(t=>t.customPlayers[0].ovr),before,'opponents remain unboosted');
+  h.newRun({mode:'classic',decades:[2010],playSeason:2025,gauntlet:true});
+  assert.equal(h.state().gauntlet,true);
+  h.newRun({mode:'classic',decades:[2010],playSeason:2025,gauntlet:true,daily:true});
+  assert.equal(h.state().gauntlet,false,'daily challenges remain comparable');
+});
+
+test('Season Gameplan Studio changes actual usage and tendencies without changing ratings',()=>{
+  const h=HL.SkillDraft.__overhaul;
+  assert.equal(Object.keys(h.ROLES).length,5);
+  const getPlayer=()=>({pos:'SG',height:76,weight:200,age:25,ovr:87,
+    attrs:Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,80])),tend:{}});
+  const base=getPlayer(),scorer=getPlayer(),creator=getPlayer(),def=getPlayer();
+  h.customizeRole(base,'balanced');
+  const scoring=h.customizeRole(scorer,'scorer');
+  const passing=h.customizeRole(creator,'facilitator');
+  h.customizeRole(def,'stopper');
+  assert.ok(scorer.tend.usage>base.tend.usage);
+  assert.ok(creator.tend.passFirst>base.tend.passFirst);
+  assert.ok(def.tend.contest>base.tend.contest);
+  assert.ok(scorer.tend.passFirst<base.tend.passFirst);
+  assert.equal(scoring.focus,'star');
+  assert.equal(passing.focus,'motion');
+  assert.deepEqual(scorer.attrs,base.attrs,'identical physical and technical ratings');
+});
+
+test('Season contracts pay modest training rewards only when real thresholds are met',()=>{
+  const h=HL.SkillDraft.__overhaul,c=career();
+  c.agenda='points';c.agendaVictories=0;c.agendaHistory=[];c.trainingReward=0;
+  const missed=h.finishAgenda(c,{g:78,ppg:29.5},82);
+  assert.equal(missed.complete,false);
+  assert.equal(c.trainingReward,0);
+  const won=h.finishAgenda(c,{g:80,ppg:30.1},82);
+  assert.equal(won.complete,true);
+  assert.equal(c.agendaVictories,1);
+  assert.ok(c.trainingReward>0);
+  c.trainingFocus='shooting';
+  h.trainSummer(c);
+  assert.equal(c.trainingReward,0,'bonus is spent once');
+  assert.ok(c.training.shooting<3,'reward stays limited');
+  assert.match(h.rolePanel(c),/data-role="scorer"/);
+  assert.match(h.rolePanel(c),/data-agenda/);
 });
