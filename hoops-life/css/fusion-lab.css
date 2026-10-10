@@ -175,3 +175,53 @@ html[data-fx-level=off] .gf-result .gf-portrait,html[data-fx-level=off] .gf-port
  margin-top:11px;}
 @media(max-width:680px){.dna-index-summary b{font-size:27px}
  .dna-index-summary span{font-size:9px}.dna-index-grid{grid-template-columns:1fr}}
+
+
+/* Genesis V2 · inherited specialist traits, honest failures and visible
+   basketball costs. Existing parent photos stay real and split in half. */
+.gf-predicted{border-top:1px solid #c4a7fa42;margin-top:14px;padding-top:13px;
+ background:radial-gradient(ellipse at right,#896dcf17,transparent);}
+.gf-predicted>b{font:900 12px var(--body);color:#d6bfff;letter-spacing:.13em;}
+.gf-predicted>p{font:750 13px/1.6 var(--body);text-transform:capitalize;color:#dce7ff;}
+.gf-predicted>small{font:450 11px/1.5 var(--body);color:#91a8c8;}
+.gf-failed-reading{max-width:680px;margin:17px auto 22px;padding:21px;
+ border:1px solid #e87e8b7a;border-radius:14px;
+ background:radial-gradient(ellipse at 0% 0%,#e7597730,transparent 70%),#101927;
+ box-shadow:inset 0 1px 0 #ffe2e51c;}
+.gf-failed-reading>b{display:block;font:900 17px var(--display);color:#f9aab9;
+ letter-spacing:.11em;text-transform:uppercase;}
+.gf-failed-reading>p{font:600 15px/1.5 var(--body);color:#f3d5e0;margin:10px 0;}
+.gf-failed-reading>small{font:450 12px/1.55 var(--body);color:#a2bad6;}
+.gf-genome{max-width:845px;margin:20px auto;border-radius:16px;padding:clamp(13px,3vw,27px);
+ border:1px solid #a5cdf353;background:
+ radial-gradient(ellipse at 80% 0%,#7661c525,transparent 64%),
+ linear-gradient(160deg,#1b2b42,#0e1726);
+ box-shadow:0 13px 43px #0005,inset 0 1px #ffffff13;}
+.gf-genome-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+ margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid #ffffff24;}
+.gf-genome-head>b{font:900 19px var(--display);letter-spacing:.12em;color:#f4f8ff;}
+.gf-genome-head>span{font:700 11px var(--body);color:#a2bad8;}
+.gf-gene-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;}
+.gf-gene{display:flex;flex-direction:column;gap:6px;padding:13px;border-radius:10px;
+ background:linear-gradient(135deg,#243d5b,#131f33);border:1px solid #c1ddfa37;}
+.gf-gene small{font:850 11px var(--body);text-transform:capitalize;color:#acc8ed;}
+.gf-gene b{font:900 36px/1 var(--display);color:#fff2cf;text-shadow:0 0 20px #ffe5a433;}
+.gf-gene-track{height:5px;border-radius:5px;overflow:hidden;background:#aec3ee2c;}
+.gf-gene-track i{display:block;height:100%;border-radius:5px;
+ background:linear-gradient(90deg,#8eacff,#e2d5a3);box-shadow:0 0 12px #adcaff78;}
+.gf-tradeoff{display:grid;gap:7px;margin-top:20px;padding:13px 0;border-top:1px solid #ffffff21;}
+.gf-tradeoff>b{font:900 13px var(--body);color:#f5c3af;letter-spacing:.15em;}
+.gf-tradeoff>div{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+ padding:8px 0;border-bottom:1px solid #ffffff13;}
+.gf-tradeoff>div>span{font:700 12px var(--body);text-transform:capitalize;color:#d7e5f9;}
+.gf-tradeoff>div>strong{font:700 12px var(--body);color:#f0b8b1;}
+.gf-tradeoff.small{font:650 11px var(--body);color:#afc8dd;}
+.gf-result-metrics{font-variant-numeric:tabular-nums;}
+.gf-result.success .gf-portrait::after{content:"";position:absolute;inset:-1px;
+ border:1px solid #fff4de75;border-radius:inherit;pointer-events:none;
+ box-shadow:inset 0 0 28px #c597ed52,0 0 25px #ddbbf857;}
+.gf-result.failure .gf-portrait{filter:grayscale(.72) saturate(.65);opacity:.82;}
+@media(max-width:590px){.gf-gene-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .gf-gene{padding:9px}.gf-gene b{font-size:29px}
+ .gf-genome-head>b{font-size:15px}
+ .gf-tradeoff>div{flex-direction:column;gap:3px}}
