@@ -67,6 +67,10 @@ HL.FusionUI=(function(){
         '</b><b>'+E(r.node.family)+'</b></div>'+
       '<div class="gf-genome"><div class="gf-genome-head"><b>INHERITED ELITE TOOLS</b>'+
       '<span>'+r.node.ancestry.length+' unique historical ancestors</span></div>'+
+      '<div class="gf-lineage"><div class="caps">LINEAGE · GENERATION '+r.node.depth+'</div>'+
+      r.node.ancestry.slice(0,18).map(pid=>'<span>'+E(HL.HISTORY?.players?.[pid]?.[0]||pid)+'</span>').join('')+
+      (r.node.ancestry.length>18?'<small>+ '+(r.node.ancestry.length-18)+' ancestors</small>':'')+
+      '</div>'+
       '<div class="gf-gene-grid">'+(r.node.strengths?.length?r.node.strengths.map(g=>
         '<div class="gf-gene"><small>'+E(g.key.replace(/([A-Z])/g,' $1'))+
         '</small><b>'+g.value+'</b><div class="gf-gene-track"><i style="width:'+g.value+'%"></i></div></div>').join(''):
@@ -108,11 +112,17 @@ HL.FusionUI=(function(){
    '>ATTEMPT FUSION</button><button class="btn" data-gf-swap '+(!a||!b?'disabled':'')+'>SWAP</button></div>'+
    '<div class="gf-feedback" data-gf-status aria-live="polite"></div><div data-gf-result></div>'+
    '<section class="gf-created"><h3>MY HYBRIDS · '+F().creations().length+'</h3>'+
-   (F().creations().length?F().creations().slice(0,30).map(node=>
-    '<div class="gf-created-row"><div><b>'+E(node.name)+'</b><small>Gen '+node.depth+
-      ' · '+node.ovr+' OVR · '+E(node.tier)+'</small></div>'+
-     '<button class="btn small" data-gf-reuse="'+E(node.id)+'">USE AS PARENT</button>'+
-     '<button class="btn small" data-gf-equip="'+E(node.id)+'">EQUIP</button></div>').join(''):
+   '<p class="t3 sm">Your fusion collection persists between careers and reloads when browser storage is available. You can keep merging any generation with any other parent.</p>'+
+   (F().creations().length?'<div class="gf-collection">'+F().creations().slice(0,30).map(node=>
+    '<article class="gf-collection-card">'+portrait(
+       {photo:node.images?.[0],name:node.heads?.[0]||node.name},
+       {photo:node.images?.[1],name:node.heads?.[1]||node.name},true)+
+    '<div class="gf-collection-desc"><b>'+E(node.name)+'</b><small>GEN '+node.depth+
+       ' · '+node.ovr+' OVR · '+E(node.tier.toUpperCase())+'</small>'+
+       '<span>'+E(Object.keys(node.mechanics||{}).slice(0,3).join(' / '))+'</span></div>'+
+    '<div class="gf-collection-actions"><button class="btn small" data-gf-reuse="'+E(node.id)+'">FUSE AGAIN</button>'+
+     '<button class="btn small" data-gf-equip="'+E(node.id)+'">EQUIP</button></div></article>').join('')+
+    '</div>':
     '<p class="t3 sm">Successful creations live here. Reuse them as new parents or equip one on your Skill Draft build.</p>')+
    '</section><details class="gf-history"><summary>EXPERIMENT LOG · '+F().history().length+'</summary>'+
    F().history().slice(0,25).map(entry=>
