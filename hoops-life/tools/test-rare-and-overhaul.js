@@ -51,11 +51,11 @@ test('elite tool ratings have a visibly nonlinear bounded simulation bonus',()=>
   assert.ok(z(99)-z(95)>z(95)-z(90));
   assert.ok(z(99)>=1 && z(99)<=1.001);
 });
-test('a 99 prime duration stays fully elite through age 50 without raising cap',()=>{
+test('a jointly extraordinary build can sustain an exceptional prime without raising the cap',()=>{
  const {load}=require('./load');
  HL.UI={esc:s=>String(s)}; HL.FX={};
- load(['js/modes/challenge820.js','js/modes/skilldraft.js']);
- const c={prime:{attrs:Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,99])),longevity:99,primeLength:99},me:{traits:{workEthic:75}}};
+ load(['js/league/legend-dna.js','js/modes/challenge820.js','js/modes/skilldraft.js']);
+ const c={prime:{attrs:Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,99])),height:85,longevity:99,primeLength:99},me:{height:85,traits:{workEthic:75}}};
  const w=HL.SkillDraft.primeWindow(c);
  assert.ok(w.end>=50,JSON.stringify(w));
  const a=HL.SkillDraft.ratingsAt(c,50);

@@ -4,7 +4,7 @@ const mk=(pid,cat='mid')=>({pid,cat});
 test('Different real players carry different usable signatures',()=>{
  const curry=HL.DNA.analyze([mk('curryst01','three')]);const bird=HL.DNA.analyze([mk('birdla01','three')]);
  assert.notEqual(curry.signatures[0].name,bird.signatures[0].name);
- assert.notDeepEqual(curry.signatures[0].bonus,bird.signatures[0].bonus);
+ assert.notDeepEqual(curry.signatures[0].mechanics,bird.signatures[0].mechanics);
  assert.equal(curry.signatures[0].title,undefined);
 });
 test('Known duo and trio chemistry is stronger and instantly active',()=>{
@@ -12,29 +12,28 @@ test('Known duo and trio chemistry is stronger and instantly active',()=>{
  assert.equal(duo.pairs[0].name,'Splash Brothers');assert.ok(duo.active.some(e=>e.type==='historical-duo'));
  const trio=HL.DNA.analyze([mk('curryst01','three'),mk('thompkl01','jumper'),mk('greendr01','intD')]);
  assert.ok(trio.trios.some(e=>e.name==='The Bay Blueprint'));
- assert.ok(HL.DNA.bonusEffects(trio).three>0);
+ assert.ok(HL.DNA.mergeMechanics(trio.active).relocation>0);
 });
-test('Fictional trios and duo categories have stable distinct identities and effects',()=>{
+test('Three arbitrary icons no longer receive generated trio mutations',()=>{
  const ps=[mk('curryst01','three'),mk('onealsh01','inside'),mk('jordami01','mid')];
  const a=HL.DNA.analyze(ps),b=HL.DNA.analyze(ps);
- assert.equal(a.trios[0].name,b.trios[0].name);
- assert.equal(a.pairs.length,3);assert.ok(a.mutations.some(m=>m.type==='evolved'));
- assert.equal(new Set(a.pairs.map(x=>x.id)).size,3);
- assert.notEqual(HL.DNA.preview(ps.slice(0,1),ps[1]).id,null);
+ assert.equal(JSON.stringify(a),JSON.stringify(b));
+ assert.equal(a.mutations.length,0);assert.equal(a.trios.length,0);
+ assert.equal(new Set(a.pairs.map(x=>x.id)).size,a.pairs.length);
 });
-test('Wade plus Cavs LeBron triggers actual mutation effects without mutating original data',()=>{
+test('Wade plus Cavs LeBron keeps ordinary transition chemistry without unqualified transformation',()=>{
  const before=HL.historicalAttributes(HL.History.seasonRows('2017').find(r=>r.pid==='jamesle01'));
  const d=HL.DNA.analyze([mk('jamesle01','speed'),mk('wadedw01','inside')]);
- assert.ok(d.mutations.some(x=>x.year===2012&&x.target==='jamesle01'));
+ assert.equal(d.mutations.length,0);
  const build={attrs:{accel:95,contactFinish:93},primeLength:80};HL.DNA.applyBuild(build,d);
- assert.ok(build.attrs.accel>=98);assert.ok(build.effects.transition>0);
+ assert.equal(build.attrs.accel,95);assert.ok(build.mechanics.transition>0);
  assert.equal(HL.historicalAttributes(HL.History.seasonRows('2017').find(r=>r.pid==='jamesle01')).accel,before.accel);
 });
-test('Chemistry modifies game ratings but respects max of 100 and original players',()=>{
+test('Chemistry supplies actual mechanics while preserving drafted ratings',()=>{
  const ps=[{id:1,historicalPid:'curryst01',attrs:{three:99,releaseSpeed:98}}, {id:2,historicalPid:'thompkl01',attrs:{three:96,releaseSpeed:90}}];
  const dna=HL.DNA.applyTeam(ps,[{pid:'curryst01',cat:'PG'},{pid:'thompkl01',cat:'SG'}]);
- assert.equal(ps[0].attrs.three,100);assert.equal(ps[1].attrs.releaseSpeed,92);
- assert.ok(ps[0].dna.effects.three>0&&dna.pairs.length>0);
+ assert.equal(ps[0].attrs.three,99);assert.equal(ps[1].attrs.releaseSpeed,90);
+ assert.ok(ps[0].dna.mechanics.gravity>0&&dna.pairs.length>0);
 });
 test('All legendary draft team rolls yield a real five-card hand, never six',async()=>{
  let enough=0;for(const spec of HL.Legends.DRAFT_TEAMS){const c=await HL.Legends.draftTeam(spec);if(c){enough++;assert.equal(c.length,5);assert.equal(new Set(c.map(x=>x.row.pid)).size,5);}}

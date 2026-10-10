@@ -61,130 +61,186 @@ HL.DNA = (function () {
     {p:['curryst01','thompkl01','duranke01'],name:'Unfair Spacing',tone:'arc',bonus:{three:.045,mid:.035,assist:.02},boost:{three:2,releaseHeight:2}},
     {p:['jordami01','pippesc01','rodmade01'],name:'Second Three-Peat',tone:'scarlet',bonus:{defense:.05,reb:.033,clutch:.025},boost:{perD:2,boxout:3}},
   ];
-  // A mutation transforms the FORM, while chemistry remains a separate effect.
-  const FORMS = [
-    {p:['jamesle01','wadedw01'],target:'jamesle01',year:2012,name:'Heat LeBron · Unleashed',tone:'scarlet',bonus:{transition:.025,rim:.02,defense:.014},boost:{accel:3,contactFinish:2}},
-    {p:['curryst01','thompkl01'],target:'curryst01',year:2015,name:'Unanimous Splash Curry',tone:'arc',bonus:{three:.025,assist:.012},boost:{releaseSpeed:3,three:2}},
-    {p:['onealsh01','bryanko01'],target:'onealsh01',year:1999,name:'Three-Peat Shaq · Untethered',tone:'royal',bonus:{rim:.028,reb:.017},boost:{post:3,str:2}},
-    {p:['jordami01','pippesc01'],target:'jordami01',year:1995,name:'72-Win Jordan · Air Supremacy',tone:'scarlet',bonus:{mid:.025,defense:.015},boost:{fade:3,clutchShot:2}},
-    {p:['curryst01','duranke01'],target:'duranke01',year:2016,name:'Bay Area Durant · Unbound',tone:'arc',bonus:{three:.018,mid:.022},boost:{releaseHeight:3}},
-    {p:['jamesle01','wadedw01','boshch01'],target:'jamesle01',year:2012,name:'Heatles Apex · LeBron',tone:'scarlet',bonus:{rim:.022,transition:.026,defense:.026},boost:{contactFinish:3,perD:2}},
-  ];
-  const CATEGORY_DOMAINS={
-    inside:['rim','draw'],mid:['mid','clutch'],three:['three','assist'],ft:['clutch','draw'],
-    pass:['assist','transition'],handle:['mid','rim'],perD:['defense','steal'],
-    intD:['defense','block'],steal:['steal','transition'],reb:['reb','defense'],
-    speed:['transition','rim'],vert:['rim','block'],strength:['rim','reb'],
-    jumper:['three','mid'],contested:['mid','clutch'],iq:['assist','defense'],
-    motor:['reb','defense'],body:['block','reb'],tendScorer:['clutch','rim'],
-    tendShot:['three','mid'],tendTeam:['assist','defense'],longevity:['defense','reb'],
-    primeLength:['mid','assist'], PG:['assist','three'],SG:['three','mid'],
-    SF:['transition','defense'],PF:['reb','rim'],C:['block','reb'],
-  };
-  const FAMILIES = [
-    ['three','handle','Ankle-Breaking Range','arc',{three:.018,mid:.008}],
-    ['mid','jumper','The High Window','violet',{mid:.023}],
-    ['speed','inside','Full-Court Avalanche','ember',{rim:.020,transition:.014}],
-    ['strength','inside','No-Mercy Contact','earth',{rim:.022}],
-    ['pass','three','Drive-Kick Engine','arc',{assist:.024,three:.012}],
-    ['reb','intD','Paint Lockdown','earth',{reb:.025,block:.014}],
-    ['contested','mid','Unanswerable Fade','violet',{mid:.023,clutch:.012}],
-    ['speed','vert','Flight Path','ember',{rim:.021,transition:.016}],
-    ['iq','pass','The Chessboard','emerald',{assist:.026}],
-    ['steal','speed','Fastbreak Predator','emerald',{steal:.015,transition:.025}],
-  ];
   const PALETTE={arc:['#21d5ff','#9b8cff'],scarlet:['#ff526a','#ffc362'],royal:['#a175ff','#ffd46a'],gold:['#ffdc61','#fff4bf'],earth:['#ffb06d','#bd654f'],emerald:['#2cdda9','#a7ffe9'],violet:['#c879ff','#e3a6ff'],ember:['#ff8557','#ffe08a']};
-  const key = list=>[...list].sort().join(':');
-  const hash = s=>{let h=2166136261;for(let i=0;i<s.length;i++)h=Math.imul(h^s.charCodeAt(i),16777619);return h>>>0;};
-  const pairNames=['Orbit','Collision','Showtime','Gravity','Afterburn','Crossfire','Skyline','Overdrive','Shadow','Velocity','Pressure','Precision'];
-  const pairEnds=['Protocol','Connection','Machine','Circuit','Fusion','Theory','Engine','Paradox','Shift','Break','System','Matrix'];
-  const seenIds=entries=>[...new Set(entries.map(x=>x.pid||x.row?.pid).filter(Boolean))];
-  function categoriesFor(entries,pid){return entries.filter(x=>(x.pid||x.row?.pid)===pid).map(x=>x.cat).filter(Boolean);}
-  function makeEffect(id,name,type,tone,bonus,boost,players,extra={}){
-    return {id,name,type,tone,bonus:{...bonus},boost:{...(boost||{})},players:[...players],colors:PALETTE[tone]||PALETTE.arc,...extra};
+  const key=list=>[...list].sort().join(':');
+  const esc=s=>String(s??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const name=pid=>HL.HISTORY?.players?.[pid]?.[0]||STARS[pid]?.name||pid;
+  const PROFILES={
+    curryst01:{gravity:1,relocation:1,quickRelease:.9,range:1},thompkl01:{screenMove:.9,quickRelease:.9},
+    birdla01:{anticipation:.9,highRelease:.65,precision:.65},jordami01:{creation:.95,clutchChoice:.9,contactBalance:.45},
+    jamesle01:{transition:.95,postRead:.8,contactBalance:.65},onealsh01:{deepSeal:1,postDouble:1,secondChance:.7},
+    wadedw01:{contactBalance:.8,transition:.8,laneDisruption:.35},bryanko01:{creation:1,clutchChoice:1,highRelease:.5},
+    duranke01:{highRelease:1,gravity:.65,creation:.7},johnsma02:{precision:.95,transition:1},
+    chambwi01:{deepSeal:.85,secondChance:1,rimIntimidation:.7},antetgi01:{transition:1,lob:.8,contactBalance:.7},
+    irvinky01:{creation:.8,contactBalance:.6},greendr01:{rotations:1,postRead:.8,screen:.8},
+    pippesc01:{laneDisruption:1,rotations:.75,transition:.6},rodmade01:{boxPosition:1,secondChance:1},
+    boshch01:{rotations:.6,screen:.55},boschch01:{rotations:.6,screen:.55},olajuha01:{postFootwork:1,rimIntimidation:.85},
+    duncati01:{boxPosition:.9,rotations:1,postFootwork:.65},garneke01:{rotations:1,rimIntimidation:.55,screen:.65},
+    millere01:{screenMove:1,quickRelease:.8,gravity:.75},allenra02:{screenMove:.8,quickRelease:.9,gravity:.75},
+    iversal01:{creation:.9,contactBalance:.55,transition:.7},nashst01:{precision:1,screenRead:1,transition:.8},
+    stockjo01:{precision:1,screenRead:.9,laneDisruption:.75},malonka01:{screen:1,deepSeal:.8,postFootwork:.5},
+    mcgratr01:{highRelease:.8,creation:1},cartevi01:{lob:1,transition:.7},nowitdi01:{highRelease:1,postFootwork:.8},
+    anthoca01:{creation:.75,postFootwork:.75},westbru01:{transition:1,secondChance:.4},hardeja01:{creation:1,range:.7,screenRead:.8},
+    leonaka01:{laneDisruption:.9,rotations:.85,creation:.6},davisan02:{rimIntimidation:1,lob:.85,rotations:.8},
+    lillada01:{range:1,clutchChoice:.9,quickRelease:.7},jokicni01:{postRead:1,precision:1,postFootwork:.8,screen:.65},
+    embiijo01:{postDouble:.8,deepSeal:.8,postFootwork:.7},tatumja01:{creation:.7,highRelease:.7,rotations:.5},
+    doncilu01:{screenRead:1,creation:.9,postRead:.7},gilgesh01:{creation:.85,contactBalance:.7,anticipation:.7},
+    edwaran01:{lob:.7,creation:.65,transition:.85},wembavi01:{rimIntimidation:1,highRelease:1,rotations:.75}
+  };
+  const DOMAINS={gravity:['three'],relocation:['three','speed','tendShot'],quickRelease:['jumper'],range:['three'],screenMove:['three','speed','tendShot'],
+    anticipation:['iq','tendShot','three'],highRelease:['jumper','mid','three'],precision:['pass'],creation:['handle','contested','mid'],clutchChoice:['contested','iq'],
+    contactBalance:['inside','strength'],transition:['speed','pass','tendShot'],postRead:['pass','iq'],deepSeal:['inside','strength'],postDouble:['inside'],
+    secondChance:['reb','motor'],lob:['vert','inside'],laneDisruption:['steal','perD'],rotations:['intD','perD','iq'],screen:['strength'],boxPosition:['reb'],
+    rimIntimidation:['intD'],postFootwork:['inside'],screenRead:['pass','handle']};
+  const CATEGORY_ATTRS={inside:['close','layup','dunk','post','contactFinish','floater','footwork'],mid:['mid','fade'],three:['three'],ft:['ft'],pass:['pass','vision','passingAccuracy'],
+    handle:['handle','shotCreation'],perD:['perD','lateral','agility'],intD:['intD','block','helpD','contestD'],steal:['steal'],reb:['oreb','dreb','boxout'],
+    speed:['speed','accel','transition'],vert:['vert','burst'],strength:['str','screen'],jumper:['releaseSpeed','releaseHeight','shotArc'],contested:['contested','clutchShot'],iq:['iq'],motor:['dur','stam','hustle']};
+  const MECHANIC_TEXT={gravity:'Range pulls help toward the perimeter and opens rim space for teammates.',relocation:'Relocate into space after a screen or pass.',quickRelease:'Release an assisted jumper before the closeout arrives.',range:'Create farther-out pull-up opportunities.',screenMove:'Use off-ball screens to create a catch window.',anticipation:'Read the defender to choose a better shot window.',highRelease:'Shoot above a shorter defender’s reach.',precision:'Protect a passing lane and deliver a better assisted shot.',creation:'Create a controlled jumper against a set defender.',clutchChoice:'Prefer the suitable late-clock counter.',contactBalance:'Preserve balance through contact on drives against size.',transition:'Sprint into an unsettled cross-match.',postRead:'Read help and pass to the vacated shooter.',deepSeal:'Establish deeper post position against smaller defenders.',postDouble:'Force a second defender toward a threatening post touch.',secondChance:'Win inside offensive-rebound and putback opportunities.',lob:'Finish assisted rim chances above late help.',laneDisruption:'Shrink high-risk passing lanes.',rotations:'Recover from helping toward the vacated shooter.',screen:'Create separation with a solid screen.',boxPosition:'Establish position before the rebound.',rimIntimidation:'Deter or block drives from the help position.',postFootwork:'Use pivots to evade post contests.',screenRead:'Read screen coverage and punish its available lane.'};
+  function evidence(e){
+    const pid=e.pid||e.row?.pid,archive=Number.isInteger(+e.season)&&HL.History?.seasonRows(String(e.season))?.find(r=>r.pid===pid);
+    const row=e.row&&archive&&(e.row===archive||JSON.stringify(e.row)===JSON.stringify(archive))?archive:null;
+    return {...e,pid,row,attrs:row?HL.historicalAttributes(row):{},verified:!!row};
   }
-  function analyze(entries,{mode='skill'}={}){
-    const players=seenIds(entries),cats=[...new Set(entries.map(x=>x.cat).filter(Boolean))];
-    const pairs=[],mutations=[],signatures=[];
-    for(const pid of players){const s=STARS[pid];if(s)signatures.push(makeEffect(`sig:${pid}`,s.title,'signature',s.tone,s.bonus,s.boost,[pid],{description:s.style}));}
-    for(let i=0;i<entries.length;i++)for(let j=i+1;j<entries.length;j++){
-      const a=entries[i],b=entries[j],pa=a.pid||a.row?.pid,pb=b.pid||b.row?.pid;
-      if(!pa||!pb||pa===pb)continue;
-      const ca=a.cat||'star',cb=b.cat||'star';const h=hash(`${key([pa,pb])}|${key([ca,cb])}`);
-      const rel=RELATIONS.find(r=>r.p.length===2&&r.p.every(x=>[pa,pb].includes(x)));
-      const pattern=FAMILIES.find(x=>[ca,cb].includes(x[0])&&[ca,cb].includes(x[1]));
-      const shared=rel||pattern;
-      const name=rel?.name || pattern?.[2] || `${pairNames[h%pairNames.length]} ${pairEnds[(h>>>6)%pairEnds.length]} · ${[STARS[pa]?.name?.split(' ').pop()||pa,STARS[pb]?.name?.split(' ').pop()||pb].join(' × ')}`;
-      const tone=rel?.tone || pattern?.[3] || Object.keys(PALETTE)[h%Object.keys(PALETTE).length];
-      const ad=CATEGORY_DOMAINS[ca]||['rim','transition'],bd=CATEGORY_DOMAINS[cb]||['mid','assist'];
-      const primary=ad[0]===bd[0]?ad[0]:[ad[0],bd[0]][(h>>>5)%2];
-      const secondary=[ad[1],bd[1]][(h>>>8)%2];
-      const bonus=rel?.bonus||pattern?.[4]||{[primary]:.007+(h%6)*.001,[secondary]:.002+(h%4)*.001};
-      const boost=rel?.boost||{};
-      pairs.push(makeEffect(`duo:${key([pa,pb])}:${key([ca,cb])}`,name,rel?'historical-duo':'duo',tone,bonus,boost,[pa,pb]));
+  function buildContext(entries,supplied={}){const attrs={};for(const e of entries)for(const k of CATEGORY_ATTRS[e.cat]||[])if(e.verified)attrs[k]=e.attrs[k];
+    const body=entries.find(e=>e.cat==='body'&&e.verified),bio=body&&HL.HISTORY.players[body.pid];return {attrs:{...attrs,...supplied.attrs},height:supplied.height??bio?.[3],weight:supplied.weight??bio?.[4],body:!!body};}
+  const N=(cat,pid,min)=>({cat,pid,min});
+  // Conditions are exact authored evidence. No random famous trio or hash lottery qualifies.
+  const RECIPES=[
+    {id:'compact-contact',name:'Low-Center Power Finisher',family:'contact',tone:'earth',frame:[60,76],needs:[N('strength','onealsh01',{str:96}),N('inside',null,{contactFinish:90}),N('handle',null,{handle:85})],tools:{str:96,contactFinish:90,handle:85},mechanics:{contactBalance:1.6,creation:.65},activation:'On a drive against a taller defender: keep balance, dislodge the defender and use an offset finishing angle.',description:'A small frame uses Shaq-level force below the defender’s center of gravity; it does not inherit a center’s deep-post game.'},
+    {id:'deep-post-power',name:'Deep-Seal Paint Dominator',family:'contact',tone:'earth',frame:[82,92],needs:[N('strength','onealsh01',{str:96}),N('inside',null,{post:90,contactFinish:92})],tools:{str:96,post:90},mechanics:{deepSeal:1.6,postDouble:1.4,secondChance:1.2},activation:'In half-court rim possessions: seal deep, force help and pursue inside-position rebounds.',description:'A center’s frame converts force into post position. Passing IQ decides whether the forced double exposes a teammate or causes a turnover.'},
+    {id:'moving-range',name:'Screen-to-Logo Shot Creator',family:'shooting',tone:'arc',frame:[68,81],needs:[N('three','curryst01',{three:98}),N('jumper',null,{releaseSpeed:84}),N('handle',null,{handle:94})],tools:{three:98,handle:94},mechanics:{gravity:1.35,relocation:1.25,range:1.25,quickRelease:1.1},activation:'After screens and off-ball catches: extend defensive coverage, relocate and release before recovery.',description:'Elite handle plus range changes where a screen is dangerous and opens teammates at the rim.'},
+    {id:'moving-range-evolved',name:'Read-and-Relocate Perimeter Architect',family:'shooting',type:'evolved',priority:3,tone:'arc',frame:[68,81],needs:[N('three','curryst01',{three:98}),N('jumper',null,{releaseSpeed:84}),N('handle',null,{handle:94}),N('speed',null,{speed:85}),N('iq',null,{iq:90})],tools:{three:98,handle:94,speed:85,iq:90},mechanics:{gravity:1.65,relocation:1.65,range:1.3,quickRelease:1.3,screenRead:1.2},activation:'Read the screen coverage, re-screen or relocate; following the shooter exposes the roll and weak side.',description:'Adds fast coverage reads and a second movement to Screen-to-Logo Shot Creator. It replaces that form instead of stacking.'},
+    {id:'tall-release',name:'Seven-Foot High-Release Marksman',family:'shooting',tone:'violet',frame:[83,91],needs:[N('three',null,{three:97}),N('jumper','duranke01',{releaseHeight:90}),N('contested',null,{contested:88})],tools:{three:97,releaseHeight:90,contested:88},mechanics:{highRelease:1.65,gravity:1.2,creation:.8},activation:'Against shorter perimeter defenders: shoot over the close contest.',description:'Long release geometry punishes a guard switched onto the big. It does not require sprinting around screens.'},
+    {id:'one-leg-counter',name:'High-Post Fade Counter',family:'creation',tone:'gold',frame:[79,88],needs:[N('mid','nowitdi01',{fade:90}),N('jumper',null,{releaseHeight:87}),N('inside',null,{footwork:85})],tools:{fade:90,releaseHeight:87},mechanics:{highRelease:1.45,postFootwork:1.4,creation:1.2},activation:'On unassisted midrange attempts: use post footwork and a high fade to evade contact.',description:'A tall balanced fade counters a crowded paint while retaining the drafted three-point accuracy.'},
+    {id:'dream-read',name:'Double-Team Post Escape Artist',family:'post',tone:'emerald',frame:[79,89],needs:[N('inside','olajuha01',{footwork:85}),N('pass','jokicni01',{vision:90}),N('iq',null,{iq:88})],tools:{footwork:85,vision:90},mechanics:{postFootwork:1.55,postRead:1.6,precision:1.3},activation:'When help commits to the post: pivot away or pass to the vacated shooter.',description:'Dream-style pivots and point-center vision create a choice between the counter and the passing lane.'},
+    {id:'rim-network',name:'Long-Frame Rotating Rim Eraser',family:'defense',tone:'emerald',frame:[84,92],needs:[N('intD','wembavi01',{block:90}),N('iq',null,{iq:88}),N('speed',null,{speed:78})],tools:{block:90,iq:88,speed:78},mechanics:{rimIntimidation:1.65,rotations:1.5},activation:'As the help defender: deter the drive and recover toward the vacated shooter.',description:'Reach plus fast reads support a second rotation. Floor spacing still forces a defensive choice.'},
+    {id:'guard-net',name:'Point-of-Attack Passing-Lane Hunter',family:'defense',tone:'scarlet',frame:[70,81],needs:[N('perD','pippesc01',{perD:85}),N('steal',null,{steal:92}),N('speed',null,{speed:88}),N('iq',null,{iq:85})],tools:{perD:85,steal:92,speed:88},mechanics:{laneDisruption:1.55,rotations:1.25,transition:1.1},activation:'Against perimeter creation and risky passes: shrink the lane and turn steals into a break.',description:'Pressure and anticipation reward defensive speed. They cannot make a small guard a seven-foot shot blocker.'},
+    {id:'glass-position',name:'Relentless Inside-Position Rebounder',family:'glass',tone:'earth',frame:[77,87],needs:[N('reb','rodmade01',{boxout:88}),N('motor',null,{stam:93,hustle:90}),N('strength',null,{str:85})],tools:{boxout:88,stam:93,str:85},mechanics:{boxPosition:1.6,secondChance:1.6},activation:'After misses: claim position early, hold it through contact and pursue the putback.',description:'Position and effort win repeat possessions; they never guarantee where every missed shot lands.'},
+    {id:'vertical-lob',name:'Full-Speed Above-Rim Finisher',family:'flight',tone:'ember',frame:[77,88],needs:[N('vert','cartevi01',{vert:94}),N('speed',null,{speed:90}),N('inside',null,{dunk:93})],tools:{vert:94,speed:90,dunk:93},mechanics:{lob:1.6,transition:1.4,contactBalance:.9},activation:'On breaks or assisted rim attempts: sprint into a mismatch and finish above late help.',description:'Explosive finishing needs space and a capable passer; packed half-court defense limits it.'},
+    {id:'pickroll-read',name:'Ball-Screen Coverage Manipulator',family:'creation',tone:'gold',frame:[68,81],needs:[N('pass','nashst01',{vision:90}),N('handle','doncilu01',{handle:92}),N('iq',null,{iq:90})],tools:{vision:90,handle:92,iq:90},mechanics:{screenRead:1.65,precision:1.5,creation:1},activation:'On a ball screen: read switch versus drop, find the roll or pull-up and protect the pass against a trap.',description:'Passing vision and pace manipulation create a different attack from off-ball shooting.'},
+    {id:'late-counter',name:'Late-Clock Contested-Shot Counter',family:'creation',tone:'royal',frame:[74,83],needs:[N('mid','jordami01',{mid:94}),N('contested','bryanko01',{contested:90}),N('handle',null,{handle:90})],tools:{mid:94,contested:90,handle:90},mechanics:{creation:1.6,clutchChoice:1.6,highRelease:.8},activation:'In close late possessions: create a controlled fade or drive instead of an unsuitable jumper.',description:'Counters a set defender without converting a desperate heave into a normal shot.'},
+    {id:'bay-motion',name:'Unanimous Curry: Two-Screen Relocation',family:'shooting',tone:'arc',mode:'team',p:['curryst01','thompkl01','greendr01'],years:[2015,2016],target:'curryst01',year:2015,roleTools:{curryst01:{three:98},thompkl01:{three:94},greendr01:{iq:86}},mechanics:{relocation:1.6,gravity:1.55,screenRead:1.1},activation:'With Klay and Draymond on the floor: chain a screen, a handoff and a second relocation.',description:'The verified Bay core transforms Curry’s movement; Klay pins the weak side and Draymond reads coverage.'},
+    {id:'heat-pressure',name:'Peak LeBron: Two-Lane Transition Pressure',family:'flight',tone:'scarlet',mode:'team',p:['jamesle01','wadedw01','boshch01'],years:[2011,2013],target:'jamesle01',year:2012,roleTools:{jamesle01:{contactFinish:85},wadedw01:{speed:82},boshch01:{mid:75}},mechanics:{transition:1.65,contactBalance:1.3,postRead:1},activation:'With Wade and Bosh on the floor in transition: pressure the downhill, parallel cut and trailing-big lanes.',description:'Verified Miami tools create different defensive choices, rather than upgrading any LeBron because Wade was drafted.'},
+    {id:'chicago-control',name:'72-Win Jordan: Turnover-to-Second-Chance Attack',family:'defense',tone:'scarlet',mode:'team',p:['jordami01','pippesc01','rodmade01'],years:[1995,1997],target:'jordami01',year:1995,roleTools:{jordami01:{mid:94},pippesc01:{perD:85},rodmade01:{boxout:88}},mechanics:{laneDisruption:1.4,transition:1.2,secondChance:1.2,clutchChoice:1.3},activation:'With Pippen and Rodman on the floor: turn wing pressure into breaks and extend misses with inside position.',description:'A verified championship core creates repeat offensive opportunities.'},
+    {id:'laker-post',name:'Peak Shaq: Double-Team Punisher',family:'contact',tone:'royal',mode:'team',p:['onealsh01','bryanko01'],years:[1999,2001],target:'onealsh01',year:1999,roleTools:{onealsh01:{str:96,post:90},bryanko01:{mid:90,handle:90}},mechanics:{deepSeal:1.65,postDouble:1.55,postRead:.9,secondChance:1.2},activation:'With peak Kobe on the floor: seal deep and punish help with the vacated perimeter space.',description:'Peak cards must qualify. Aging Shaq and rookie Kobe keep their ordinary chemistry without this form.'},
+    {id:'fictional-orbit',name:'Logo Shooter and Point-Center Handoff',family:'shooting',tone:'gold',mode:'team',p:['curryst01','jokicni01'],target:'curryst01',roleTools:{curryst01:{three:99,handle:95},jokicni01:{vision:95,screen:80}},mechanics:{screenRead:1.5,relocation:1.5,gravity:1.5},activation:'With Curry and Jokić sharing the floor: chain a handoff into a screen and punish its coverage.',description:'Two extraordinary verified seasons create a fictional relationship grounded in compatible roles.'},
+    {id:'fictional-sky',name:'Long-Range Entry to an Above-Rim Seal',family:'post',tone:'violet',mode:'team',p:['johnsma02','chambwi01','curryst01'],target:'chambwi01',roleTools:{johnsma02:{vision:94},chambwi01:{post:90,vert:90},curryst01:{three:98}},mechanics:{deepSeal:1.5,lob:1.5,postRead:1.2},activation:'With elite vision and range on the floor: throw over the front and finish the deep seal.',description:'Three elite roles create a high-low attack. Three arbitrary legends do not qualify.'},
+    {id:'fictional-wall',name:'Switch-to-Rim Defensive Relay',family:'defense',tone:'emerald',mode:'team',p:['leonaka01','garneke01','wembavi01'],target:'wembavi01',roleTools:{leonaka01:{perD:93},garneke01:{helpD:90},wembavi01:{block:92}},mechanics:{rimIntimidation:1.65,rotations:1.65,laneDisruption:1.2},activation:'With all three sharing the floor: contain the ball, switch the screen and relay the drive to rim protection.',description:'Strong versions of the whole defensive trio coordinate a recovery.'}
+  ];
+  const REL_MECHANICS={'Splash Brothers':{screenMove:.75,relocation:.7,gravity:.65},'Heatles Reborn':{transition:.85,contactBalance:.55},'Unfair Inside-Out':{postDouble:.65,postRead:.55},'The Unsolvable Switch':{gravity:.7,highRelease:.65},'Chicago Lockdown':{laneDisruption:.7,rotations:.75},'Purple and Gold':{transition:.65,precision:.55},'The Big Three':{transition:.85,rotations:.65},'The Bay Blueprint':{screenRead:.8,relocation:.85},'Unfair Spacing':{gravity:.85,highRelease:.65},'Second Three-Peat':{laneDisruption:.85,boxPosition:.85}};
+  for(const [p,n,m]of [
+    [['stockjo01','malonka01'],'Stockton–Malone Ball-Screen Timing',{screenRead:.85,screen:.85}],
+    [['nashst01','stoudam01'],'Nash–Stoudemire Roll Timing',{screenRead:.8,lob:.8}],
+    [['jokicni01','murraja01'],'Denver Handoff Timing',{screenRead:.8,creation:.65}],
+    [['duncati01','parketo01'],'Spurs Screen and Paint Timing',{screenRead:.75,postRead:.65}],
+    [['duncati01','ginobma01'],'Spurs Weak-Side Reads',{rotations:.7,precision:.75}],
+    [['birdla01','mchalke01','parisro01'],'Boston Frontcourt Positioning',{postRead:.8,boxPosition:.85}],
+    [['garneke01','piercpa01','allenra02'],'Boston Inside-Out Coverage',{rotations:.8,screenMove:.7}],
+    [['johnsma02','abdulka01','worthja01'],'Showtime Three-Lane Break',{transition:.95,precision:.8}],
+    [['duranke01','westbru01'],'Thunder Drive-and-Rise',{transition:.75,highRelease:.65}],
+    [['jamesle01','irvinky01'],'Cleveland Drive-and-Counter',{creation:.75,postRead:.6}],
+    [['jamesle01','davisan02'],'Lakers Lob and Weak-Side Cover',{lob:.8,rotations:.75}],
+    [['olajuha01','drexlcl01'],'Houston Post-and-Cut',{postRead:.7,transition:.7}],
+    [['birdla01','mchalke01'],'Boston Post Entry and Cut',{postRead:.75,precision:.65}]
+  ]){RELATIONS.push({p,name:n,tone:'gold',bonus:{},boost:{}});REL_MECHANICS[n]=m;}
+  const SECONDARY=[
+    [['three','pass'],'Range Opens the Passing Lane',{gravity:.45,precision:.4},'arc'],
+    [['strength','inside'],'Screen Force into Contact Finish',{screen:.45,contactBalance:.45},'earth'],
+    [['pass','iq'],'Anticipated Passing Window',{precision:.55,postRead:.35},'gold'],
+    [['reb','motor'],'Early Box-Out and Repeat Effort',{boxPosition:.5,secondChance:.45},'earth'],
+    [['intD','iq'],'Help-and-Recover Timing',{rotations:.5,rimIntimidation:.35},'emerald'],
+    [['speed','vert'],'Sprint into the Lob Window',{transition:.45,lob:.45},'ember'],
+    [['mid','contested'],'Controlled Contested Pull-Up',{creation:.5,clutchChoice:.35},'violet'],
+    [['three','jumper'],'Catch Before the Closeout',{quickRelease:.55,screenMove:.3},'arc'],
+    [['steal','perD'],'Pressure into Passing-Lane Reads',{laneDisruption:.55},'scarlet'],
+    [['inside','pass'],'Post Touch into the Open Side',{postRead:.55},'gold'],
+    [['handle','three'],'Ball-Screen Pull-Up Threat',{screenRead:.4,creation:.4},'violet'],
+    [['strength','reb'],'Hold the Inside Rebounding Spot',{boxPosition:.55},'earth']
+  ];
+  function selectedMechanics(pid,cats,mode){return Object.fromEntries(Object.entries(PROFILES[pid]||{}).filter(([k])=>mode==='team'||DOMAINS[k]?.some(c=>cats.includes(c))));}
+  function effect(id,n,type,tone,ps,mechanics,extra={}){return {id,name:n,type,tone,players:ps,mechanics,bonus:{},boost:{},colors:PALETTE[tone]||PALETTE.arc,
+    activation:'While the relevant skills are used together; team partners must share the floor.',description:Object.keys(mechanics).map(k=>MECHANIC_TEXT[k]).join(' '),...extra};}
+  function qualify(r,entries,b,mode){
+    if(r.mode){if(mode!==r.mode)return null;const es=r.p.map(pid=>entries.find(e=>e.pid===pid&&e.verified&&(!r.years||(+e.season>=r.years[0]&&+e.season<=r.years[1]))&&Object.entries(r.roleTools?.[pid]||{}).every(([k,v])=>e.attrs[k]>=v)));return es.every(Boolean)?es:null;}
+    if(mode!=='skill'||!b.body||!Number.isFinite(b.height)||b.height<r.frame[0]||b.height>r.frame[1]||!Object.entries(r.tools||{}).every(([k,v])=>b.attrs[k]>=v))return null;
+    const es=r.needs.map(n=>entries.find(e=>e.cat===n.cat&&(!n.pid||n.pid===e.pid)&&e.verified&&Object.entries(n.min||{}).every(([k,v])=>e.attrs[k]>=v)));
+    return es.every(Boolean)?[...es,entries.find(e=>e.cat==='body'&&e.verified)]:null;
+  }
+  function analyze(rawEntries,{mode='skill',build:supplied={}}={}){
+    const entries=[...new Map(rawEntries.filter(e=>e.pid||e.row?.pid).map(e=>[`${e.pid||e.row.pid}:${e.cat}`,evidence(e)])).values()].sort((a,b)=>`${a.pid}:${a.cat}`.localeCompare(`${b.pid}:${b.cat}`));
+    const players=[...new Set(entries.map(e=>e.pid))],cats=[...new Set(entries.map(e=>e.cat))],build=buildContext(entries,supplied),signatures=[],pairs=[],trios=[];
+    for(const pid of players){const s=STARS[pid],es=entries.filter(e=>e.pid===pid),m=selectedMechanics(pid,es.map(e=>e.cat),mode);if(s&&Object.keys(m).length)signatures.push(effect(`sig:${pid}`,s.title,'signature',s.tone,[pid],m,{qualification:`Inherited from ${name(pid)}: ${es.map(e=>e.cat).join(', ')}.`,ingredients:es}));}
+    for(const r of RELATIONS)if(r.p.every(pid=>players.includes(pid))){const m=Object.fromEntries(Object.entries(REL_MECHANICS[r.name]||{}).filter(([k])=>mode==='team'||DOMAINS[k]?.some(c=>cats.includes(c))));if(!Object.keys(m).length)continue;const f=effect(`chem:${key(r.p)}`,r.name,r.p.length===3?'historical-trio':'historical-duo',r.tone,r.p,m,{qualification:`Established partnership: ${r.p.map(name).join(' + ')}.`,ingredients:r.p.map(pid=>entries.find(e=>e.pid===pid))});(r.p.length===3?trios:pairs).push(f);}
+    if(mode==='skill')for(const [cs,n,m,tone]of SECONDARY){const es=cs.map(c=>entries.find(e=>e.cat===c&&e.verified));if(es.every(Boolean)&&es.every(e=>Math.max(...(CATEGORY_ATTRS[e.cat]||[]).map(k=>e.attrs[k]))>=75))pairs.push(effect(`skill:${cs.join(':')}`,n,'duo',tone,[...new Set(es.map(e=>e.pid))],m,{ingredients:es,qualification:es.map(e=>`${name(e.pid)}’s ${e.cat}`).join(' + ')}));}
+    if(mode==='team')for(const [a,b,n,m,tone]of [
+      ['gravity','deepSeal','Range and Deep-Post Space',{gravity:.45,postRead:.35},'arc'],['precision','lob','Passer and Above-Rim Target',{precision:.45,lob:.5},'gold'],
+      ['screenRead','screen','Ball Handler and Screen Setter',{screenRead:.45,screen:.5},'earth'],['laneDisruption','rimIntimidation','Wing Pressure and Back-Line Cover',{rotations:.5,laneDisruption:.35},'emerald']]){
+      const ea=entries.find(e=>e.verified&&(PROFILES[e.pid]?.[a]||0)>=.8),eb=entries.find(e=>e.verified&&e.pid!==ea?.pid&&(PROFILES[e.pid]?.[b]||0)>=.8);
+      if(ea&&eb&&!pairs.some(f=>f.players.includes(ea.pid)&&f.players.includes(eb.pid)))pairs.push(effect(`fit:${a}:${b}:${key([ea.pid,eb.pid])}`,n,'duo',tone,[ea.pid,eb.pid],m,{ingredients:[ea,eb],qualification:`${name(ea.pid)} + ${name(eb.pid)}; compatible ${a} and ${b} roles.`}));}
+    const qualified=RECIPES.map(r=>({r,es:qualify(r,entries,build,mode)})).filter(x=>x.es).sort((a,b)=>(b.r.priority||1)-(a.r.priority||1)||a.r.id.localeCompare(b.r.id)),mutations=[],families=new Set();
+    for(const {r,es}of qualified){if(families.has(r.family)||mutations.length>=2)continue;families.add(r.family);mutations.push(effect(`mutation:${r.id}`,r.name,r.type||'mutation',r.tone,[...new Set(es.map(e=>e.pid))],r.mechanics,{...r,id:`mutation:${r.id}`,type:r.type||'mutation',ingredients:es,qualification:mode==='team'?es.map(e=>`${name(e.pid)} · ${e.season}-${String(+e.season+1).slice(-2)}`).join(' + '):`${build.height} inch frame; ${es.map(e=>`${name(e.pid)}’s ${e.cat}`).join(' + ')}.`,target:r.target||null}));}
+    return {players,cats,mode,build,signatures,pairs,trios,mutations,active:[...signatures,...pairs.slice(0,6),...trios.slice(0,3),...mutations]};
+  }
+  function mergeMechanics(items){const out={};for(const f of items)for(const[k,v]of Object.entries(f.mechanics||{}))out[k]=Math.max(out[k]||0,v);return out;}
+  function bonusEffects(dna,scope=null){const out={};for(const f of dna.active||[])if(!scope||f.players.includes(scope))for(const[k,v]of Object.entries(f.bonus||{}))out[k]=clamp((out[k]||0)+v,-.03,.06);return out;}
+  function applyBuild(build,dna){build.dna=dna;build.effects=bonusEffects(dna);build.mechanics=mergeMechanics(dna.active);return build;}
+  function applyTeam(players,entries){const dna=analyze(entries,{mode:'team'});for(const p of players){const pid=p.historicalPid||p.pid||entries.find(e=>e.playerId===p.id)?.pid,privateFx=dna.signatures.filter(s=>s.players.includes(pid)),links=dna.active.filter(s=>s.type!=='signature'&&s.players.includes(pid)&&(!s.target||s.target===pid));p.dna={effects:bonusEffects({active:privateFx}),mechanics:mergeMechanics(privateFx),links:links.map(f=>({id:f.id,players:f.players,mechanics:f.mechanics})),signature:privateFx[0]?.name||null,mutations:links.filter(s=>s.type==='mutation'||s.type==='evolved').map(s=>s.name)};}return dna;}
+  function mechanicsFor(p,lineup=[],cache=null){
+    if(cache?.get(lineup)?.has(p))return cache.get(lineup).get(p);
+    const items=[{mechanics:p?.dna?.mechanics||{}}];for(const link of p?.dna?.links||[])if(link.players.every(pid=>lineup.some(x=>(x.historicalPid||x.pid)===pid)))items.push(link);
+    const tool={gravity:'three',relocation:'speed',quickRelease:'releaseSpeed',range:'three',screenMove:'speed',anticipation:'iq',highRelease:'releaseHeight',precision:'vision',creation:'shotCreation',clutchChoice:'clutchShot',contactBalance:'str',transition:'speed',postRead:'vision',deepSeal:'post',postDouble:'post',secondChance:'oreb',lob:'vert',laneDisruption:'steal',rotations:'helpD',screen:'screen',boxPosition:'boxout',rimIntimidation:'block',postFootwork:'footwork',screenRead:'vision'},a=p?.attrs||{};
+    const result=Object.fromEntries(Object.entries(mergeMechanics(items)).map(([k,v])=>[k,v*clamp(((a[tool[k]]??75)-25)/50,0,1)]));
+    if(cache){if(!cache.has(lineup))cache.set(lineup,new WeakMap());cache.get(lineup).set(p,result);}return result;}
+  function reconcileAttributes(source,height=78){
+    const attrs={...source},constraints=[];
+    const cap=(k,value,reason)=>{if(Number.isFinite(attrs[k])&&attrs[k]>value){constraints.push({key:k,ceiling:attrs[k],effective:Math.round(value),reason});attrs[k]=Math.round(value);}};
+    // Tall standing reach needs less lift; a short player needs both elevation and burst.
+    cap('dunk',clamp(37+(attrs.vert??65)*.42+(attrs.burst??65)*.24+Math.max(0,height-72)*1.8,25,100),'Dunk execution depends on standing reach, vertical and explosiveness.');
+    cap('screen',clamp(28+(attrs.str??65)*.65+(attrs.iq??65)*.18,25,100),'Screen execution depends on strength and positional timing.');
+    cap('block',clamp(35+Math.max(0,height-72)*2+(attrs.vert??65)*.28+(attrs.helpD??65)*.16,25,100),'Block execution depends on reach, elevation and help timing.');
+    cap('shotCreation',clamp(30+(attrs.handle??65)*.55+(attrs.footwork??65)*.2+(attrs.burst??65)*.15,25,100),'Shot creation needs handle, footwork and separation.');
+    return {attrs,constraints};
+  }
+  function basketballContext({shooter,defender,lineup=[],dline=[],type=null,transition=false,clutch=false,assisted=false,coverage='man',play=null,cache=null}){
+    const m=mechanicsFor(shooter,lineup,cache),dm=dline.map(p=>mechanicsFor(p,dline,cache)),a=shooter.attrs||{};
+    const best=k=>Math.max(0,...dm.map(x=>x[k]||0)),own=k=>m[k]||0;
+    const gravity=Math.max(0,...lineup.filter(p=>p!==shooter).map(p=>mechanicsFor(p,lineup,cache).gravity||0));
+    const height=shooter.height||78,dh=defender?.height||78;
+    const screener=lineup.filter(p=>p!==shooter).reduce((v,p)=>Math.max(v,(p.attrs?.screen||50)/100*(.65+(mechanicsFor(p,lineup,cache).screen||0)*.35)),0);
+    const screen=(own('screenMove')+own('screenRead')*.65+own('relocation')*.65)*screener;
+    const postThreat=!transition&&(shooter.tend?.post||0)>25?own('postDouble'):0;
+    const read=clamp(own('postRead')+Math.max(0,(a.vision||65)-75)/40,0,1.8);
+    const out={make:0,block:0,foul:0,assist:0,turnover:0,rimWeight:1,midWeight:1,threeWeight:1,kickChance:0,rebOff:0,actions:[]};
+    const add=(key,amount)=>{if(amount>0&&!out.actions.includes(key))out.actions.push(key);};
+    out.threeWeight+=own('range')*.25+own('relocation')*.25+screen*.18;
+    out.rimWeight+=own('deepSeal')*.3+own('contactBalance')*.12+own('transition')*(transition?.4:0);
+    out.rimWeight*=Math.max(.65,1-best('rimIntimidation')*.12);
+    out.midWeight+=own('creation')*.18+own('highRelease')*.12;
+    if(clutch){out.midWeight+=own('clutchChoice')*.22;out.threeWeight+=own('clutchChoice')*(a.three>=a.mid?.18:-.1);}
+    out.turnover=best('laneDisruption')*.012-own('precision')*.012+postThreat*.015*(1-read*.45);
+    out.assist=own('precision')*.035+screen*.07+read*postThreat*.04;
+    out.kickChance=clamp(postThreat*read*.24,0,.6);
+    out.rebOff=clamp(own('secondChance')*.025+own('boxPosition')*.01-best('boxPosition')*.025,-.06,.06);
+    if(type==='rim'){
+      out.make+=gravity*.05;add('gravitySpace',gravity);
+      if(height<=77&&dh>height+2){out.make+=own('contactBalance')*.055;out.foul+=own('contactBalance')*.18;add('contactBalance',own('contactBalance'));}
+      if(!transition&&(shooter.tend?.post||0)>25){out.make+=own('deepSeal')*(dh<height?.065:.04)+own('postFootwork')*.035-postThreat*.015;add('deepSeal',own('deepSeal'));add('postDouble',postThreat);}
+      if(transition){out.make+=own('transition')*.06;add('transitionMismatch',own('transition'));}
+      if(assisted){out.make+=own('lob')*.06;add('lob',own('lob'));}
+      out.make-=best('rimIntimidation')*.05;out.block+=best('rimIntimidation')*.025;add('rimIntimidation',best('rimIntimidation'));
+    }else if(type){
+      if(assisted){out.make+=own('quickRelease')*.03+screen*.025;add('quickRelease',own('quickRelease'));add('screenWindow',screen);add('relocation',own('relocation'));}
+      else{out.make+=own('creation')*.04+own('anticipation')*.025;add('shotCreation',own('creation'));add('shotAnticipation',own('anticipation'));}
+      if(height>dh){out.make+=own('highRelease')*.035*clamp((height-dh)/5,0,1);add('highRelease',own('highRelease'));}
+      out.make-=best('rotations')*.025;add('defensiveRecovery',best('rotations'));
+      if(coverage==='drop'&&screen>0)out.make+=screen*.015;
     }
-    // Real trios are stronger than imagined combinations; unusual fictional
-    // trios get their own stable names and effects based on exact ingredients.
-    const trios=[];
-    for(let i=0;i<players.length;i++)for(let j=i+1;j<players.length;j++)for(let k=j+1;k<players.length;k++){
-      const ps=[players[i],players[j],players[k]],h=hash(key(ps));
-      const rel=RELATIONS.find(r=>r.p.length===3&&r.p.every(x=>ps.includes(x)));
-      const name=rel?.name||`${pairNames[h%pairNames.length]} ${pairEnds[(h>>>9)%pairEnds.length]} · ${ps.map(p=>STARS[p]?.name?.split(' ').pop()||p).join(' / ')}`;
-      const tone=rel?.tone||Object.keys(PALETTE)[(h>>>5)%Object.keys(PALETTE).length];
-      const core=ps.map(p=>categoriesFor(entries,p)[0]||'star').map(c=>CATEGORY_DOMAINS[c]||['transition']);
-      const domain=core[h%core.length][0];
-      trios.push(makeEffect(`trio:${key(ps)}`,name,rel?'historical-trio':'trio',tone,rel?.bonus||{[domain]:.018+(h%7)*.002},rel?.boost||{},ps));
-    }
-    for(const f of FORMS)if(f.p.every(pid=>players.includes(pid)))mutations.push(makeEffect(`mutation:${key(f.p)}`,f.name,'mutation',f.tone,f.bonus,f.boost,f.p,{target:f.target,year:f.year}));
-    // Rare evolving form for three distinct famous players, even if their
-    // historical paths never crossed. Its identity is deterministic per trio.
-    const iconic=players.filter(p=>STARS[p]);
-    if(iconic.length>=3){const ps=iconic.slice(0,3),h=hash(key(ps));mutations.push(makeEffect(`evolved:${key(ps)}`,`Apex ${pairNames[h%pairNames.length]} · Evolved`,'evolved',Object.keys(PALETTE)[h%8],{[(['three','rim','mid','assist'][h%4])]:.018}, {shotCreation:2},ps,{target:ps[h%3],year:null}));}
-    // Avoid drowning the UI or overpowering the sim. Every pair/trio exists,
-    // but only the strongest 4 pairs and 2 trios have active game bonuses.
-    const sortedPairs=pairs.sort((a,b)=>(b.type==='historical-duo')-(a.type==='historical-duo')||hash(a.id)-hash(b.id));
-    const sortedTrios=trios.sort((a,b)=>(b.type==='historical-trio')-(a.type==='historical-trio')||hash(a.id)-hash(b.id));
-    const active=[...signatures,...sortedPairs.slice(0,6),...sortedTrios.slice(0,4),...mutations.slice(0,3)];
-    return {players,cats,signatures,pairs:sortedPairs,trios:sortedTrios,mutations,active};
+    if(clutch&&type){out.make+=own('clutchChoice')*.025;add('clutchCounter',own('clutchChoice'));}
+    if(type&&out.turnover>0)add('passingLanePressure',best('laneDisruption'));
+    out.make=clamp(out.make,-.14,.18);return out;
   }
-  function bonusEffects(dna,scope='all'){
-    const result={};for(const item of dna.active||[])for(const [kind,v]of Object.entries(item.bonus)) result[kind]=(result[kind]||0)+v;
-    for(const kind in result)result[kind]=clamp(result[kind],-.03,.095);
-    return result;
-  }
-  function applyBuild(build,dna){
-    build.dna=dna; build.effects=bonusEffects(dna);
-    for(const fx of dna.active.filter(x=>x.type==='signature'||x.type==='mutation'||x.type==='evolved'))for(const [k,b] of Object.entries(fx.boost))
-      if(Number.isFinite(build.attrs[k]))build.attrs[k]=Math.min(100,build.attrs[k]+b);
-    return build;
-  }
-  function applyTeam(players,entries){
-    const dna=analyze(entries,{mode:'team'});
-    const combined=bonusEffects(dna);
-    for(const p of players){const playerId=p.historicalPid||p.pid||entries.find(e=>e.playerId===p.id)?.pid;
-      const signature=dna.signatures.find(s=>s.players.includes(playerId));
-      // Signature boost goes to its owner. General chemistry scales across
-      // the lineup because it represents team interactions, not private OVR.
-      p.attrs={...p.attrs};
-      if(signature)for(const [k,v]of Object.entries(signature.boost))if(Number.isFinite(p.attrs[k]))p.attrs[k]=Math.min(100,p.attrs[k]+v);
-      const mutations=dna.mutations.filter(m=>m.target===playerId);
-      for(const m of mutations)for(const [k,v]of Object.entries(m.boost))if(Number.isFinite(p.attrs[k]))p.attrs[k]=Math.min(100,p.attrs[k]+v);
-      p.dna={effects:combined,signature:signature?.name||null,mutations:mutations.map(m=>m.name)};
-    }
-    return dna;
-  }
-  const fmt=(effect)=>`--dna-a:${effect.colors[0]};--dna-b:${effect.colors[1]};`;
-  const esc=s=>String(s).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
-  function visual(f,{compact=false}={}){
-    const body=f.description?`<p>${esc(f.description)}</p>`:`<p>${esc(Object.entries(f.bonus).map(([k,v])=>`${k} +${(v*100).toFixed(1)}% situational effect`).join(' · '))}</p>`;
-    return `<article class="dna-effect dna-${f.type}" style="${fmt(f)}" data-dna="${esc(f.id)}"><div class="dna-mark" aria-hidden="true">${f.type==='mutation'||f.type==='evolved'?'✦':f.type.includes('trio')?'Ⅲ':f.type.includes('duo')?'Ⅱ':'★'}</div><div><span class="dna-kind">${esc(f.type.replaceAll('-',' '))}</span><b>${esc(f.name)}</b>${compact?'':body}</div></article>`;
-  }
-  function board(dna,{compact=false}={}){
-    if(!dna)return '';
-    const feature=[...dna.mutations,...dna.trios.slice(0,compact?1:4),...dna.pairs.slice(0,compact?2:7),...dna.signatures.slice(0,compact?1:3)];
-    if(!feature.length)return '<p class="t3 sm">Draft more players to reveal your DNA.</p>';
-    return `<section class="dna-showcase"><div class="dna-section-label">${compact?'SYNERGY PREVIEW':'SIGNATURES · CHEMISTRY · MUTATIONS'}</div><div class="dna-effect-grid">${feature.map(f=>visual(f,{compact})).join('')}</div>${!compact&&dna.pairs.length>7?`<details><summary>${dna.pairs.length-7} more duo combinations</summary><div class="dna-effect-grid">${dna.pairs.slice(7).map(f=>visual(f,{compact:true})).join('')}</div></details>`:''}</section>`;
-  }
-  function preview(entries,candidate){const next=analyze([...entries,candidate]);const old=analyze(entries);const fresh=[...next.mutations,...next.trios,...next.pairs].filter(x=>![...old.mutations,...old.trios,...old.pairs].some(y=>y.id===x.id));return fresh[0]||null;}
-  return {STARS,RELATIONS,FORMS,analyze,bonusEffects,applyBuild,applyTeam,visual,board,preview,esc,PALETTE};
+  function visual(f,{compact=false}={}){const detail=`<p>${esc(f.description)}</p><p><b>Unlocked by</b> ${esc(f.qualification)}</p><p><b>Activates</b> ${esc(f.activation)}</p>`;return `<article class="dna-effect dna-${esc(f.type)}" style="--dna-a:${f.colors[0]};--dna-b:${f.colors[1]}" data-dna="${esc(f.id)}"><div class="dna-mark" aria-hidden="true">${['mutation','evolved'].includes(f.type)?'✦':f.type.includes('trio')?'Ⅲ':f.type.includes('duo')?'Ⅱ':'★'}</div><div><span class="dna-kind">${esc(f.type.replaceAll('-',' '))}</span><b>${esc(f.name)}</b><details><summary>How it works</summary>${detail}</details>${compact?'':`<p>${esc(f.activation)}</p>`}</div></article>`;}
+  function board(dna,{compact=false}={}){if(!dna)return '';const featured=[...dna.mutations,...dna.trios,...dna.pairs.slice(0,compact?2:6),...dna.signatures.slice(0,compact?1:3)],more=[...dna.pairs.slice(compact?2:6),...dna.signatures.slice(compact?1:3)];if(!featured.length)return '<p class="t3 sm">Draft compatible skills to discover chemistry. Transformations require verified elite tools and a matching build.</p>';return `<section class="dna-showcase"><div class="dna-section-label">${compact?'BUILD DNA':'SIGNATURES · CHEMISTRY · RARE TRANSFORMATIONS'}</div><div class="dna-effect-grid">${featured.map(f=>visual(f,{compact})).join('')}</div>${more.length?`<details><summary>Inspect ${more.length} more abilities</summary><div class="dna-effect-grid">${more.map(f=>visual(f,{compact})).join('')}</div></details>`:''}</section>`;}
+  function preview(entries,candidate,options={}){const next=analyze([...entries,candidate],options),old=analyze(entries,options);return [...next.mutations,...next.trios,...next.pairs].find(f=>!old.active.some(o=>o.id===f.id))||null;}
+  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,preview,esc,PALETTE};
 })();

@@ -203,7 +203,7 @@ HL.Challenge = (function () {
     if (!c || st.lineup[slot] || st.phase !== 'hand') return;
     const oldDna=st.dna;
     st.lineup[slot] = c;
-    st.dna=HL.DNA.analyze(SLOTS.filter(x=>st.lineup[x]).map(x=>({pid:st.lineup[x].row.pid,cat:x})),{mode:'team'});
+    st.dna=HL.DNA.analyze(SLOTS.filter(x=>st.lineup[x]).map(x=>({pid:st.lineup[x].row.pid,cat:x,row:st.lineup[x].row,season:st.lineup[x].season})),{mode:'team'});
     const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id)) || st.dna.trios.find(x=>!oldDna?.trios.some(y=>y.id===x.id)) || st.dna.pairs.find(x=>!oldDna?.pairs.some(y=>y.id===x.id));
     if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
@@ -265,7 +265,7 @@ HL.Challenge = (function () {
       b.realMpg = 2;
       players.push(b);
     }
-    const dnaEntries=SLOTS.map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,playerId:players[SLOTS.indexOf(slot)].id}));
+    const dnaEntries=SLOTS.map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,row:st.lineup[slot].row,season:st.lineup[slot].season,playerId:players[SLOTS.indexOf(slot)].id}));
     // Historical mutations remain distinct from team chemistry.
     st.dna=HL.DNA.applyTeam(players.slice(0,8),dnaEntries);
     dream.players = players;
