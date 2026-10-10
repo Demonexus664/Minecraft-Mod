@@ -278,7 +278,7 @@ HL.DEFAULT_RULES = () => ({
       common: 0.068 * (prof && prof.ftr ? HL.clamp(prof.ftr / BASE.ftr, 0.8, 1.6) : 1),
     };
     const paceAdj = ((H.strat.pace + A.strat.pace) / 2 - 50) * 0.12;
-    const possPerTeam48 = E.pace * 1.045 + paceAdj + (opts.paceMod || 0);
+    const possPerTeam48 = E.pace * 1.025 + paceAdj + (opts.paceMod || 0);
     let avgPossSec = 2880 / (possPerTeam48 * 2);
     const regSeconds = rules.quarterLen * 60 * 4;
 
@@ -613,7 +613,7 @@ HL.DEFAULT_RULES = () => ({
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
       if (rules.handCheck && type !== 'rim') makeP -= 0.012;
       if (clutch) makeP += (shooter.traits.clutch - 55) * 0.0012;
-      makeP += homeBoost + E.efg;
+      makeP += homeBoost + E.efg - 0.025; // Calibrated against 2025-26 league shot efficiency.
       // Score effects: big leads breed complacency, trailing teams push harder.
       makeP -= HL.clamp(lead, -18, 26) * 0.0016;
       // Foul drawing: real players use their real free-throw rate; generated players use scoring talent.
@@ -821,7 +821,7 @@ HL.DEFAULT_RULES = () => ({
         const T = teams.find(T => T.team.id === teamId); if (!T) return false;
         Object.assign(T.strat, values);
         if (rules.illegalDefense && T.strat.defense === 'zone') T.strat.defense = 'man';
-        avgPossSec = 2880 / ((E.pace * 1.045 + ((H.strat.pace + A.strat.pace) / 2 - 50) * .12 + (opts.paceMod || 0)) * 2);
+        avgPossSec = 2880 / ((E.pace * 1.025 + ((H.strat.pace + A.strat.pace) / 2 - 50) * .12 + (opts.paceMod || 0)) * 2);
         return true;
       },
       playerControl(pid, values) {
