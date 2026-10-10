@@ -72,7 +72,7 @@ HL.GameNights=(function(){
     if(finished)return;finished=true;document.removeEventListener('keydown',key);
     document.body.style.overflow=oldScroll;ref.remove();
     if(prior?.isConnected&&prior.focus)prior.focus();
-    resolve(PLANS[id]?id:'trust');
+    resolve(id==='trust:automatic'?id:PLANS[id]?id:'trust');
    }
    document.addEventListener('keydown',key);
    ref.querySelectorAll('[data-game-night]').forEach(el=>el.onclick=()=>finish(el.dataset.gameNight));
