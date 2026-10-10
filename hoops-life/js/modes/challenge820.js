@@ -52,6 +52,37 @@ HL.Challenge = (function () {
     const taken = new Set(excluded);
     return R.shuffle(candidates(franchise, dec).filter(c => !taken.has(c.row.pid)).slice(0, HAND));
   }
+  // For Skill Draft, select the best qualifying season of each player FOR THE ROLLED SKILL.
+  function skillValue(c, category) {
+    if (category[0] === 'body') {
+      const bio = HL.HISTORY.players[c.row.pid];
+      return Math.round(HL.clamp(38+(bio[3]-69)*2.6+(bio[4]-175)*0.12,25,99));
+    }
+    const a = HL.History.unpack(c.row.attrs, HL.HISTORY.attrs);
+    return Math.round(category[2].reduce((n,k)=>n+a[k],0)/category[2].length);
+  }
+  const skillCache = new Map();
+  function skillCandidates(franchise,dec,category) {
+    const key = franchise+':'+dec+':'+category[0];
+    if (skillCache.has(key)) return skillCache.get(key);
+    const best = new Map();
+    for (const k of HL.HISTORY.seasons) {
+      if (k.includes('-') || Math.floor(+k/10)*10 !== dec || !HL.HISTORY_SEASONS[k]) continue;
+      for (const r of HL.History.seasonRows(k)) {
+        const club = r.stints.find(s=>LINEAGE[s[0]]===franchise && s[1]>=20);
+        if (!club) continue;
+        const c={row:r,season:+k,club:club[0]}, old=best.get(r.pid);
+        if (!old || skillValue(c,category)>skillValue(old,category) ||
+            (skillValue(c,category)===skillValue(old,category)&&r.ovr>old.row.ovr)) best.set(r.pid,c);
+      }
+    }
+    const sorted=[...best.values()].sort((a,b)=>skillValue(b,category)-skillValue(a,category)||b.row.ovr-a.row.ovr);
+    skillCache.set(key,sorted);return sorted;
+  }
+  function dealSkillHand(franchise,dec,category,excluded=[]) {
+    const taken=new Set(excluded);
+    return skillCandidates(franchise,dec,category).filter(c=>!taken.has(c.row.pid)).slice(0,HAND);
+  }
   function franchisesIn(dec) {
     const set = new Set();
     for (const k of HL.HISTORY.seasons) {
@@ -464,5 +495,5 @@ HL.Challenge = (function () {
     draw();
   }
 
-  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, franchisesIn, loadDecade, posOk, penalty, naturals };
+  return { open: () => { st = null; render(); }, LINEAGE, candidates, dealHand, skillCandidates, skillValue, dealSkillHand, franchisesIn, loadDecade, posOk, penalty, naturals };
 })();
