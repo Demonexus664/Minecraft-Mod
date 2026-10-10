@@ -30,11 +30,11 @@ HL.SkillDraft = (function () {
     st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 1, era: 1, stat: 1 }, career: null, name: 'Your Player' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
-  const decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020];
+  const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
   const SHORT = { inside: 'INSIDE', mid: 'MID', three: '3PT', ft: 'FT', pass: 'PASS', handle: 'HANDLE', perD: 'PER D', intD: 'RIM D', reb: 'REB', ath: 'ATH', iq: 'IQ', motor: 'MOTOR', body: 'BODY' };
-  // A card's value for the drawn skill (body cards are rated by overall, and show height and weight).
-  const skillValue = (c, cat) => cat[0] === 'body' ? c.row.ovr : avgOf(rowAttrs(c.row), cat[2]);
+  // BODY measures frame independently from skill or overall.
+  const skillValue = (c, cat) => C().skillValue(c, cat);
 
   // Spin the three reels (team, decade, skill), deal a hand of five from that club and decade, flip it.
   async function spin(what = 'all') {
@@ -45,7 +45,7 @@ HL.SkillDraft = (function () {
     const fr = C().franchisesIn(st.decade);
     if (what === 'all' || what === 'team' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
     // Use the same best-five team/decade hand as 82-0.
-    st.hand = C().dealHand(st.team, st.decade);
+    st.hand = C().dealSkillHand(st.team, st.decade, catOf(st.cat));
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);
@@ -138,16 +138,20 @@ HL.SkillDraft = (function () {
 
   // Ratings by age: physical tools arrive early, skills grow until ~26, decline after 29.
   // Work ethic ("reach") decides how close he gets to the prime he was built for.
+  // The acquired attributes are reachable at prime. Work ethic controls speed to prime, not a secret ceiling.
   function ratingsAt(c, age) {
     const out = {};
-    const grow = age <= 19 ? 0 : age >= 26 ? 1 : (age - 19) / 7;
-    const decline = age <= 29 ? 0 : (age - 29) * (age >= 33 ? 2.6 : 1.6);
+    const yearsToPrime = HL.clamp(7-(c.me.traits.workEthic-50)/22,5,9);
+    const growth = HL.clamp((age-19)/yearsToPrime,0,1);
+    const fullPrime = age >= 28 && age <= 29;
+    const decline = age<=29 ? 0 : (age-29)*(age>=33 ? 2.6 : 1.6);
     for (const k of HL.ATTR_KEYS) {
-      const target = c.prime.attrs[k] * c.reach + (1 - c.reach) * 50;
-      const gap = ['speed', 'vert', 'str', 'dur', 'stam'].includes(k) ? 3 : 13;
-      const phys = ['speed', 'vert', 'stam'].includes(k) ? 1.5 : ['iq', 'ft', 'pass'].includes(k) ? 0.3 : 1;
-      const fixed = c.noise ? c.noise[k] : 0;
-      out[k] = Math.round(HL.clamp(target - gap * (1 - grow) - decline * phys + fixed + R.normal(0, 0.7), 25, 99));
+      const target = c.prime.attrs[k];
+      if (fullPrime) {out[k]=target;continue;}
+      const gap = ['speed','vert','str','dur','stam'].includes(k)?4:13;
+      const fade = ['speed','vert','stam'].includes(k)?1.5:['iq','ft','pass'].includes(k)?0.3:1;
+      const variation = age<28?(c.noise?.[k]||0)*(1-growth):0;
+      out[k] = Math.round(HL.clamp(target-gap*(1-growth)-decline*fade+variation,25,99));
     }
     return out;
   }
@@ -162,7 +166,6 @@ HL.SkillDraft = (function () {
     me.id = ME_ID; me.weight = prime.weight; me.realMpg = null;
     return {
       me, prime, primeOvr: HL.computeOvr(prime.attrs, prime.pos),
-      reach: HL.clamp(0.88 + (me.traits.workEthic - 50) / 400 + R.normal(0, 0.04), 0.78, 1.04),
       noise: Object.fromEntries(HL.ATTR_KEYS.map(k => [k, R.normal(0, 1.6)])),
       debut: st.debut, age: 19, yr: st.debut, franchise: null, teamMeta: null, contract: null, minors: false,
       seasons: [], awards: [], rings: 0, teams: [], pick: null, altered: [], earnings: 0, log: [], lastRecords: {},
@@ -635,7 +638,7 @@ HL.SkillDraft = (function () {
     return `<section class="block"><header><h3>Draft night · ${c.debut}</h3></header><div class="body stack">
         <div class="row" style="gap:16px">${t && !c.minors ? U.logo(t, 72) : ''}<div><div class="caps">${c.pick ? `Pick #${c.pick}` : 'Undrafted'}</div><h2 style="font-size:30px">${c.minors ? 'No team called his name' : `${esc(fullName(t))}`}</h2><div class="t2">${esc(c.log[c.log.length - 1].text)}${c.contract && !c.minors ? ` · ${esc(c.contract.kind)}, ${U.money(c.contract.amount)} a year through ${yrLabel(c.contract.through)}` : ''}</div></div></div>
         <div class="kv"><span>Rookie rating</span><b>${c.me.ovr} OVR</b></div>
-        <div class="kv"><span>Ceiling (if he works for it)</span><b>${c.primeOvr} OVR</b></div>
+        <div class="kv"><span>Achievable prime (age 28–29)</span><b>${c.primeOvr} OVR</b></div>
         <div class="kv"><span>Work ethic</span><b>${c.me.traits.workEthic >= 75 ? 'Gym rat' : c.me.traits.workEthic >= 55 ? 'Solid' : c.me.traits.workEthic >= 40 ? 'Inconsistent' : 'Questionable'}</b></div>
         <div class="row wrap" style="gap:10px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-simrest>Sim the whole career</button></div>
       </div></section>
@@ -877,9 +880,9 @@ HL.SkillDraft = (function () {
         <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button>
         <button class="btn" data-skip="stat" ${st.skips.stat && st.phase === 'hand' ? '' : 'disabled'}>Skill skip (${st.skips.stat})</button></div>
       ${show ? `<div class="result">${esc(cat[1])} from the ${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
-    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Tap a card to take his ${esc(cat[1].toLowerCase())}.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
+    const cards = show ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? `Top ${st.hand.length} by ${esc(cat[1].toLowerCase())} · best-first. Tap a card to select.` : 'Nobody to deal from this club and decade. Use a skip.'}</div>
       <div class="hand">${st.hand.map((c, i) => { const bio = HL.HISTORY.players[c.row.pid]; const r = c.row; const v = skillValue(c, cat);
-        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: cat[0] === 'body' ? 'OVR' : SHORT[cat[0]], meta: `${yrLabel(c.season)} · ${c.club}`,
+        return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: cat[0] === 'body' ? 'FRAME' : SHORT[cat[0]], meta: `#${i + 1} · ${yrLabel(c.season)} · ${c.club}`,
           stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
     const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Thirteen skills build one player.</p>' : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reels}${intro}${controls}${cards}</section>`;
@@ -916,5 +919,5 @@ HL.SkillDraft = (function () {
     return { ...c, verdict: verdict(c) };
   }
 
-  return { open: () => { st = null; cache = null; render(); }, CATS, simulate };
+  return { open: () => { st = null; cache = null; render(); }, CATS, simulate, ratingsAt };
 })();
