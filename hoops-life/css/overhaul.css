@@ -725,3 +725,38 @@ html[data-fx-level=off] .press-live i{animation:none!important}
 .press-classic .press-big{font-family:Georgia,serif;font-size:clamp(27px,3vw,42px);letter-spacing:-.02em;}
 .press-classic .press-caption{border-top:1px solid rgba(30,26,18,.4);}
 .press-classic .press-screen::before,.press-classic .press-screen::after{display:none;}
+
+
+/* FILM IQ / scouting studio: technical basketball information with TV graphics. */
+.film-iq{background:radial-gradient(ellipse at right top,rgba(85,151,206,.13),transparent 65%),
+ linear-gradient(125deg,#131c2c,#0d1522 85%);}
+.film-findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;}
+.film-finding{border:1px solid rgba(171,203,236,.22);background:linear-gradient(125deg,#203047,#111b2b);
+ border-radius:11px;padding:15px;display:flex;flex-direction:column;gap:6px;min-height:137px;}
+.film-finding b{font:900 18px var(--display);text-transform:uppercase;letter-spacing:.04em;}
+.film-finding span{font:800 10px var(--body);color:#a1cbf0;letter-spacing:.09em;text-transform:uppercase;}
+.film-finding p{margin-top:3px;color:var(--text-2);font:450 12px/1.48 var(--body);flex:1;}
+.film-analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;}
+.film-breakdown{position:relative;display:flex;flex-direction:column;gap:10px;padding:16px;
+ border:1px solid rgba(210,121,143,.35);border-radius:14px;
+ background:linear-gradient(145deg,rgba(71,39,61,.3),#131c2b 55%,#0b1420);
+}
+.film-breakdown.win{border-color:rgba(113,215,168,.32);background:linear-gradient(145deg,rgba(35,85,73,.21),#131c2b 55%,#0b1420);}
+.film-breakdown .caps{color:#a7bcd4;}
+.film-score{display:flex;gap:10px;align-items:baseline;}
+.film-score b{font:900 clamp(31px,4vw,48px)/1 var(--display);font-variant-numeric:tabular-nums;}
+.film-score b:last-child{color:#8d9daf;}
+.film-score span{font:850 25px var(--display);color:var(--text-3);}
+.film-compare{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.film-compare span{padding:7px 9px;border-radius:5px;background:rgba(115,146,193,.1);
+ font:700 11px var(--body);color:var(--text-2);font-variant-numeric:tabular-nums;}
+.film-key{font:900 12px var(--body);color:#b9d4f1;letter-spacing:.085em;margin-top:4px;}
+.film-breakdown p{font:450 12px/1.5 var(--body);color:var(--text-2);margin:0;flex:1;}
+.film-coaching{display:grid;grid-template-columns:1fr auto auto;gap:13px;align-items:center;
+ border:1px solid var(--rule);padding:12px;border-radius:9px;background:rgba(32,44,62,.66);}
+.film-coaching b{display:block;font:850 15px var(--display);text-transform:uppercase;}
+.film-coaching small{display:block;font:450 11px/1.4 var(--body);color:var(--text-3);}
+.film-coaching strong{font:900 21px var(--display);font-variant-numeric:tabular-nums;}
+.film-coaching span{font:850 14px var(--display);font-variant-numeric:tabular-nums;}
+@media(max-width:600px){.film-analysis-grid,.film-findings{grid-template-columns:1fr;}
+ .film-coaching{grid-template-columns:1fr auto;}.film-coaching span{grid-column:2}}
