@@ -7,7 +7,7 @@ const path = require('path');
 const runs = +(process.argv[2] || 20);
 const style = process.argv[3] || 'good';
 const seasons = fs.readdirSync(path.join(__dirname, '../data/history/seasons')).map(f => `data/history/seasons/${f}`);
-const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', 'data/history/career-traits.js', 'js/league/era-depth.js', 'js/league/legacy-experience.js', ...seasons]);
+const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/legend-dna.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', 'data/history/career-traits.js', 'js/league/era-depth.js', 'js/league/legacy-experience.js', 'js/league/career-story.js', 'js/league/rare-encounters.js', ...seasons]);
 ctx.HL.UI = { esc: s => String(s), money: m => '$' + m.toFixed(1) + 'M', ordinal: n => n + 'th' };
 load(['js/modes/challenge820.js', 'js/modes/skilldraft.js']);
 const R = HL.RNG;

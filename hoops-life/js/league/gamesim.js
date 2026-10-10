@@ -270,6 +270,8 @@ HL.DEFAULT_RULES = () => ({
   };
 
   const aValue = (p,k) => p.attrs[k]??65;
+  const dna = (p,key) => HL.clamp(p.dna?.effects?.[key] || 0,-0.03,0.095);
+
   // ---------- Main ----------
   HL.createGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
     // Live intentions belong to this game; never edit the league player's tendencies.
@@ -524,6 +526,9 @@ HL.DEFAULT_RULES = () => ({
       if (assigned && D.matchup.targetId === initiator.id && D.matchup.pressure === 'trap') pTO += .018;
       if (transition) pTO += 0.01;
       pTO += ((initiator.tend.riskyPass || 50)-50)*.00015;
+      // Signature passing and defensive identities change actual turnover odds.
+      pTO -= dna(initiator,'assist')*.19;
+      pTO += dline.reduce((n,p)=>n+dna(p,'steal'),0)/Math.max(1,dline.length)*.12;
       pTO += E.tov;
       if (R.chance(HL.clamp(pTO, 0.06, 0.25))) {
         O.st[initiator.id].line.tov++;
@@ -607,6 +612,7 @@ HL.DEFAULT_RULES = () => ({
       pAst += HL.clamp((supportingPass - 75) * 0.003, -0.035, 0.055);
       pAst += ((shooter.tend.moveBall||50)-50)*.00025;
       if (strat.focus === 'motion') pAst += 0.08;
+      pAst += dna(shooter,'assist') * .72;
       if (focusStar) pAst -= 0.05;
       if (play && ['catchShoot','cut','pickPop','handoff','driveKick'].includes(play.play)) pAst += .18;
       if (play?.play === 'isolation') pAst -= .2;
@@ -630,7 +636,8 @@ HL.DEFAULT_RULES = () => ({
           : Math.max(eff(O, shooter, 'layup'), eff(O, shooter, 'dunk') * 0.92 + shooter.attrs.vert * 0.08, eff(O, shooter, 'close') * 0.97);
         const help = (eff(D, helper, 'intD') + eff(D, helper, 'block') + eff(D,helper,'helpD')) / 3;
         makeP = 0.682 + ((aValue(shooter,'contactFinish')-65)*.00045 +(aValue(shooter,'footwork')-65)*.00022) + (soft(finish) - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013 + matchup.size + (isPost ? matchup.postAdvantage : matchup.handleAdvantage * 0.5);
-        if (transition) makeP += 0.07;
+        if (transition) makeP += 0.07 + dna(shooter,'transition')*.7;
+        makeP += dna(shooter,'rim') * .85 - dna(sDef,'defense')*.62;
         if (dstrat.defense === 'drop') makeP -= 0.015;
         blockP = 0.068 + (helper.attrs.block - 65) * 0.0022 +
           matchup.blockReach;
@@ -640,12 +647,14 @@ HL.DEFAULT_RULES = () => ({
         makeP = 0.455 + ((shooter.attrs.shotCreation-65)*.00042 +(shooter.attrs.contested-65)*.0003) + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024-(sDef.attrs.contestD-65)*.00028 - matchup.contest + matchup.handleAdvantage;
         if (dstrat.defense === 'drop') makeP += 0.02;
         blockP = 0.018; foulP = 0.06;
+        makeP += dna(shooter,'mid')*.85 - dna(sDef,'defense')*.60;
         label = 'jumper';
       } else {
         let deep = rules.fourPoint && R.chance(0.12);
         value = deep ? 4 : (rules.threeValue || 3);
         makeP = 0.338 + ((shooter.attrs.releaseSpeed-65)*.00045 +(shooter.attrs.shotArc-65)*.00035 +(shooter.attrs.releaseHeight-65)*.00028) + (soft(eff(O, shooter, 'three')) - 70) * 0.0055 - (contest('perD') - 65) * 0.0015-(sDef.attrs.contestD-65)*.00022 - matchup.contest * 0.75 + matchup.handleAdvantage * 0.6;
         if (deep) makeP -= 0.09;
+        makeP += dna(shooter,'three')*.88 - dna(sDef,'defense')*.6;
         if (passer) makeP += 0.013 + (eff(O, passer, 'pass') - 65) * 0.00045 + (shooter.attrs.iq - 65) * 0.00014;
         else makeP -= 0.015;
         if (dstrat.defense === 'switch') makeP -= 0.008;
@@ -683,7 +692,7 @@ HL.DEFAULT_RULES = () => ({
       makeP += 0.042*HL.eliteImpact(eliteShot) - 0.026*HL.eliteImpact(eliteStop);
       if (type === 'mid' && !passer) makeP += 0.016*HL.eliteImpact(shooter.attrs.fade);
       if (type === 'rim') makeP += 0.016*HL.eliteImpact(shooter.attrs.contactFinish);
-      if (clutch) makeP += 0.017*HL.eliteImpact(shooter.attrs.clutchShot);
+      if (clutch) makeP += 0.017*HL.eliteImpact(shooter.attrs.clutchShot) + dna(shooter,'clutch')*.77;
       makeP -= (teamD - 66) * 0.0052;
       makeP += (teamIQ - 68) * 0.0024;
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
@@ -779,6 +788,7 @@ HL.DEFAULT_RULES = () => ({
       const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb') + frameRebound(p)+(p.attrs.boxout-65)*.18 + 12*HL.eliteImpact(p.attrs.dreb) + 6*HL.eliteImpact(p.attrs.boxout), 0) / 5;
       let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012 + E.orb;
       if (type === 'three') pOff += 0.02;
+      pOff += O.onCourt.reduce((n,p)=>n+dna(p,'reb'),0)/Math.max(1,O.onCourt.length)*.36;
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
         const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2+13*HL.eliteImpact(p.attrs.oreb)) / 50, 1.7) * (0.5 + p.tend.crash / 100));

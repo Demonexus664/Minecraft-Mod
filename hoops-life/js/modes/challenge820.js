@@ -167,7 +167,7 @@ HL.Challenge = (function () {
   function newRun(cfg) {
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [] };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -179,11 +179,13 @@ HL.Challenge = (function () {
     await loadDecade(st.decade);
     const fr = franchisesIn(st.decade);
     if (what !== 'era' || !fr.includes(st.team)) st.team = R.pick(fr.filter(t => t !== st.team || fr.length === 1));
+    // A rare legendary team REPLACES the team roll (no extra card).
+    st.special=null;
+    const special = what === 'both' || what === 'all' ? await HL.Legends.rollDraftTeam():null;
+    if(special){st.special=special.spec;st.decade=Math.floor(special.spec.year/10)*10;st.team=special.spec.franchise;}
     // Deal the hand now (seeded), reveal it after the reels land.
     const taken = new Set(SLOTS.filter(s => st.lineup[s]).map(s => st.lineup[s].row.pid));
-    st.hand = dealHand(st.team, st.decade, taken);
-    const wild=await HL.Legends.wildcard(null,[...taken]);
-    if(wild && !st.hand.some(c=>c.row.pid===wild.row.pid))st.hand.push(wild);
+    st.hand = special ? special.hand.filter(c=>!taken.has(c.row.pid)) : dealHand(st.team, st.decade, taken);
     render();
     const host = document.querySelector('#reels');
     const teams = HL.TEAMS.map(t => t.abbr);
@@ -199,7 +201,10 @@ HL.Challenge = (function () {
   function place(handIdx, slot) {
     const c = st.hand[handIdx];
     if (!c || st.lineup[slot] || st.phase !== 'hand') return;
+    const oldDna=st.dna;
     st.lineup[slot] = c;
+    st.dna=HL.DNA.analyze(SLOTS.filter(x=>st.lineup[x]).map(x=>({pid:st.lineup[x].row.pid,cat:x})),{mode:'team'});
+    const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id)) || st.dna.trios.find(x=>!oldDna?.trios.some(y=>y.id===x.id)) || st.dna.pairs.find(x=>!oldDna?.pairs.some(y=>y.id===x.id));
     if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
     st.hand = [];
@@ -210,9 +215,10 @@ HL.Challenge = (function () {
     render();
     const el = document.querySelector(`.slot-wrap[data-slot="${slot}"]`);
     if (el) FX.burst(el, FX.tierOf(rating(c)).colors.concat('#fff'), FX.tierIndex(rating(c)) >= 3 ? 30 : 14, 0.6);
+    if(unlocked)setTimeout(()=>HL.DNAFX.reveal(unlocked,{title:unlocked.type==='mutation'||unlocked.type==='evolved'?'LEGENDARY MUTATION':'CHEMISTRY UNLOCKED'}),260);
     if (pen >= 10) U.toast(`<b>${esc(HL.HISTORY.players[c.row.pid][0])}</b> at ${slot}: −${pen} out of position.`);
   }
-  function swap(a, b) { if (st.phase === 'season' || st.phase === 'result') return; const t = st.lineup[a]; st.lineup[a] = st.lineup[b]; st.lineup[b] = t; FX.sfx.flip(); render(); }
+  function swap(a, b) { if (['season', 'result', 'playoffs'].includes(st.phase)) return; const t = st.lineup[a]; st.lineup[a] = st.lineup[b]; st.lineup[b] = t; FX.sfx.flip(); render(); }
 
   // ---------- the season, played live ----------
   async function playSeason() {
@@ -224,6 +230,8 @@ HL.Challenge = (function () {
     const games = L.games;
     const dream = { id: 999, abbr: 'YOU', city: 'Your', name: 'Five', color: '#c9a227', color2: '#111111', conf: 'East', strategy: HL.DEFAULT_STRATEGY() };
     const players = [];
+    // Load archived seasons for unlocked historical forms before changing cards.
+    for(const form of st.dna?.mutations||[])if(form.year)await HL.History.load(String(form.year));
     const minutes = { PG: 34, SG: 34, SF: 34, PF: 33, C: 33, B1: 22, B2: 18, B3: 14 };
     for (const slot of SLOTS) {
       const c = st.lineup[slot];
@@ -232,10 +240,21 @@ HL.Challenge = (function () {
       // Position changes cost decision-making and role execution, not God-given height,
       // shooting touch or strength. Bigs running PG lose creation, not their post game.
       p.attrs = fittedAttributes(c, slot, p.attrs);
+      const forms=(st.dna?.mutations||[]).filter(m=>m.target===c.row.pid);
+      for(const form of forms){
+        if(!form.year)continue;
+        const historic=HL.History.seasonRows(String(form.year))?.find(r=>r.pid===c.row.pid);
+        if(!historic)continue;
+        const transformed=HL.historicalAttributes(historic);
+        // In a fantastical mutation we preserve the drafted player's best
+        // tools while changing his form toward the partnered historical peak.
+        for(const [key,value] of Object.entries(transformed))if(Number.isFinite(p.attrs[key]))p.attrs[key]=Math.max(p.attrs[key],value);
+      }
+      p.mutationNames=forms.map(x=>x.name);
       p.realMpg = minutes[slot];
       if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
-      p.ovr = effRating(c,slot);
-      p.slot = slot;
+      p.ovr = Math.min(100,Math.max(effRating(c,slot),HL.computeOvr(p.attrs,p.pos)));
+      p.slot = slot;p.historicalPid=c.row.pid;
       players.push(p);
     }
     // Five replacement-level players fill out the roster for garbage time and emergencies.
@@ -246,19 +265,19 @@ HL.Challenge = (function () {
       b.realMpg = 2;
       players.push(b);
     }
+    const dnaEntries=SLOTS.map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,playerId:players[SLOTS.indexOf(slot)].id}));
+    // Historical mutations remain distinct from team chemistry.
+    st.dna=HL.DNA.applyTeam(players.slice(0,8),dnaEntries);
     dream.players = players;
+    st.dream=dream;
     dream.strategy.starters = players.slice(0, 5).map(p => p.id);
     // Game plans alter real possessions: tempo, shot priorities, defensive coverage and glass.
     const tactical=HL.Legacy.gamePlans[st.plan] || HL.Legacy.gamePlans.balanced;
     Object.assign(dream.strategy,{ focus:tactical.focus, pace:tactical.pace, defense:tactical.defense, crash:tactical.crash });
-    // Rare crossover exhibition games challenge even the strongest drafted five.
-    // They are explicitly fictional, outside the recorded NBA schedule.
-    const rare=await HL.Legends.rareOpponent();
-    const rareTeam=rare?await HL.Legends.opponent(rare):null;
+    // Legendary specials are draft-only. Exhibitions never replace league games.
     const opps = L.teams;
     // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
-    if(rareTeam) schedule[R.int(0,games-1)]=rareTeam;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
@@ -302,12 +321,24 @@ HL.Challenge = (function () {
       if (d) d.className = won ? 'w' : 'l';
       if (q('.ticker .rec')) q('.ticker .rec').textContent = `${w}-${l}`;
       if (won) FX.sfx.win(); else FX.sfx.loss();
-      if (!won && l === 1) { const s = q('.ticker .status'); if (s) { s.textContent = `Perfect season over · game ${g + 1} vs the ${opp.name}`; s.classList.add('over'); } FX.shake(q('.ticker'), 0.8); }
+      if (!won && l === 1) {
+        const status=q('.ticker .status');if(status){status.textContent=`First loss · Game ${g+1} vs ${opp.name}`;status.classList.add('over');}
+        FX.shake(q('.ticker'),0.8);
+        if(q('.ticker')){
+          const decision=document.createElement('div');decision.className='dna-first-loss';
+          decision.innerHTML=`<b>The perfect season is over.</b><p>Continue chasing 73 wins, a championship and your team's legacy, or restart the challenge?</p><button class="btn go" data-keep>Continue the season</button> <button class="btn" data-restart>Restart</button>`;
+          q('.ticker').appendChild(decision);
+          const continueRun=await new Promise(done=>{decision.querySelector('[data-keep]').onclick=()=>done(true);decision.querySelector('[data-restart]').onclick=()=>done(false);});
+          decision.remove();
+          if(!continueRun){st=null;render();return;}
+        }
+      }
       if (q('.ticker .sub')) q('.ticker .sub').textContent = `${(pf / (g + 1)).toFixed(1)} PPG · ${(pa / (g + 1)).toFixed(1)} allowed · ${streak > 1 ? `${streak}-game win streak` : streak === 1 ? 'won the last one' : 'lost the last one'}`;
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog,specialEncounter:rareTeam?.legendSpec||null };
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog,specialEncounter:null, dna:st.dna, specialDraft:st.special?.label||null };
+    st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
     st.result.unlocked = achievements();
     saveBest();
@@ -317,6 +348,85 @@ HL.Challenge = (function () {
     st.phase = 'result';
     render();
     for (const a of st.result.unlocked.filter(x => x.fresh)) { await FX.wait(250); U.toast(`Achievement unlocked: <b>${esc(a.name)}</b>`); FX.sfx.pop(3); }
+  }
+
+  // ---------- Postseason side quest: game by game, four best-of-seven series ----------
+  const ROUND_TITLES=['First round','Conference semifinals','Conference finals','NBA Finals'];
+  function startPlayoffs(){
+    const pool=(st.playoffTeams||[]).slice().sort((a,b)=>(b.real?.w||0)-(a.real?.w||0));
+    const without=pool.filter(t=>t.id!==999);
+    const chosen=[];
+    // Escalating opposition rather than four arbitrary repeat matches.
+    for(const slot of [Math.min(7,without.length-1),Math.min(3,without.length-1),Math.min(1,without.length-1),0]){
+      const opp=without[slot]||R.pick(without);if(opp&&!chosen.some(x=>x.id===opp.id))chosen.push(opp);
+      else{const alt=without.find(t=>!chosen.some(x=>x.id===t.id));if(alt)chosen.push(alt);}
+    }
+    st.playoffs={round:0,wins:0,losses:0,opponents:chosen,history:[],pending:null,last:null,completed:false,champion:false};
+    st.phase='playoffs';
+  }
+  function finishPlayoffGame(result){
+    const P=st.playoffs,winner=result.mine>result.theirs;winner?P.wins++:P.losses++;
+    P.last={...result,winner,round:ROUND_TITLES[P.round],series:`${P.wins}-${P.losses}`};
+    P.history.push(P.last);
+    if(P.wins===4){if(P.round>=3){P.completed=true;P.champion=true;}else{P.round++;P.wins=0;P.losses=0;}}
+    if(P.losses===4){P.completed=true;P.champion=false;}
+    if(P.completed){st.result.playoffRun=P.history.slice();st.result.champion=P.champion;}
+    render();
+  }
+  function playPlayoffGame(){
+    const P=st.playoffs;if(!P||P.completed||P.pending)return;
+    const opp=P.opponents[P.round],players=HL.League.teamPlayers(opp.id);
+    const home=(P.wins+P.losses)%2===0;
+    const guest={...opp,players,customPlayers:players,strategy:opp.strategy||HL.DEFAULT_STRATEGY()};
+    const raw=home?HL.simGame(st.dream,guest,st.playoffRules):HL.simGame(guest,st.dream,st.playoffRules);
+    const me=home?raw.home:raw.away,rival=home?raw.away:raw.home;
+    const game={mine:me.score,theirs:rival.score,opp:opp.name,opponent:opp,raw,home,game:P.history.length+1,hero:null,play:null,made:null};
+    // In close games, one final meaningful offensive possession can matter.
+    // The sim result is held until the selected possession has been resolved.
+    if(Math.abs(game.mine-game.theirs)<=3 && st.dream.players.length){P.pending=game;render();return;}
+    finishPlayoffGame(game);
+  }
+  function resolvePlayoffClutch(move){
+    const P=st.playoffs,g=P?.pending;if(!g)return;
+    const sel=document.querySelector('[data-playoff-shooter]'),hero=st.dream.players.find(p=>p.id===+(sel?.value))||st.dream.players[0];
+    const attr=move==='three'?'three':move==='fade'?'fade':move==='pass'?'pass':'contactFinish';
+    const value=move==='three'?3:2,skill=hero.attrs[attr]||65;
+    const defender=HL.League.teamPlayers(g.opponent.id).sort((a,b)=>b.ovr-a.ovr)[0];
+    const d=defender?.attrs?.perD||75;
+    const situational=(hero.dna?.effects?.[move==='three'?'three':move==='fade'?'mid':move==='pass'?'assist':'rim']||0);
+    const odds=HL.clamp(.3+(skill-70)*.006+(hero.attrs.clutchShot-65)*.0012-(d-75)*.0012+situational,.16,.78);
+    const made=R.chance(odds);
+    if(made){g.mine+=value;
+      const myBox=g.home?g.raw.home:g.raw.away;
+      const line=myBox.box[hero.id];if(line){line.pts+=value;line.fgm++;line.fga++;if(value===3){line.tpm++;line.tpa++;}}
+      myBox.score=g.mine;myBox.quarters[myBox.quarters.length-1]+=value;
+    }
+    g.hero=hero.name;g.play=move;g.made=made;g.odds=odds;
+    if (g.mine===g.theirs) {
+      // Ties cannot be recorded as losses; play overtime on the same simulated
+      // possession model and synchronize the visible score/quarter breakdown.
+      const extra=HL.simGame(st.dream,{...g.opponent,players:HL.League.teamPlayers(g.opponent.id)},st.playoffRules);
+      const extraMe=g.home?extra.home:extra.away,extraOpp=g.home?extra.away:extra.home;
+      const margin=extraMe.score-extraOpp.score;
+      const otMine=Math.max(6,Math.round(extraMe.score*.09));
+      let otOpp=Math.max(6,otMine-(margin===0?(R.chance(.5)?2:-2):Math.sign(margin)*2));
+      // Preserve exactly one extra period with a clear winner.
+      g.mine+=otMine;g.theirs+=otOpp;
+      let tieBreak=0;
+      if (g.mine===g.theirs){tieBreak=R.chance(.5)?2:-2; if(tieBreak>0)g.mine+=tieBreak;else g.theirs-=tieBreak;}
+      const myBox=g.home?g.raw.home:g.raw.away,theirBox=g.home?g.raw.away:g.raw.home;
+      myBox.score=g.mine;theirBox.score=g.theirs;
+      myBox.quarters.push(otMine+(tieBreak>0?tieBreak:0));
+      theirBox.quarters.push(otOpp+(tieBreak<0?-tieBreak:0));
+      g.overtime=true;
+    }
+    P.pending=null;finishPlayoffGame(g);
+  }
+  function playoffView(){
+    const P=st.playoffs,opp=P.opponents[Math.min(P.round,3)],last=P.last;
+    const pending=P.pending;
+    const chooser=pending?`<article class="dna-playoff-clutch"><div class="dna-section-label">THE FINAL POSSESSION</div><h3>One possession can change the series.</h3><p>${esc(pending.opp)} · ${pending.mine}-${pending.theirs}. Choose your closer and move. Matchups, clutch ratings and DNA effects determine the outcome.</p><label>Closer <select data-playoff-shooter>${st.dream.players.slice(0,8).map(p=>`<option value="${p.id}">${esc(p.name)} · ${p.ovr} OVR</option>`).join('')}</select></label><div class="row wrap">${[['three','Deep three'],['fade','Fadeaway'],['drive','Attack the rim'],['pass','Create with a pass']].map(([k,label])=>`<button class="btn" data-final-possession="${k}">${label}</button>`).join('')}</div></article>`:'';
+    return `<div class="stack" style="gap:13px"><section class="block"><div class="body stack"><div class="caps">82-0 · Postseason side quest</div><h2>${P.completed?(P.champion?'NBA CHAMPIONS':'THE RUN ENDS'):ROUND_TITLES[P.round]}</h2><p>${P.completed?'Final postseason report below':`${esc(opp.name)} · series ${P.wins}-${P.losses} · first to four wins`}</p>${!P.completed&&!pending?'<button class="btn go big" data-playoff-game>Sim next playoff game</button>':''}${chooser}${last?`<div class="dossier-honor"><div class="caps">Last playoff game · ${esc(last.round)}</div><h3>${last.winner?'WIN':'LOSS'} ${last.mine}-${last.theirs} vs ${esc(last.opp)}</h3>${last.hero?`<p>${esc(last.hero)} ${last.made?'made':'missed'} the final ${esc(last.play)} attempt (${Math.round(last.odds*100)}% modeled chance).</p>`:''}</div>`:''}</div></section><section class="block"><header><h3>Playoff game log</h3></header><div class="body"><div class="scouting-games">${P.history.map((g,i)=>`<div class="kv"><span>${i+1}. ${esc(g.round)} vs ${esc(g.opp)}</span><b>${g.winner?'W':'L'} ${g.mine}-${g.theirs}</b></div>`).join('')||'<p>Your first playoff game awaits.</p>'}</div></div></section>${HL.DNA.board(st.dna,{compact:true})}${P.completed?`<button class="btn go" data-finish-playoffs>Return to your season Verdict</button>`:''}</div>`;
   }
 
   // ---------- achievements ----------
@@ -363,9 +473,10 @@ HL.Challenge = (function () {
     const bio = HL.HISTORY.players[c.row.pid];
     const team = teamMeta(LINEAGE[c.club]) || null;
     const r = c.row;
+    const forms=(st.dna?.mutations||[]).filter(m=>m.target===c.row.pid);
     return HL.Cards.card({
       pid: c.row.pid, name: bio[0], nbaId: bio[1], team, pos: r.pos, rating: opts.rating != null ? opts.rating : rating(c),
-      meta: `${c.legendary ? '★ RARE LEGEND · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
+      meta: `${forms.length ? '✦ MUTATED: '+forms.map(f=>f.name).join(' / ')+' · ' : ''}${c.legendary ? '★ LEGENDARY TEAM · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
       stat: [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: st.mode === 'hoopiq' && st.phase !== 'result', down: opts.down, cls: opts.cls || '', attrs: opts.attrs || '',
     });
   }
@@ -407,13 +518,14 @@ HL.Challenge = (function () {
     let main;
     if (st.phase === 'result') main = resultView();
     else if (st.phase === 'season') main = tickerView();
+    else if (st.phase === 'playoffs') main = playoffView();
     else main = machineView(revealHand);
     U.app().innerHTML = `<div class="frame challenge-frame"><div class="masthead"><div class="bar">
         <div class="wordmark" data-home>Hoops<i>Life</i></div>
         <div class="mainnav"><button class="on">82-0 Challenge${st.daily ? ' · Daily' : ''}</button></div>
         <div class="simbar"><span class="t2 sm">${st.mode === 'hoopiq' ? 'HoopIQ' : 'Classic'} · ${yrLabel(st.playSeason)} · Pick ${Math.min(filled() + 1, SLOTS.length)}/${SLOTS.length}</span>${FX.soundToggle()}<button class="btn small" data-new>New run</button></div>
       </div></div>
-      <div class="page"><div class="game820">${main}<div class="stack" style="gap:12px">${courtView()}
+      <div class="page"><div class="game820">${main}<div class="stack" style="gap:12px">${courtView()}${st.phase==='result'||st.phase==='playoffs'?'':st.dna?HL.DNA.board(st.dna,{compact:true}):''}
         <section class="block"><header><h3>Best runs</h3></header><div class="body">${bestRuns().slice(0, 5).map(r => `<div class="kv"><span>${r.daily ? `<span class="tag">Daily ${esc(r.daily)}</span> ` : ''}${r.five.slice(0, 2).map(esc).join(', ')}…</span><b>${r.w}-${r.l}</b></div>`).join('') || '<div class="t3 sm">No runs yet.</div>'}</div></section>
       </div></div></div></div>`;
     bind();
@@ -433,7 +545,7 @@ HL.Challenge = (function () {
           <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
           <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button><button class="btn" data-skip="all" ${st.skips.all && st.phase === 'hand' ? '' : 'disabled'}>Full respin (${st.skips.all})</button></div>
         ${fm && st.phase === 'hand' ? `<div class="result">${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
-    const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.hand.some(c=>c.legendary) ? '★ RARE LEGENDARY WILDCARD! Choose any card, including this out-of-era bonus.' : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
+    const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.special ? `✦ LEGENDARY TEAM ROLL · ${esc(st.special.label)} · Pick ONE player` : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
         <div class="hand">${st.hand.map((c, i) => cardFor(c, { down: !!reveal, attrs: `data-hand="${i}"` })).join('')}</div></div>` : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
   }
@@ -484,7 +596,10 @@ HL.Challenge = (function () {
           <div class="t3 sm" style="margin-top:8px">${r.pf.toFixed(1)} PPG · ${r.pa.toFixed(1)} allowed · longest win streak ${r.best}${r.firstLoss ? ` · first loss: game ${r.firstLoss.g} vs the ${esc(r.firstLoss.opp.name)}` : ''}</div></div>
         <div class="stack" style="gap:8px"><button class="btn spin" data-new>Play again</button><button class="btn" data-share>Copy result</button></div>
       </div></section>
+      ${r.specialDraft?`<section class="block"><header><h3>Legendary roster discovered</h3></header><div class="body"><p>✦ ${esc(r.specialDraft)} supplied one of your drafted players. No extra draft slot was awarded.</p></div></section>`:''}
+      ${HL.DNA.board(st.dna)}
       ${identityReport(r)}
+      <section class="block"><header><h3>Postseason: The second challenge</h3></header><div class="body stack"><p>Now take your drafted superteam through four best-of-seven playoff series, one game at a time. Close finishes can become interactive clutch possessions. The regular-season 82–0 record stays separate.</p><button class="btn go" data-start-playoffs>Start the playoffs</button>${st.playoffs?.completed?`<p>${st.playoffs.champion?'NBA CHAMPIONS':'Playoff run ended'} · ${st.playoffs.history.length} games played.</p>`:''}</div></section>
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
       <section class="block"><header><h3>Season scouting report</h3></header><div class="body stack">
         <div class="cols c2"><div><div class="kv"><span>Net points / game</span><b>${(r.pf-r.pa).toFixed(1)}</b></div><div class="kv"><span>Season efficiency (TS%)</span><b>${(() => {const a=Object.values(r.lines).reduce((t,b)=>({pts:t.pts+b.pts,fga:t.fga+b.fga,fta:t.fta+b.fta}),{pts:0,fga:0,fta:0});return a.fga+.44*a.fta ? (100*a.pts/(2*(a.fga+.44*a.fta))).toFixed(1)+'%' : '—';})()}</b></div></div><div><div class="kv"><span>Era environment</span><b>${yrLabel(st.playSeason)}</b></div><div class="kv"><span>Schedule</span><b>${r.games} games · ${r.w} wins</b></div></div></div>
@@ -505,7 +620,7 @@ HL.Challenge = (function () {
     };
     app.querySelectorAll('.hand .gcard, .gcard.placed').forEach(card => {
       card.onpointerdown = (e) => {
-        if (st.phase === 'season' || st.phase === 'result' || card.classList.contains('down')) return;
+        if (['season', 'result', 'playoffs'].includes(st.phase) || card.classList.contains('down')) return;
         e.preventDefault();
         const src = card.dataset.hand != null ? { hand: +card.dataset.hand } : { from: card.dataset.from };
         const start = { x: e.clientX, y: e.clientY };
@@ -556,6 +671,10 @@ HL.Challenge = (function () {
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
     app.querySelectorAll('[data-gameplan]').forEach(b=>b.onclick=()=>{st.plan=b.dataset.gameplan;render();});
     const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
+    app.querySelectorAll('[data-start-playoffs]').forEach(b=>b.onclick=()=>{startPlayoffs();render();});
+    app.querySelectorAll('[data-finish-playoffs]').forEach(b=>b.onclick=()=>{st.phase='result';render();});
+    app.querySelectorAll('[data-playoff-game]').forEach(b=>b.onclick=()=>playPlayoffGame());
+    app.querySelectorAll('[data-final-possession]').forEach(b=>b.onclick=()=>resolvePlayoffClutch(b.dataset.finalPossession));
     const sh = app.querySelector('[data-share]');
     if (sh) sh.onclick = async () => { const t = app.querySelector('[data-share-text]').value; try { await navigator.clipboard.writeText(t); U.toast('Result copied. Paste it anywhere.'); } catch (e) { U.toast('Copy failed. Here it is:<br>' + esc(t).replace(/\n/g, '<br>')); } };
     bindDrag(app);
