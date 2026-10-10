@@ -825,6 +825,7 @@ HL.Challenge = (function () {
       ${r.specialDraft?`<section class="block"><header><h3>Legendary roster discovered</h3></header><div class="body"><p>✦ ${esc(r.specialDraft)} supplied one of your drafted players. No extra draft slot was awarded.</p></div></section>`:''}
       ${HL.DNA.board(st.dna)}
       ${HL.DNA.powerMap(st.dna)}
+      ${HL.AbilityReplay?.render(r.abilityCounts,'SUPERTEAM ABILITY REPLAY')||''}
       ${identityReport(r)}
        ${mission}${gauntlet}${rivals}
        ${filmReel(r.gameLog)}
