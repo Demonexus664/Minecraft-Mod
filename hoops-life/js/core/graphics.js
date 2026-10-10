@@ -24,20 +24,11 @@ HL.GFX = (function () {
 
   // Keep the legacy card API while replacing the drawn uniform with typography.
   function jersey(team, number) { return `<div class="gfx-identity-number">${esc(number)}</div>`; }
-  function uniform(team, number, player) {
-    const key = (team.bref || team.abbr).toLowerCase();
-    const src = U.asset('jersey.' + key) || window.HL_UNIFORMS?.[key]?.src || window.HL_UNIFORMS?.[team.abbr.toLowerCase()]?.src;
-    if (!src) return '';
-    const { c2 } = teamColors(team);
-    const raw = window.HL_JERSEY_FITS?.[U.slugOf(player.name)] || {};
-    const fit = (key, fallback, lo, hi) => Number.isFinite(raw[key]) ? HL.clamp(raw[key], lo, hi) : fallback;
-    return `<div class="gfx-uniform" style="--trim:${c2};--jersey-y:${fit('y',3,0,8)}%;--jersey-x:${fit('x',0,-4,4)}%;--jersey-scale:${fit('scale',.98,.88,1.06)}"><img src="${esc(src)}" alt="" onload="this.parentNode.classList.add('ready')" onerror="const note=this.parentNode.parentNode.querySelector('.gfx-photo-credit');if(note)note.textContent='Archive photo';this.parentNode.remove()"><div class="gfx-uniform-print"><b class="gfx-uniform-number">${esc(number)}</b></div></div>`;
-  }
+  // Real player portraits are kept intact, without synthetic jerseys.
   function figure(p, team, opts = {}) {
     const { c } = teamColors(team);
     const source = U.photo(p, team, opts.season ?? HL.League.get()?.season);
-    const garment = source.src && !source.exact && team ? uniform(team, HL.jerseyNumber(p), p) : '';
-    return `<div class="gfx-figure" style="--c:${c}"><div class="gfx-head"><div class="gfx-placeholder"><b>${esc(U.initials(p))}</b><span>Photo unavailable</span></div>${U.photoImage(p, source)}</div>${garment}${source.src ? `<span class="gfx-photo-credit">${esc(garment ? 'Composite portrait' : source.label)}</span>` : ''}</div>`;
+    return `<div class="gfx-figure" style="--c:${c}"><div class="gfx-head"><div class="gfx-placeholder"><b>${esc(U.initials(p))}</b><span>Photo unavailable</span></div>${U.photoImage(p, source)}</div>${source.src ? `<span class="gfx-photo-credit">${esc(source.label)}</span>` : ''}</div>`;
   }
   function rays() { return '<div class="gfx-light" aria-hidden="true"></div>'; }
   function stripes(c2) {
