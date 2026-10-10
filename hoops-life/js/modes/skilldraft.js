@@ -719,7 +719,7 @@ HL.SkillDraft = (function () {
     const role = rank === 1 ? 'Number one option' : rank <= 3 ? 'Star role' : rank <= 5 ? 'Starter' : rank <= 8 ? 'Rotation' : 'End of bench';
     // Weak teams pay more to get him; contenders sell winning. His own team has his rights (Bird rights).
     const tilt = isCur ? 1.06 : 1.12 - (1 - strengthRank / Math.max(1, nTeams - 1)) * 0.24;
-    const amount = Math.max(minSalary(c.yr), marketValue(ovr, age, c.yr) * tilt * R.range(0.93, 1.07));
+    const amount = Math.max(minSalary(c.yr), marketValue(ovr, age, c.yr) * tilt * R.range(0.93, 1.07) * (HL.SkillPress?.market(c)||1));
     let years = age <= 26 ? R.int(3, 5) : age <= 30 ? R.int(2, 4) : age <= 33 ? R.int(1, 3) : 1;
     if (ovr < 68) years = Math.min(years, R.int(1, 2));
     const tier = strengthRank < 5 ? 'Contender' : strengthRank < Math.round(nTeams * 0.45) ? 'Playoff team' : strengthRank < Math.round(nTeams * 0.75) ? 'Fringe' : 'Rebuilding';
