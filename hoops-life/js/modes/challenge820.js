@@ -672,7 +672,7 @@ HL.Challenge = (function () {
     const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.special ? `✦ LEGENDARY TEAM ROLL · ${esc(st.special.label)} · Pick ONE player` : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
         <div class="hand">${st.hand.map((c,i)=>'<div class="scout-wrap">'+
           cardFor(c,{down:!!reveal,attrs:`data-hand="${i}"`})+
-          (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="${i}">FULL SCOUT REPORT</button>')+
+          (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="'+i+'">FULL SCOUT REPORT</button>')+
           '</div>').join('')}</div></div>` : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
   }
