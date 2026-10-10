@@ -861,6 +861,7 @@ HL.SkillDraft = (function () {
     const rankOnTeam = roster.filter(p => p.ovr > me.ovr).length;
     const byRank = [36, 34, 32, 30, 28, 25, 22, 19, 15, 12, 8];
     me.realMpg = Math.min(starMin, byRank[Math.min(rankOnTeam, byRank.length - 1)] * Math.max(1, starMin / 36));
+    const originalMinutes=roster.map(p=>[p,p.realMpg]);
     const othersMin = roster.filter(p => p.realMpg).reduce((a, p) => a + p.realMpg, 0);
     const room = 240 - me.realMpg;
     if (othersMin > room) for (const p of roster) if (p.realMpg) p.realMpg *= room / othersMin;
@@ -1027,6 +1028,8 @@ HL.SkillDraft = (function () {
     const rcT = realChamp && L.teams.find(t => t.bref === realChamp);
     if (champion && realChamp && LIN()[realChamp] !== LIN()[team.bref]) altered.push(`Won the title that went to the ${rcT ? rcT.name : realChamp}`);
     const mates = roster.filter(p => p.id !== me.id).slice(0, 3).map(p => ({ name: p.name, ovr: p.ovr, nbaId: p.nbaId, pos: p.pos }));
+    // The temporary MyPlayer rotation must never corrupt the persistent NBA roster.
+    for(const [p,minutes] of originalMinutes)p.realMpg=minutes;
     return {
       g, line, pline, ppg, rpg, apg, leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
       ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
