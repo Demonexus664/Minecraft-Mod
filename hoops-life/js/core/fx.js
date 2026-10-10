@@ -14,13 +14,17 @@ HL.FX = (function () {
   function tone(freq, dur = 0.08, type = 'square', vol = 0.04, slide = 0) {
     if (!soundOn()) return;
     try {
-      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      const Audio=window.AudioContext||window.webkitAudioContext;
+      if(!Audio)return;
+      ctx=ctx||new Audio();
+      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = type; o.frequency.value = freq;
       if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(40, freq + slide), ctx.currentTime + dur);
       g.gain.setValueAtTime(vol, ctx.currentTime);
       g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
       o.connect(g); g.connect(ctx.destination);
+      o.onended=()=>{try{o.disconnect();g.disconnect();}catch{}};
       o.start(); o.stop(ctx.currentTime + dur + 0.02);
     } catch (e) { /* audio unavailable */ }
   }
@@ -33,6 +37,13 @@ HL.FX = (function () {
     loss: () => tone(160, 0.12, 'sawtooth', 0.03),
     fanfare: () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, i === 3 ? 0.5 : 0.14, 'triangle', 0.07), i * 120)),
     boo: () => [392, 330, 262].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'sawtooth', 0.04), i * 180)),
+    ui: () => tone(720+Math.random()*55,.038,'sine',.013,95),
+    draft: () => { tone(180,.13,'triangle',.05,-65);setTimeout(()=>tone(440,.12,'sine',.027,185),85); },
+    swish: () => {tone(860,.085,'sine',.027,-380);setTimeout(()=>tone(1300,.055,'triangle',.018,-640),55);},
+    clutch: () => {tone(94,.24,'sawtooth',.044,52);setTimeout(()=>tone(208,.19,'triangle',.045,220),125);},
+    rival: () => {tone(144,.28,'sawtooth',.046,-22);setTimeout(()=>tone(286,.12,'triangle',.028,340),160);},
+    achievement: () => [523,659,784,988,1175].forEach((f,i)=>
+      setTimeout(()=>tone(f,i===4?.44:.10,'triangle',.03),i*94)),
   };
 
   // ---------- rarity tiers ----------
@@ -155,7 +166,25 @@ HL.FX = (function () {
   }
 
   function soundToggle() { return `<button class="btn small quiet" data-sound title="Sound">${soundOn() ? 'Sound on' : 'Sound off'}</button>`; }
-  function bindSound(root) { const b = root.querySelector('[data-sound]'); if (b) b.onclick = () => { setSound(!soundOn()); b.textContent = soundOn() ? 'Sound on' : 'Sound off'; if (soundOn()) sfx.pop(1); }; }
+  const boundRoots=new WeakSet();
+  function bindSound(root) {
+    const b=root.querySelector('[data-sound]');
+    if(b)b.onclick=()=>{
+      setSound(!soundOn());
+      b.textContent=soundOn()?'Sound on':'Sound off';
+      b.setAttribute('aria-pressed',soundOn()?'true':'false');
+      if(soundOn())sfx.pop(1);
+    };
+    // Delegate to the persistent app root; repeated screen renders never stack
+    // duplicate listeners. Give deliberate menu choices tactile feedback.
+    if(!boundRoots.has(root)){
+      boundRoots.add(root);
+      root.addEventListener('click',event=>{
+        const el=event.target.closest?.('button,[data-drop],.gcard');
+        if(el&&!el.disabled&&!el.matches('[data-sound]')&&!el.closest('.ticker'))sfx.ui();
+      },{passive:true});
+    }
+  }
 
   return { sfx, TIERS, tierOf, tierIndex, burst, shake, flash, countUp, reels, flipIn, tilt, banner, wait, soundToggle, bindSound, reduced };
 })();
