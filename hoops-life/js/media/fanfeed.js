@@ -63,7 +63,7 @@ HL.FanFeed=(function(){
       s.rival.theirScore.toFixed(1)+' in voting-impact value.',
       s.rival.win?'hype':'heat'));
     if(s.pressResult)posts.push(one('Press Room','PROMISE RECEIPTS',
-      (s.pressResult.won?'The player backed up the quote.':'The clip came back around after the season.')+
+      (s.pressResult.won==null?'The named rival was not eligible this year; there is no penalty.':s.pressResult.won?'The player backed up the quote.':'The clip came back around after the season.')+
       ' '+s.pressResult.measure+'. Approval '+(s.pressResult.impact>0?'+':'')+s.pressResult.impact+'.',
       s.pressResult.won?'hype':'heat'));
     if(s.agenda)posts.push(one('Contract Desk','SEASON CONTRACT',
