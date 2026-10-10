@@ -11,7 +11,7 @@ const originalReturn = 'return { open: () => { st = null; cache = null; render()
 assert.ok(source.includes(originalReturn), 'Skill Draft module return must be present');
 // Test-only access to private state; production bundle is never modified.
 const instrumented = source.replace(originalReturn,
-  'return { __test: { newRun, spinFree, freeRosterCandidates, chooseFreePlayer, finishPick, state: () => st }, open: () => { st = null; cache = null; render(); }');
+  'return { __test: { newRun, spin, spinFree, freeRosterCandidates, chooseFreePlayer, finishPick, state: () => st }, open: () => { st = null; cache = null; render(); }');
 
 function fixture(year, pid, clubGames, overall, scores) {
   return {
@@ -49,6 +49,7 @@ function harness() {
       LINEAGE: { GSW: 'GSW' },
       loadDecade: async () => {},
       franchisesIn: () => ['GSW'],
+      dealSkillHand: () => [{ row: alpha11, season: 2011, club: 'GSW' }],
       skillValue: (candidate, cat) => candidate.row.scores[cat[0]] ?? 70
     },
     historicalSeasonOvr: row => row.ovr,
@@ -59,9 +60,10 @@ function harness() {
     },
     DNA: { STARS: {}, analyze: () => ({ mutations: [], pairs: [], trios: [], signatures: [], active: [] }),
       board: () => '', preview: () => null },
+    Legends: { wildcard: async () => null },
     Cards: { card: options => '<div class="gcard" ' + (options.attrs || '') + '>' + options.name + '</div>' },
     FX: {
-      soundToggle: () => '', bindSound() {}, tilt() {}, reels: async () => {},
+      soundToggle: () => '', bindSound() {}, tilt() {}, reels: async () => {}, flipIn: async () => {},
       tierOf: () => ({ key: 'gold', colors: ['#aaa'] }),
       tierIndex: () => 2, sfx: { pop() {} }, burst() {}
     }
@@ -115,4 +117,16 @@ test('original skill draft stays the default, and duplicate categories are refus
   t.finishPick(chosen, 'three');
   assert.equal(t.state().picks.three, old);
   assert.equal(Object.keys(t.state().picks).length, 1);
+});
+
+test('original draft still spins three reels and deals only the selected skill', async () => {
+  const { t, app } = harness();
+  t.newRun('classic', 2010);
+  await t.spin('all');
+  assert.equal(t.state().draftStyle, 'original');
+  assert.equal(t.state().phase, 'hand');
+  assert.ok(t.state().cat, 'random skill remains on Original ruleset');
+  assert.equal(t.state().hand.length, 1);
+  assert.equal((app.innerHTML.match(/reel-label/g) || []).length, 3);
+  assert.match(app.innerHTML, /data-hand/);
 });
