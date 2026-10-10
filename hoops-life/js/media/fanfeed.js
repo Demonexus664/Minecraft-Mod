@@ -62,6 +62,10 @@ HL.FanFeed=(function(){
       s.rival.name+'. '+s.rival.myScore.toFixed(1)+' versus '+
       s.rival.theirScore.toFixed(1)+' in voting-impact value.',
       s.rival.win?'hype':'heat'));
+    if(s.pressResult)posts.push(one('Press Room','PROMISE RECEIPTS',
+      (s.pressResult.won?'The player backed up the quote.':'The clip came back around after the season.')+
+      ' '+s.pressResult.measure+'. Approval '+(s.pressResult.impact>0?'+':'')+s.pressResult.impact+'.',
+      s.pressResult.won?'hype':'heat'));
     if(s.agenda)posts.push(one('Contract Desk','SEASON CONTRACT',
       s.agenda.title+': '+(s.agenda.complete?'mission accomplished, extra summer development earned.':
         'missed the target, no bonus training session.'),s.agenda.complete?'hype':'neutral'));
