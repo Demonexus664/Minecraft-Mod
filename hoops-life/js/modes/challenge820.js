@@ -436,7 +436,11 @@ HL.Challenge = (function () {
         .sort((a,b)=>b[1].pts-a[1].pts)[0];
       const hero=heroLine?{name:players.find(p=>p.id===+heroLine[0])?.name||'Player',
         pts:heroLine[1].pts||0,reb:(heroLine[1].orb||0)+(heroLine[1].drb||0),ast:heroLine[1].ast||0}:null;
-      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won,boss:!!boss,hero});
+      const film=HL.FilmIQ?.analyze(mine,theirs,adapted)||null;
+      const tactics=schemeRecords[signature]||{games:0,wins:0,pf:0,pa:0};
+      tactics.games++;tactics.wins+=won?1:0;tactics.pf+=mine.score;tactics.pa+=theirs.score;
+      schemeRecords[signature]=tactics;
+      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won,boss:!!boss,hero,film});
       if(won&&mine.score-theirs.score<=2&&mine.score-theirs.score>=0)FX.sfx.clutch?.();
       if(hero?.pts>=50)FX.sfx.swish?.();
       if(Math.abs(mine.score-theirs.score)<=5){closeGames++;if(won)closeWins++;}
