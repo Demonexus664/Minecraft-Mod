@@ -69,11 +69,15 @@ HL.History = (function () {
     return o;
   }
 
+  const rowCache = new Map();
   function seasonRows(key) {
     const S = HL.HISTORY_SEASONS[key];
     if (!S) return null;
+    if (rowCache.has(key)) return rowCache.get(key);
     const F = H().seasonFields;
-    return S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); return o; });
+    const rows = S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); return o; });
+    rowCache.set(key, rows);
+    return rows;
   }
 
   // Load a season file (browser: script tag; node tests preload them).
