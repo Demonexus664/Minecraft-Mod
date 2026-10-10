@@ -162,6 +162,105 @@ HL.DNA = (function () {
     [['handle','three'],'Ball-Screen Pull-Up Threat',{screenRead:.4,creation:.4},'violet'],
     [['strength','reb'],'Hold the Inside Rebounding Spot',{boxPosition:.55},'earth']
   ];
+
+  // Procedural basketball relationships stay role-grounded. These 32 distinct
+  // pairs and 14 three-skill chains modify possessions via the existing engine,
+  // but never count as extremely rare form transformations.
+  const COMBO_DUOS=[
+    ['three','handle','Deep Pull-Up Geometry',{range:.75,creation:.65,gravity:.45},'arc'],
+    ['three','pass','Gravity and the Skip Pass',{gravity:.74,precision:.62,postRead:.3},'arc'],
+    ['three','jumper','Split-Second Green Light',{quickRelease:.84,screenMove:.4},'arc'],
+    ['three','speed','Trailing Three-Point Threat',{transition:.67,relocation:.82,gravity:.4},'arc'],
+    ['three','iq','Long-Range Coverage Decoder',{gravity:.63,screenRead:.75},'arc'],
+    ['mid','handle','Three-Level Counter',{creation:.82,clutchChoice:.5},'gold'],
+    ['mid','contested','Footwork Fade Specialist',{creation:.86,highRelease:.52},'gold'],
+    ['mid','inside','Inside-Out Post Counter',{creation:.55,postFootwork:.67},'earth'],
+    ['inside','strength','Contact Finishing Wall',{contactBalance:.85,deepSeal:.53},'earth'],
+    ['inside','vert','Catch Above the Crowd',{lob:.89,contactBalance:.42},'ember'],
+    ['inside','pass','The Double-Team Escape',{postRead:.83,precision:.45},'gold'],
+    ['inside','handle','Rim Pressure Creator',{creation:.61,contactBalance:.69},'earth'],
+    ['inside','reb','Relentless Second Chance',{secondChance:.84,boxPosition:.52},'earth'],
+    ['pass','handle','Pick-and-Roll Manipulator',{screenRead:.88,precision:.75},'gold'],
+    ['pass','iq','Possession Architect',{precision:.84,anticipation:.51},'gold'],
+    ['pass','speed','One-Pass Fastbreak',{transition:.83,precision:.51},'ember'],
+    ['perD','steal','Elite Ball Hawk',{laneDisruption:.92,rotations:.4},'scarlet'],
+    ['perD','speed','Recovery Lockdown',{rotations:.79,laneDisruption:.5},'emerald'],
+    ['perD','intD','The Switch Everything Wall',{rotations:.9,rimIntimidation:.52},'emerald'],
+    ['intD','vert','Late-Help Shot Eraser',{rimIntimidation:.93,rotations:.51},'emerald'],
+    ['intD','iq','Two-Rotation Read',{rotations:.93,rimIntimidation:.41},'emerald'],
+    ['reb','strength','Own the Box',{boxPosition:.88,secondChance:.59},'earth'],
+    ['reb','motor','Tireless Glass Cleaner',{secondChance:.9,boxPosition:.7},'earth'],
+    ['speed','vert','Poster Fastbreak',{transition:.8,lob:.9},'ember'],
+    ['speed','handle','First-Step Advantage',{transition:.58,creation:.81},'ember'],
+    ['contested','iq','Fourth-Quarter Shot Selector',{clutchChoice:.94,anticipation:.56},'violet'],
+    ['strength','perD','Physical Point of Attack',{laneDisruption:.59,rotations:.58},'scarlet'],
+    ['strength','intD','The Paint Anchor',{rimIntimidation:.79,boxPosition:.57},'earth'],
+    ['jumper','contested','Pressure Jumper',{highRelease:.6,clutchChoice:.62},'violet'],
+    ['motor','speed','Nonstop Two-Way Engine',{transition:.76,rotations:.46},'ember'],
+    ['motor','perD','Forty-Eight-Minute Pest',{laneDisruption:.74,rotations:.64},'scarlet'],
+    ['steal','speed','Steal-to-Dunk Express',{laneDisruption:.66,transition:.77},'emerald']
+  ];
+  const COMBO_TRIOS=[
+    [['three','handle','jumper'],'Logo-to-Release Chain',{range:1,creation:.9,quickRelease:1.1},'arc'],
+    [['three','pass','iq'],'Read the Double, Burn the Help',{gravity:1,precision:.9,postRead:.8},'arc'],
+    [['three','speed','jumper'],'Off-Ball Relocation Terror',{relocation:1.1,screenMove:.95,quickRelease:.82},'arc'],
+    [['inside','strength','reb'],'Second-Chance Powerhouse',{deepSeal:.95,secondChance:1.1,boxPosition:.82},'earth'],
+    [['inside','vert','speed'],'Above-the-Rim Avalanche',{transition:1.08,lob:1.1,contactBalance:.75},'ember'],
+    [['inside','pass','iq'],'Point-Center Help Decoder',{postRead:1.1,precision:.95,postFootwork:.6},'gold'],
+    [['perD','steal','speed'],'Ninety-Four-Feet Pressure',{laneDisruption:1.13,rotations:.84,transition:.76},'scarlet'],
+    [['perD','intD','iq'],'Full-Court Defensive Relay',{rotations:1.18,rimIntimidation:.7,laneDisruption:.63},'emerald'],
+    [['reb','strength','motor'],'The Glass Never Sleeps',{boxPosition:1.13,secondChance:1.07},'earth'],
+    [['mid','contested','handle'],'Impossible Shot Artist',{creation:1.12,clutchChoice:1.07,highRelease:.55},'violet'],
+    [['three','inside','pass'],'Unsolvable Inside-Out',{gravity:.87,postRead:.91,precision:.79},'arc'],
+    [['inside','vert','pass'],'Lob and Kick-Out Threat',{lob:1,postRead:.83,precision:.73},'ember'],
+    [['pass','handle','speed'],'Seven-Second Floor General',{screenRead:.95,transition:.98,precision:.95},'gold'],
+    [['strength','intD','reb'],'Paint Fortress',{rimIntimidation:.99,boxPosition:1.12,rotations:.6},'earth']
+  ];
+  const TEAM_CHAINS=[
+    [['three',91],['post',89],['vision',87],'The Floor-Splitting Triangle',{gravity:1.1,deepSeal:1.05,postRead:.89},'arc'],
+    [['three',94],['vision',93],['speed',89],'Relocate and Deliver',{relocation:1.15,screenRead:.97,precision:1.01},'arc'],
+    [['perD',89],['block',91],['steal',88],'The Rotating Lock',{laneDisruption:1.1,rimIntimidation:1.1,rotations:1.17},'emerald'],
+    [['pass',90],['vert',91],['screen',86],'The Alley-Oop Machine',{precision:1.15,lob:1.08,screenRead:.79},'ember'],
+    [['post',92],['three',94],['dreb',90],'Paint, Pop and Rebound',{deepSeal:1.01,gravity:.95,boxPosition:.99},'earth'],
+    [['mid',94],['handle',91],['three',91],'Three-Level Scoring Hydra',{creation:1.17,gravity:.81,clutchChoice:.89},'violet'],
+    [['speed',91],['vision',90],['dunk',93],'Run the Whole Floor',{transition:1.17,precision:.87,lob:.91},'ember'],
+    [['intD',89],['perD',91],['iq',91],'Five-Man Defensive Geometry',{rotations:1.2,rimIntimidation:.82},'emerald']
+  ];
+  const sourceGrade=e=>Math.max(0,...(CATEGORY_ATTRS[e.cat]||[]).map(k=>e.attrs[k]||0));
+  function derivedChemistry(entries,mode){
+    const pairs=[],trios=[];
+    if(mode==='skill'){
+      for(const [a,b,title,m,tone]of COMBO_DUOS){
+        const x=entries.find(e=>e.cat===a&&e.verified&&sourceGrade(e)>=83);
+        const y=entries.find(e=>e.cat===b&&e.verified&&sourceGrade(e)>=83);
+        if(x&&y)pairs.push(effect('mix:'+a+':'+b,title,'elite-duo',tone,[...new Set([x.pid,y.pid])],m,{
+          ingredients:[x,y],qualification:name(x.pid)+' '+a+' ('+sourceGrade(x)+') + '+name(y.pid)+' '+b+' ('+sourceGrade(y)+') · both 83+',
+          activation:'When these two high-level tools work together in a matching possession, modify the shot, read or defensive recovery.'}));
+      }
+      for(const [cats,title,m,tone]of COMBO_TRIOS){
+        const es=cats.map(c=>entries.find(e=>e.cat===c&&e.verified&&sourceGrade(e)>=87));
+        if(es.every(Boolean))trios.push(effect('triple:'+cats.join(':'),title,'elite-trio',tone,
+          [...new Set(es.map(e=>e.pid))],m,{ingredients:es,
+          qualification:es.map(e=>name(e.pid)+' '+e.cat+' ('+sourceGrade(e)+')').join(' + ')+' · 87+ each',
+          activation:'The three qualified skills combine during matching plays to unlock coordinated counters and recovery actions.'}));
+      }
+    }else if(mode==='team'){
+      for(const [tools,title,m,tone]of TEAM_CHAINS){
+        const used=new Set(),es=[];
+        for(const [tool,min]of tools){
+          const selected=entries.filter(e=>e.verified&&!used.has(e.pid)&&e.attrs[tool]>=min)
+            .sort((a,b)=>b.attrs[tool]-a.attrs[tool])[0];
+          if(!selected)break;used.add(selected.pid);es.push(selected);
+        }
+        if(es.length===3)trios.push(effect('scheme:'+tools.map(x=>x[0]).join(':'),title,'tactical-trio',
+          tone,es.map(e=>e.pid),m,{ingredients:es,
+          qualification:es.map((e,i)=>name(e.pid)+' '+tools[i][0]+' '+Math.round(e.attrs[tools[i][0]])+' ≥ '+tools[i][1]).join(' + '),
+          activation:'Only when all three named historical-season players are on the floor, their complementary roles influence actual possessions.'}));
+      }
+    }
+    return {pairs,trios};
+  }
+
   function selectedMechanics(pid,cats,mode){return Object.fromEntries(Object.entries(PROFILES[pid]||{}).filter(([k])=>mode==='team'||DOMAINS[k]?.some(c=>cats.includes(c))));}
   function effect(id,n,type,tone,ps,mechanics,extra={}){return {id,name:n,type,tone,players:ps,mechanics,bonus:{},boost:{},colors:PALETTE[tone]||PALETTE.arc,
     activation:'While the relevant skills are used together; team partners must share the floor.',description:Object.keys(mechanics).map(k=>MECHANIC_TEXT[k]).join(' '),...extra};}
@@ -194,6 +293,8 @@ HL.DNA = (function () {
       ['screenRead','screen','Ball Handler and Screen Setter',{screenRead:.45,screen:.5},'earth'],['laneDisruption','rimIntimidation','Wing Pressure and Back-Line Cover',{rotations:.5,laneDisruption:.35},'emerald']]){
       const ea=entries.find(e=>e.verified&&(PROFILES[e.pid]?.[a]||0)>=.8),eb=entries.find(e=>e.verified&&e.pid!==ea?.pid&&(PROFILES[e.pid]?.[b]||0)>=.8);
       if(ea&&eb&&!pairs.some(f=>f.players.includes(ea.pid)&&f.players.includes(eb.pid)))pairs.push(effect(`fit:${a}:${b}:${key([ea.pid,eb.pid])}`,n,'duo',tone,[ea.pid,eb.pid],m,{ingredients:[ea,eb],qualification:`${name(ea.pid)} + ${name(eb.pid)}; compatible ${a} and ${b} roles.`}));}
+    const generated=derivedChemistry(entries,mode);
+    pairs.push(...generated.pairs);trios.push(...generated.trios);
     const qualified=RECIPES.map(r=>({r,es:qualify(r,entries,build,mode)})).filter(x=>x.es).sort((a,b)=>(b.r.priority||1)-(a.r.priority||1)||a.r.id.localeCompare(b.r.id)),mutations=[],families=new Set();
     for(const {r,es}of qualified){if(families.has(r.family)||mutations.length>=2)continue;families.add(r.family);mutations.push(effect(`mutation:${r.id}`,r.name,r.type||'mutation',r.tone,[...new Set(es.map(e=>e.pid))],r.mechanics,{...r,id:`mutation:${r.id}`,type:r.type||'mutation',ingredients:es,qualification:qualificationFor(r,es,build,mode),target:r.target||null}));}
     return {players,cats,mode,build,signatures,pairs,trios,mutations,active:[...signatures,...pairs,...trios,...mutations]};
@@ -262,5 +363,5 @@ HL.DNA = (function () {
   function visual(f,{compact=false}={}){const detail=`<p>${esc(f.description)}</p><p><b>Unlocked by</b> ${esc(f.qualification)}</p><p><b>Activates</b> ${esc(f.activation)}</p>`;return `<article class="dna-effect dna-${esc(f.type)}" style="--dna-a:${f.colors[0]};--dna-b:${f.colors[1]}" data-dna="${esc(f.id)}"><div class="dna-mark" aria-hidden="true">${['mutation','evolved'].includes(f.type)?'✦':f.type.includes('trio')?'Ⅲ':f.type.includes('duo')?'Ⅱ':'★'}</div><div><span class="dna-kind">${esc(f.type.replaceAll('-',' '))}</span><b>${esc(f.name)}</b><details><summary>How it works</summary>${detail}</details>${compact?'':`<p>${esc(f.activation)}</p>`}</div></article>`;}
   function board(dna,{compact=false}={}){if(!dna)return '';const featured=[...dna.mutations,...dna.trios,...dna.pairs.slice(0,compact?2:6),...dna.signatures.slice(0,compact?1:3)],more=[...dna.pairs.slice(compact?2:6),...dna.signatures.slice(compact?1:3)];if(!featured.length)return '<p class="t3 sm">Draft compatible skills to discover chemistry. Transformations require verified elite tools and a matching build.</p>';return `<section class="dna-showcase"><div class="dna-section-label">${compact?'BUILD DNA':'SIGNATURES · CHEMISTRY · RARE TRANSFORMATIONS'}</div><div class="dna-effect-grid">${featured.map(f=>visual(f,{compact})).join('')}</div>${more.length?`<details><summary>Inspect ${more.length} more abilities</summary><div class="dna-effect-grid">${more.map(f=>visual(f,{compact})).join('')}</div></details>`:''}</section>`;}
   function preview(entries,candidate,options={}){const next=analyze([...entries,candidate],options),old=analyze(entries,options);return [...next.mutations,...next.trios,...next.pairs].find(f=>!old.active.some(o=>o.id===f.id))||null;}
-  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,preview,esc,PALETTE};
+  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,COMBO_DUOS,COMBO_TRIOS,TEAM_CHAINS,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,preview,esc,PALETTE};
 })();
