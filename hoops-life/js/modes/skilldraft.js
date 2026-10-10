@@ -5,20 +5,24 @@ window.HL = window.HL || {};
 HL.SkillDraft = (function () {
   const U = HL.UI, esc = U.esc, R = HL.RNG, FX = HL.FX;
   const C = () => HL.Challenge;
+  // Separate explosive guard traits from raw strength. All categories transfer actual ratings.
   const CATS = [
-    ['inside', 'Inside scoring', ['close', 'layup', 'dunk', 'post']],
-    ['mid', 'Mid-range', ['mid']],
-    ['three', 'Three-point', ['three']],
-    ['ft', 'Free throws', ['ft']],
-    ['pass', 'Playmaking', ['pass']],
-    ['handle', 'Ball handling', ['handle']],
-    ['perD', 'Perimeter defense', ['perD', 'steal']],
-    ['intD', 'Rim protection', ['intD', 'block']],
-    ['reb', 'Rebounding', ['oreb', 'dreb']],
-    ['ath', 'Athleticism', ['speed', 'vert', 'str']],
-    ['iq', 'Basketball IQ', ['iq']],
-    ['motor', 'Durability & motor', ['dur', 'stam']],
-    ['body', 'Body (height & frame)', []],
+    ['inside','Inside & finishing',['close','layup','dunk','post']],
+    ['mid','Mid-range shooting',['mid']],
+    ['three','Three-point shooting',['three']],
+    ['ft','Free throws',['ft']],
+    ['pass','Playmaking',['pass']],
+    ['handle','Ball handling',['handle']],
+    ['perD','Perimeter defense',['perD']],
+    ['intD','Interior & block',['intD','block']],
+    ['steal','Steals',['steal']],
+    ['reb','Rebounding',['oreb','dreb']],
+    ['speed','Speed',['speed']],
+    ['vert','Vertical leap',['vert']],
+    ['strength','Strength',['str']],
+    ['iq','Basketball IQ',['iq']],
+    ['motor','Stamina & longevity',['dur','stam']],
+    ['body','Body (height & frame)',[]],
   ];
   const catOf = id => CATS.find(c => c[0] === id);
   const avgOf = (attrs, keys) => keys.length ? Math.round(keys.reduce((s, k) => s + attrs[k], 0) / keys.length) : 0;
@@ -32,7 +36,7 @@ HL.SkillDraft = (function () {
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
 
-  const SHORT = { inside: 'INSIDE', mid: 'MID', three: '3PT', ft: 'FT', pass: 'PASS', handle: 'HANDLE', perD: 'PER D', intD: 'RIM D', reb: 'REB', ath: 'ATH', iq: 'IQ', motor: 'MOTOR', body: 'BODY' };
+  const SHORT = { inside: 'INSIDE', mid: 'MID', three: '3PT', ft: 'FT', pass: 'PASS', handle: 'HANDLE', perD: 'PER D', intD: 'RIM D', reb: 'REB',steal: 'STEAL',speed:'SPEED',vert:'VERT',strength:'POWER', iq: 'IQ', motor: 'MOTOR', body: 'BODY' };
   // BODY measures frame independently from skill or overall.
   const skillValue = (c, cat) => C().skillValue(c, cat);
 
@@ -909,7 +913,7 @@ HL.SkillDraft = (function () {
       <div class="hand">${st.hand.map((c, i) => { const bio = HL.HISTORY.players[c.row.pid]; const r = c.row; const v = skillValue(c, cat);
         return HL.Cards.card({ pid: r.pid, name: bio[0], nbaId: bio[1], team: tm(C().LINEAGE[c.club]) || fm, pos: r.pos, rating: v, ratingLabel: cat[0] === 'body' ? 'FRAME' : SHORT[cat[0]], meta: `#${i + 1} · ${yrLabel(c.season)} · ${c.club}`,
           stat: cat[0] === 'body' ? [['HT', HL.fmtHeight(bio[3])], ['WT', bio[4]]] : [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: hide, down: !!reveal, attrs: `data-hand="${i}"` }); }).join('')}</div></div>` : '';
-    const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Thirteen skills build one player.</p>' : '';
+    const intro = !st.cat && st.phase === 'spin' && !Object.keys(st.picks).length ? '<p class="t2" style="text-align:center;max-width:52ch;margin:14px auto 0">Each spin lands a franchise, a decade and a skill. You get dealt five players who played there. Take one player\'s skill. Sixteen distinct skills build one player.</p>' : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reels}${intro}${controls}${cards}</section>`;
   }
 
