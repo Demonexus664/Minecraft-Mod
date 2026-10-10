@@ -46,6 +46,7 @@ HL.FusionLab=(function(){
   if(a.id===b.id)chance=Math.max(.6,chance*.25);
   const t=[...new Set([...tags(a),...tags(b)])].slice(0,9);
   const paradox=t.includes('gravity')&&t.includes('deepSeal');
+  if(paradox&&height>=8)chance=Math.min(chance,4.5);
   return {chance,affinity:clamp(Math.round(72-tension+overlap*5),0,100),tension:Math.round(tension),
    power:Math.round(power),family:paradox?'Impossible Gravity':overlap>=2?'Perfect Synchronization':
     height>=9?'Extremes of the Court':'Hybrid Weapon',tags:t};
