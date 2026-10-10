@@ -76,7 +76,7 @@ HL.History = (function () {
     if (!S) return null;
     if (rowCache.has(key)) return rowCache.get(key);
     const F = H().seasonFields;
-    const rows = S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); return o; });
+    const rows = S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); o.seasonStart = parseInt(key, 10); return o; });
     rowCache.set(key, rows);
     return rows;
   }
