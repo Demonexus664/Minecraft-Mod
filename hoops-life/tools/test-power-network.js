@@ -37,3 +37,16 @@ test('rarity network never requires a mutation for every drafted card',()=>{
  assert.match(DNA.powerMap(example),/Draft your first verified/);
  assert.equal(DNA.preview([], {pid:'nobody',cat:'mid',row:null,season:1981}),null);
 });
+
+test('compact power network does not render the entire locked catalog on every draft pick',()=>{
+ const pair={id:'p',type:'elite-duo',name:'Synergy Test',colors:['#fff','#000'],
+   ingredients:[],players:['curryst01','bryanko01'],mechanics:{gravity:.65},
+   description:'Basketball spacing',qualification:'Elite verified two-card tools',
+   activation:'Both skill sources work together'};
+ const dna={mode:'skill',pairs:[pair],trios:[],mutations:[],signatures:[],active:[pair]};
+ const compact=DNA.powerMap(dna,{compact:true});
+ const expanded=DNA.powerMap(dna);
+ assert.match(compact,/POWER NETWORK/);
+ assert.doesNotMatch(compact,/UNDISCOVERED ELITE DUOS/);
+ assert.match(expanded,/UNDISCOVERED ELITE DUOS/);
+});
