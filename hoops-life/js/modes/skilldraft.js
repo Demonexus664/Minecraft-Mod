@@ -558,6 +558,7 @@ HL.SkillDraft = (function () {
     // Rebuild shot diet from the combined skills: a borrowed elite 3PT rating
     // actively increases 3PA, while Shaq's frame stays with that same player.
     me.tend = HL.completeTendencies({...me,tend:{...HL.defaultTendencies(me),...c.prime.tendencies}});
+    me._skillRoleBaseline={...me.tend};
   }
 
   function newCareer() {
