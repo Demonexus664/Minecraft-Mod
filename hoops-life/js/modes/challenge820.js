@@ -732,7 +732,7 @@ HL.Challenge = (function () {
       const left={photo:hybrid.images?.[0]||'',name:hybrid.heads?.[0]||'Parent A'};
       const right={photo:hybrid.images?.[1]||'',name:hybrid.heads?.[1]||'Parent B'};
       const visual=HL.FusionUI?.portrait(left,right,true)||'';
-      return '<div class="genesis-lineup-card" data-from="'+slot+'">'+visual+
+      return '<div class="gcard placed genesis-lineup-card" data-from="'+slot+'">'+visual+
         '<div class="genesis-lineup-meta"><b>'+esc(hybrid.name)+'</b>'+
         '<span>'+hybrid.ovr+' OVR · GEN '+hybrid.depth+'</span></div></div>';
     }
@@ -781,8 +781,8 @@ HL.Challenge = (function () {
     const drafting=!['season','result','playoffs'].includes(st.phase);
     if(!drafting)return '<aside class="draft-side">'+courtView()+'</aside>';
     const view=['roster','dna','fusion'].includes(st.draftView)?st.draftView:'roster';
-    const names=[['roster','MY TEAM',filled()+'/8'],['dna','COMBOS',st.dna?.pairs?.length||0],
-      ['fusion','FUSION',Object.keys(st.fusionSlots).length]];
+    const names=[['roster','MY TEAM',filled()+'/8'],['dna','COMBOS',st.dna?.pairs?.length||0]];
+    if(!st.daily&&st.mode!=='hoopiq')names.push(['fusion','FUSION',Object.keys(st.fusionSlots).length]);
     const tabs='<nav class="draft-workspace-tabs" aria-label="Team-building views">'+
       names.map(([id,label,n])=>'<button data-team-view="'+id+'" aria-pressed="'+(view===id)+
         '" class="'+(view===id?'on':'')+'"><span>'+label+'</span><b>'+n+'</b></button>').join('')+'</nav>';
@@ -816,6 +816,23 @@ HL.Challenge = (function () {
     if (revealHand) {const cards=[...document.querySelectorAll('.hand .gcard')];FX.flipIn(cards).catch(()=>cards.forEach(c=>{c.classList.remove('down','charging');c.classList.add('up');}));}
   }
 
+
+  function draftFitChip(c){
+    const free=SLOTS.filter(slot=>!st.lineup[slot]);
+    if(!free.length)return '';
+    const best=free.slice().sort((a,b)=>effRating(c,b)-effRating(c,a))[0];
+    const current=st.dna||HL.DNA.analyze(teamDnaEntries(),{mode:'team'});
+    const future=HL.DNA.analyze([...teamDnaEntries(),
+      {pid:c.row.pid,cat:best,row:c.row,season:c.season}],{mode:'team'});
+    const duos=Math.max(0,(future.pairs?.length||0)-(current.pairs?.length||0));
+    const trios=Math.max(0,(future.trios?.length||0)-(current.trios?.length||0));
+    const rare=future.mutations?.some(x=>!current.mutations?.some(y=>x.id===y.id));
+    return '<div class="draft-fit-chip">'+
+      [best+' FIT · '+effRating(c,best),duos?duos+' NEW DUO'+(duos>1?'S':''):'',
+       trios?trios+' NEW TRIO'+(trios>1?'S':''):'',rare?'✦ RARE DNA':''].filter(Boolean).map(esc).join(' · ')+
+      '</div>';
+  }
+
   function machineView(reveal) {
     const fm = st.team ? teamMeta(st.team) : null;
     const done = st.phase === 'ready';
@@ -832,6 +849,7 @@ HL.Challenge = (function () {
     const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.special ? `✦ LEGENDARY TEAM ROLL · ${esc(st.special.label)} · Pick ONE player` : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
         <div class="hand">${st.hand.map((c,i)=>'<div class="scout-wrap">'+
           cardFor(c,{down:!!reveal,attrs:`data-hand="${i}"`})+
+          (st.mode==='hoopiq'?'':draftFitChip(c))+
           (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="'+i+'">FULL SCOUT REPORT</button>')+
           '</div>').join('')}</div></div>` : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
