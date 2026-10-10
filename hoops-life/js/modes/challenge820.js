@@ -200,6 +200,20 @@ HL.Challenge = (function () {
     }).sort((a,b)=>b.power-a.power).slice(0,4).map(x=>x.team);
   }
 
+
+  // Legend Gauntlet schedules four consecutive *actual opponents* at fixed
+  // chapters. No buffed ratings or scripted wins: the existing sim decides.
+  function gauntletSchedule(teams,schedule) {
+    const strongest=marqueeOpponents(teams).slice(0,4);
+    if(!strongest.length)return [];
+    const dates=[.25,.5,.75,1].map(f=>Math.max(0,Math.round(schedule.length*f)-1));
+    return dates.map((g,i)=>{
+      const opp=strongest[i%strongest.length];
+      schedule[g]=opp;
+      return {g:g+1,id:opp.id,opp:opp.name,played:false,win:false,margin:null};
+    });
+  }
+
   // ---------- run ----------
   function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -207,7 +221,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[], gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -360,6 +374,7 @@ HL.Challenge = (function () {
     const opps = L.teams;
     // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
+    st.bosses=st.gauntlet?gauntletSchedule(opps,schedule):[];
     const marqueeIds=new Set(marqueeOpponents(opps).map(t=>t.id));
     const marqueeLog=[],schemeCounts={};
     let baseStrategy={...dream.strategy};const coaching=COACHES[st.coach]||COACHES.steady;
@@ -412,7 +427,11 @@ HL.Challenge = (function () {
       const won = mine.score > theirs.score;
       if (won) { w++; streak++; best = Math.max(best, streak); } else { l++; streak = 0; }
       pf += mine.score; pa += theirs.score;
-      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
+      const boss=st.bosses.find(x=>x.g===g+1);
+      if(boss){boss.played=true;boss.win=won;boss.margin=mine.score-theirs.score;
+        if(won){FX.sfx.achievement?.();FX.burst(q('.ticker .rec'),['#ffe4a5','#9bc9ff'],22,.85);}
+        else FX.sfx.rival?.();}
+      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won,boss:!!boss});
       if(Math.abs(mine.score-theirs.score)<=5){closeGames++;if(won)closeWins++;}
       if(marqueeIds.has(opp.id)){marqueeLog.push({g:g+1,opp:opp.name,won,for:mine.score,against:theirs.score});FX.sfx.rival?.();}
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
@@ -444,7 +463,9 @@ HL.Challenge = (function () {
         matchup.classList.toggle('win',won);matchup.classList.toggle('loss',!won);
       }
       const event=q('.ticker .broadcast-event');
-      if(event)event.textContent=marqueeIds.has(opp.id)?
+      if(event)event.textContent=boss?
+        ('LEGEND GAUNTLET · BOSS '+st.bosses.indexOf(boss)+1+'/'+st.bosses.length+' · '+(won?'BOSS DEFEATED':'BOSS WINS')):
+        marqueeIds.has(opp.id)?
         ('MARQUEE · '+opp.name+' · '+(won?'STATEMENT WIN':'RIVAL TAKES THE GAME')):
         (Math.abs(mine.score-theirs.score)<=3?'CLUTCH FINISH · '+Math.abs(mine.score-theirs.score)+' POINTS':
           streak>=5?'ON FIRE · '+streak+' STRAIGHT WINS':'MISSION · '+(CHALLENGES[st.mission]?.title||'THE IMPOSSIBLE'));
@@ -454,7 +475,7 @@ HL.Challenge = (function () {
     }
     st.result = {w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,best,losses:log,lines,players,firstLoss,gameLog,
       absences,injuriesLog,specialEncounter:null,dna:st.dna,specialDraft:st.special?.label||null,
-      closeGames,closeWins,marqueeLog,schemeCounts,coach:st.coach,coachLog:st.coachLog,
+      closeGames,closeWins,marqueeLog,schemeCounts,coach:st.coach,coachLog:st.coachLog,bosses:st.bosses,gauntlet:st.gauntlet,
       mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
@@ -720,6 +741,12 @@ HL.Challenge = (function () {
     const mission='<section class="block"><header><h3>SEASON MISSION</h3></header><div class="body stack">'+
       '<h2 class="'+(r.mission.completed?'win':'loss')+'">'+(r.mission.completed?'MISSION COMPLETE':'MISSION FAILED')+'</h2>'+
       '<b>'+esc(r.mission.title)+'</b><p class="t2">'+esc(r.mission.detail)+'</p></div></section>';
+    const gauntlet=r.gauntlet?'<section class="block"><header><h3>LEGEND GAUNTLET</h3>'+
+      '<div class="body stack"><h2>'+r.bosses.filter(b=>b.win).length+' / '+r.bosses.length+
+      ' BOSSES DEFEATED</h2><p class="t2">Four deliberately tougher dates against the real league’s strongest rosters. No scripted boosts.</p>'+
+      r.bosses.map(b=>'<div class="kv"><span>Game '+b.g+' · '+esc(b.opp)+'</span>'+
+      '<b class="'+(b.win?'win':'loss')+'">'+(b.win?'W':'L')+' '+(b.margin>0?'+':'')+b.margin+'</b></div>').join('')+
+      '</div></section>':'';
     const rivals='<section class="block"><header><h3>MARQUEE GAMES & COACHING FILM</h3></header><div class="body stack">'+
       (r.marqueeLog.length?r.marqueeLog.map(e=>'<div class="kv"><span>Game '+e.g+' · '+esc(e.opp)+'</span><b class="'+
         (e.won?'win':'loss')+'">'+(e.won?'W':'L')+' '+e.for+'-'+e.against+'</b></div>').join(''):'')+
@@ -738,7 +765,7 @@ HL.Challenge = (function () {
       ${r.specialDraft?`<section class="block"><header><h3>Legendary roster discovered</h3></header><div class="body"><p>✦ ${esc(r.specialDraft)} supplied one of your drafted players. No extra draft slot was awarded.</p></div></section>`:''}
       ${HL.DNA.board(st.dna)}
       ${identityReport(r)}
-       ${mission}${rivals}
+       ${mission}${gauntlet}${rivals}
       <section class="block"><header><h3>Postseason: The second challenge</h3></header><div class="body stack"><p>Now take your drafted superteam through four best-of-seven playoff series, one game at a time. Close finishes can become interactive clutch possessions. The regular-season 82–0 record stays separate.</p><button class="btn go" data-start-playoffs>Start the playoffs</button>${st.playoffs?.completed?`<p>${st.playoffs.champion?'NBA CHAMPIONS':'Playoff run ended'} · ${st.playoffs.history.length} games played.</p>`:''}</div></section>
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
       <section class="block"><header><h3>Season scouting report</h3></header><div class="body stack">
@@ -872,7 +899,7 @@ HL.Challenge = (function () {
     U.applyTeamTheme(null);
     U.setEra('modern');
     const all = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
-    const cfg = { mode: 'classic', decades: all.slice(), playSeason: HL.LATEST_SEASON, daily: false, mission:'perfect',coach:'steady',timeouts:true };
+    const cfg = { mode: 'classic', decades: all.slice(), playSeason: HL.LATEST_SEASON, daily: false, mission:'perfect',coach:'steady',timeouts:true,gauntlet:false };
     const years = [];
     for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
     const dailyDone = bestRuns().find(r => r.daily === today());
@@ -893,6 +920,7 @@ HL.Challenge = (function () {
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides ratings and stats, so you draft from memory.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], cfg.mode)}</div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Season Mission</b><div class="d">Choose another victory condition measured from the actual season.</div></div><select data-mission>${Object.entries(CHALLENGES).map(([id,c])=>`<option value="${id}" ${cfg.mission===id?'selected':''}>${esc(c.title)} · ${esc(c.detail)}</option>`).join('')}</select></div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Coaching Identity</b><div class="d">Your coach adapts actual gameplay tactics to opponents or momentum.</div></div><select data-coach>${Object.entries(COACHES).map(([id,c])=>`<option value="${id}" ${cfg.coach===id?'selected':''}>${esc(c.title)} · ${esc(c.description)}</option>`).join('')}</select></div>
+          <div class="setting"><div class="grow"><b>Legend Gauntlet</b><div class="d">Replace four regular-season dates with the four strongest real rosters as scheduled boss matchups. Earn every win in the simulation.</div></div><input type="checkbox" data-gauntlet ${cfg.gauntlet?'checked':''}></div>
           <div class="setting"><div class="grow"><b>Broadcast Timeouts</b><div class="d">Choose schemes at games 21, 41 and 61. Uncheck for continuous sim.</div></div><input type="checkbox" data-timeouts ${cfg.timeouts?'checked':''}></div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Play the season in</b><div class="d">Your team joins that year's real league: its teams, rules (no three-point line before 1979-80), schedule length and era look.</div></div>
             <select data-play-season>${years.map(y => `<option value="${y}" ${y === cfg.playSeason ? 'selected' : ''}>${yrLabel(y)}${y === HL.LATEST_SEASON ? ' (today)' : ''}</option>`).join('')}</select></div>
@@ -908,6 +936,7 @@ HL.Challenge = (function () {
       app.querySelector('[data-mission]').onchange=e=>{cfg.mission=e.target.value;};
       app.querySelector('[data-coach]').onchange=e=>{cfg.coach=e.target.value;};
       app.querySelector('[data-timeouts]').onchange=e=>{cfg.timeouts=e.target.checked;};
+      app.querySelector('[data-gauntlet]').onchange=e=>{cfg.gauntlet=e.target.checked;};
       const ps = app.querySelector('[data-play-season]');
       ps.onchange = () => { cfg.playSeason = +ps.value; U.setEra(HL.eraForSeason(cfg.playSeason)); };
       app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun({ ...cfg, decades: cfg.decades.slice().sort() }); render(); };
