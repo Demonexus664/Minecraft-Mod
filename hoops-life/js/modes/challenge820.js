@@ -670,7 +670,10 @@ HL.Challenge = (function () {
           <button class="btn" data-skip="era" ${st.skips.era && st.phase === 'hand' ? '' : 'disabled'}>Decade skip (${st.skips.era})</button><button class="btn" data-skip="all" ${st.skips.all && st.phase === 'hand' ? '' : 'disabled'}>Full respin (${st.skips.all})</button></div>
         ${fm && st.phase === 'hand' ? `<div class="result">${esc(fm.city)} ${esc(fm.name)} · ${st.decade}s</div>` : ''}`;
     const hand = st.phase === 'hand' ? `<div class="stack" style="gap:8px;margin-top:18px"><div class="t2 sm" style="text-align:center">${st.hand.length ? st.special ? `✦ LEGENDARY TEAM ROLL · ${esc(st.special.label)} · Pick ONE player` : 'Drag a card onto the court or the bench, or tap a card and then a spot.' : 'No players to deal from this club and decade. Use a skip.'}</div>
-        <div class="hand">${st.hand.map((c, i) => cardFor(c, { down: !!reveal, attrs: `data-hand="${i}"` })).join('')}</div></div>` : '';
+        <div class="hand">${st.hand.map((c,i)=>'<div class="scout-wrap">'+
+          cardFor(c,{down:!!reveal,attrs:`data-hand="${i}"`})+
+          (st.mode==='hoopiq'?'':'<button class="scout-launch" data-scout="${i}">FULL SCOUT REPORT</button>')+
+          '</div>').join('')}</div></div>` : '';
     return `<section class="machine"><div class="lights">${'<i></i>'.repeat(14)}</div>${reelHost}${controls}${hand}</section>`;
   }
 
@@ -748,6 +751,51 @@ HL.Challenge = (function () {
       <textarea hidden data-share-text>${esc(share)}</textarea></div>`;
   }
 
+
+  // Real season-scoped scouting instead of another arbitrary rating booster.
+  function scoutPlayer(index) {
+    if(!st||st.phase!=='hand'||st.mode==='hoopiq')return;
+    const c=st.hand[index];if(!c)return;
+    const bio=HL.HISTORY.players[c.row.pid],a=HL.historicalAttributes(c.row);
+    const keys=HL.ATTR_KEYS.filter(k=>!['dur','stam'].includes(k)&&Number.isFinite(a[k]));
+    const ranked=keys.slice().sort((x,y)=>a[y]-a[x]);
+    const labels={three:'Three-point shooting',mid:'Midrange touch',dunk:'Dunking',
+      handle:'Ball handling',pass:'Passing',vision:'Court vision',perD:'Perimeter defense',
+      intD:'Interior defense',block:'Shot blocking',steal:'Steals',oreb:'Offensive boards',
+      dreb:'Defensive boards',vert:'Vertical',speed:'Speed',str:'Strength',
+      iq:'Basketball IQ',ft:'Free throws',post:'Post scoring',shotCreation:'Shot creation',
+      passingAccuracy:'Pass accuracy',hustle:'Motor'};
+    const metric=k=>'<div class="scout-metric"><span>'+esc(labels[k]||k)+'</span>'+
+      '<div class="scout-bar"><i style="width:'+a[k]+'%"></i></div><strong>'+a[k]+'</strong></div>';
+    const positions=STARTERS.map(slot=>{
+      const cost=penalty(c,slot);
+      return '<div class="scout-fit"><b>'+slot+'</b><strong class="'+(cost?'loss':'win')+'">'+
+        (cost?'−'+cost:'NATURAL')+'</strong><small>'+(st.lineup[slot]?'Filled':'Available')+'</small></div>';
+    }).join('');
+    const sheet=document.createElement('div');sheet.className='coach-break scout-overlay';
+    sheet.setAttribute('role','dialog');sheet.setAttribute('aria-modal','true');
+    sheet.setAttribute('aria-label',bio[0]+' scouting report');
+    sheet.innerHTML='<div class="coach-panel scout-panel"><div class="coach-broadcast">PRO SCOUTING · '+
+      yrLabel(c.season)+' · '+esc(c.club)+'</div><div class="coach-panel-inner">'+
+      '<div class="row wrap" style="gap:15px"><div class="grow"><div class="caps">THE FILM ROOM</div>'+
+      '<h2>'+esc(bio[0])+'</h2><p class="t2">'+yrLabel(c.season)+' · '+esc(c.row.pos)+
+      ' · '+HL.fmtHeight(bio[3])+'</p></div><button class="btn small" data-scout-close>Close report</button></div>'+
+      '<div class="scout-columns"><div><div class="caps">BEST TOOLS</div>'+ranked.slice(0,5).map(metric).join('')+
+      '</div><div><div class="caps">AREAS TO PROTECT</div>'+ranked.slice(-5).reverse().map(metric).join('')+
+      '</div></div><div class="caps">POSITION FIT · SIMULATION PENALTIES</div>'+
+      '<div class="scout-fits">'+positions+'</div>'+
+      '<p class="t3 sm">Ratings are scoped to this historical season. Position changes affect real game skills, but do not rewrite physical size.</p>'+
+      '</div></div>';
+    const key=e=>{if(e.key==='Escape')close();};
+    const close=()=>{sheet.remove();document.removeEventListener('keydown',key);};
+    document.body.appendChild(sheet);
+    sheet.querySelector('[data-scout-close]').onclick=close;
+    sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
+    document.addEventListener('keydown',key);
+    sheet.querySelector('[data-scout-close]').focus();
+    FX.sfx.draft?.();
+  }
+
   // ---------- drag & drop (pointer events: mouse and touch), with tap-to-place ----------
   let picked = null;
   function bindDrag(app) {
@@ -808,6 +856,7 @@ HL.Challenge = (function () {
     const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin(); };
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
     app.querySelectorAll('[data-gameplan]').forEach(b=>b.onclick=()=>{st.plan=b.dataset.gameplan;render();});
+    app.querySelectorAll('[data-scout]').forEach(b=>b.onclick=()=>scoutPlayer(+b.dataset.scout));
     const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
     app.querySelectorAll('[data-start-playoffs]').forEach(b=>b.onclick=()=>{startPlayoffs();render();});
     app.querySelectorAll('[data-finish-playoffs]').forEach(b=>b.onclick=()=>{st.phase='result';render();});
