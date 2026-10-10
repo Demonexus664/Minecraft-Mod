@@ -37,14 +37,17 @@ HL.FusionUI=(function(){
   const p=F().preview(a,b),rare=p.rare;
   return '<div class="gf-odds '+(rare?'rare':'')+'"><div class="gf-chance"><span>TRUE SUCCESS ODDS</span>'+
    '<strong>'+p.display+'</strong><div class="gf-probability"><i style="width:'+p.chance+'%"></i></div>'+
-   '<small>'+p.repeats+' previous experiment(s) on this exact pairing</small></div>'+
+   '<small>'+p.repeats+' experiment(s) · each attempt slightly improves stabilization odds, maximum 93%</small></div>'+
    '<div class="gf-meters"><div><b>'+p.affinity+'</b><span>Chemistry</span></div>'+
    '<div><b>'+p.tension+'</b><span>Instability</span></div>'+
    '<div><b>'+p.power+'</b><span>Ceiling</span></div></div>'+
    '<div class="gf-science"><strong>'+E(p.family)+'</strong><p>'+
    (rare?'Extremely difficult, potentially extraordinary. A rare successful paradox can combine otherwise incompatible on-court abilities.':
    'A successful experiment produces real combined ratings and mechanics. Failure never deletes the original players.')+
-   '</p></div></div>';
+   '</p><div class="gf-predicted"><b>WHAT THIS PAIR COULD CREATE</b>'+
+   '<p>'+E(p.tags.slice(0,6).join(' + '))+'</p>'+
+   '<small>Major physical gaps can limit speed, contact finishing or release mechanics. A successful pairing is never guaranteed to inherit both parents’ 99s.</small></div>'+
+   '</div></div>';
  }
  function result(r){
   if(!root)return;
@@ -55,10 +58,24 @@ HL.FusionUI=(function(){
    '</span><b>'+E(r.ok?r.node.tier.toUpperCase():'PARENTS PRESERVED')+'</b></div>'+
    (a&&b?portrait(a,b):'')+
    '<h2>'+E(r.ok?r.node.name:'FUSION REJECTED')+'</h2>'+
-   '<p>'+(r.ok?'The new creation can now be fused again. Its generation is not capped.':
-       'Both originals are safe. You can try again, switch parents, or experiment with an existing fusion.')+'</p>'+
+   '<p>'+(r.ok?'This creation inherits a specific set of elite tools and can be fused again indefinitely.':
+       'Both parents remain intact. The experiment has no successful specimen, but the research history persists.')+'</p>'+
+   (!r.ok?'<div class="gf-failed-reading"><b>DIAGNOSIS · '+E(r.outcome.replaceAll('-',' '))+
+     '</b><p>'+E(r.failureReason||'The experiment did not stabilize.')+'</p>'+
+     '<small>'+E(r.echo||'You can try again without losing your originals.')+'</small></div>':'')+
    (r.ok?'<div class="gf-result-metrics"><b>'+r.node.ovr+' OVR</b><b>GEN '+r.node.depth+
-        '</b><b>'+E(r.node.family)+'</b></div><div class="gf-ability-list">'+
+        '</b><b>'+E(r.node.family)+'</b></div>'+
+      '<div class="gf-genome"><div class="gf-genome-head"><b>INHERITED ELITE TOOLS</b>'+
+      '<span>'+r.node.ancestry.length+' unique historical ancestors</span></div>'+
+      '<div class="gf-gene-grid">'+(r.node.strengths?.length?r.node.strengths.map(g=>
+        '<div class="gf-gene"><small>'+E(g.key.replace(/([A-Z])/g,' $1'))+
+        '</small><b>'+g.value+'</b><div class="gf-gene-track"><i style="width:'+g.value+'%"></i></div></div>').join(''):
+        '<p>Specialist inheritance is carried mainly in the active abilities below.</p>')+'</div>'+
+      (r.node.tradeoffs?.length?'<div class="gf-tradeoff"><b>THE PHYSICAL COST</b>'+
+        r.node.tradeoffs.map(g=>'<div><span>'+E(g.key.replace(/([A-Z])/g,' $1'))+
+        '</span><strong>−'+g.lost+' vs the better parent · '+g.value+' retained</strong></div>').join('')+
+        '</div>':'<div class="gf-tradeoff small">No significant frame-specific mismatch was found.</div>')+
+      '</div><div class="gf-ability-list">'+
       Object.entries(r.node.mechanics).slice(0,9).map(([k,v])=>
        '<div><strong>'+E(k.replace(/([A-Z])/g,' $1'))+'</strong><span>'+
        E(HL.DNA.MECHANIC_TEXT?.[k]||'Specialized basketball possession bonus.')+'</span><b>'+
