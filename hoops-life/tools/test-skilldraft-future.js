@@ -31,7 +31,7 @@ test('generated seasons draft rookies, develop peers and change team standings',
   t.reset();HL.RNG.setSeed(17);
   const start=await t.leagueFor(2025);
   const startCount=Object.keys(start.players).length;
-  const records=[],rookies=[],improvements=[];
+  const records=[],rookies=[],improvements=[],awardFields=[];
   for(let y=2026;y<=2030;y++){
     const L=await t.leagueFor(y);
     assert.equal(L.season,y,'do not replay the final archived year');
@@ -44,7 +44,14 @@ test('generated seasons draft rookies, develop peers and change team standings',
     records.push(L.teams[0].real.w);
     rookies.push(drafted.length);
     improvements.push(L._careerDevelopment.filter(p=>p.change>0).length);
+    if(y<=2027){
+      const rivals=t.generatedAwardField(L);
+      assert.equal(L._careerAwardYear,y,'rivals must be measured in the new season');
+      awardFields.push(rivals);
+    }
   }
+  assert.notStrictEqual(awardFields[0],awardFields[1],'award rivals must recalculate after rollover');
+  assert.ok(awardFields[0].length>100&&awardFields[1].length>100);
   const latest=await t.leagueFor(2030);
   assert.ok(Object.keys(latest.players).length>startCount,'persistent league adds prospects');
   assert.ok(new Set(records).size>=3,'team strength must vary with seasons');
