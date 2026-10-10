@@ -79,7 +79,7 @@ test('Skill Draft training affects specific attrs and has diminishing returns',(
   assert.ok(gains[0]>gains[11],'training becomes harder as you master the skill');
   assert.equal(c.trainingHistory.length,12);
   const improved=h.ratingsAt(c,29),ordinary=h.ratingsAt(baseline,29);
-  assert.ok(improved.three>ordinary.three,'trained shooting earns real attribute gains');
+  assert.equal(improved.three,ordinary.three,'removed career training gives no secret boosts');
   assert.equal(improved.intD,ordinary.intD,'not an indiscriminate OVR boost');
   assert.ok(HL.ATTR_KEYS.every(k=>improved[k]>=25&&improved[k]<=99));
 });
