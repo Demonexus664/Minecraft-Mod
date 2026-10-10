@@ -760,3 +760,81 @@ html[data-fx-level=off] .press-live i{animation:none!important}
 .film-coaching span{font:850 14px var(--display);font-variant-numeric:tabular-nums;}
 @media(max-width:600px){.film-analysis-grid,.film-findings{grid-template-columns:1fr;}
  .film-coaching{grid-template-columns:1fr auto;}.film-coaching span{grid-column:2}}
+
+
+/* BATCH 4 / GAME NIGHT. The choice is a televised coaching decision with
+   concrete consequences, not a free upgrade spinner. */
+.game-night-overlay {position:fixed;inset:0;z-index:120000;overflow-y:auto;
+  padding:clamp(10px,3vw,32px);display:grid;place-items:center;
+  background:radial-gradient(ellipse at 50% 10%,#26365d7a,#02050b 65%);
+  backdrop-filter:blur(18px);animation:night-entry .32s ease both;}
+.game-night-board {position:relative;overflow:hidden;width:min(1150px,100%);
+  background:linear-gradient(135deg,#1b2a41,#0c1423 48%,#0a101c);
+  border:1px solid #8bb3e04a;border-radius:21px;
+  box-shadow:0 40px 135px #000d,0 0 90px #365cae20,inset 0 1px #ffffff22;
+  padding:clamp(17px,3vw,33px);}
+.game-night-board::before {content:"";position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent 0 56px,#ffffff08 57px 58px);
+  mask-image:linear-gradient(#0009,transparent 65%);}
+.game-night-board>*{position:relative}
+.game-night-board>header,.game-night-board>footer{display:flex;align-items:center;justify-content:space-between;gap:14px;}
+.game-night-board>header{padding-bottom:14px;border-bottom:1px solid #b0d8fa32;}
+.game-night-board>footer{margin-top:19px;border-top:1px solid #94acd332;padding-top:15px;}
+.game-night-board>footer>span{font:600 12px var(--body);color:#8c9fb8;}
+.game-night-eyebrow{font:850 11px var(--body);letter-spacing:.22em;color:#c7dfff;}
+.game-night-spotlight{display:grid;grid-template-columns:minmax(140px,.52fr) 1fr;gap:clamp(13px,3vw,35px);padding:25px 0;align-items:stretch;}
+.game-night-jersey{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:255px;border:1px solid #84bdf44c;border-radius:16px;
+  background:radial-gradient(ellipse at 50% 24%,#4772b069,transparent 65%),linear-gradient(160deg,#223759,#070f1d);
+  box-shadow:inset 0 0 75px #0008,0 14px 25px #0003;}
+.game-night-jersey::before {content:"";position:absolute;inset:19% 19% 24%;border:3px solid #bad1f94d;
+  border-radius:30px 30px 8px 8px;transform:perspective(650px) rotateX(7deg);
+  box-shadow:0 0 24px #95bcfb2c,inset 0 0 28px #7da5fb13;}
+.game-night-number{position:relative;font:900 clamp(65px,10vw,140px)/.95 var(--display);
+  color:#fcfcff;letter-spacing:-.07em;text-shadow:0 7px 36px #0008,0 0 30px #68bbff45;}
+.game-night-captain{position:relative;text-align:center;padding:3px 15px;
+  font:850 13px var(--display);color:#e6f1ff;text-transform:uppercase;letter-spacing:.13em;}
+.game-night-story {display:flex;flex-direction:column;justify-content:center;}
+.game-night-story h2{font:900 clamp(33px,5vw,72px)/.9 var(--display);
+  letter-spacing:-.028em;color:#fff;margin:12px 0 17px;text-transform:uppercase;}
+.game-night-story p{font:450 15px/1.6 var(--body);color:#cedbef;max-width:56ch;}
+.game-night-opposition{display:grid;gap:7px;margin-top:16px;padding:15px 17px;border-left:3px solid #e7c181;
+  background:linear-gradient(90deg,#a3804330,transparent);}
+.game-night-opposition b{font:850 12px var(--body);letter-spacing:.16em;color:#f9d59d;}
+.game-night-opposition span{font:500 13px/1.4 var(--body);color:#b9cce3;}
+.game-night-board>.caps{color:#f5d7a9;letter-spacing:.2em;margin:9px 0 14px;}
+.game-night-options {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;}
+.game-night-choice {min-width:0;min-height:225px;display:flex;flex-direction:column;
+  text-align:left;color:#f8faff;cursor:pointer;padding:16px 13px;
+  background:linear-gradient(150deg,#253651,#111d30 70%);
+  border:1px solid #a3bfe737;border-radius:12px;
+  transition:transform .2s,border-color .2s,box-shadow .2s,background .2s;}
+.game-night-choice:hover{transform:translateY(-5px);border-color:#f6ce82;
+  background:linear-gradient(150deg,#324b6f,#172740 65%);
+  box-shadow:0 15px 28px #0005,0 0 22px #e0b96b23;}
+.game-night-choice:focus-visible{outline:2px solid #acd9ff;outline-offset:3px;}
+.game-night-tag{font:800 10px/1.4 var(--body);color:#a6bede;letter-spacing:.075em;min-height:34px;}
+.game-night-choice strong{font:900 23px/1 var(--display);text-transform:uppercase;margin:6px 0;}
+.game-night-choice p{font:450 12px/1.52 var(--body);color:#aec0d9;flex:1;margin:9px 0;}
+.game-night-effect{display:grid;gap:5px;padding-top:10px;border-top:1px solid #ffffff1c;}
+.game-night-effect span{font:750 11px var(--body);color:#b9e9ca;}
+.game-night-effect small{font:500 10px/1.35 var(--body);color:#efc4a5;}
+.game-night-recap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:9px;}
+.game-night-recap-item{padding:16px;border:1px solid #e4a6a64c;border-radius:13px;
+  background:linear-gradient(125deg,#4b2d382a,#111d2c);}
+.game-night-recap-item.won{border-color:#83d7ab58;background:linear-gradient(125deg,#3263542e,#111d2c);}
+.game-night-recap-item strong{display:block;font:900 19px var(--display);text-transform:uppercase;margin:9px 0;}
+.game-night-recap-item p{font:800 13px var(--body);margin:7px 0;}
+.game-night-recap-item small{font:450 11px/1.5 var(--body);color:#aec0d5;}
+@keyframes night-entry{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@media(max-width:990px){.game-night-options{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .game-night-choice{min-height:190px}}
+@media(max-width:650px){.game-night-spotlight{grid-template-columns:1fr}
+ .game-night-jersey{min-height:160px}.game-night-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .game-night-board>header,.game-night-board>footer{flex-wrap:wrap}
+ .game-night-choice{min-height:188px;padding:11px}
+ .game-night-choice strong{font-size:19px}}
+@media(max-width:410px){.game-night-options{grid-template-columns:1fr}
+ .game-night-choice{min-height:118px}.game-night-tag{min-height:0}}
+@media(prefers-reduced-motion:reduce){.game-night-overlay,.game-night-choice{animation:none!important;transition:none!important}}
+html[data-fx-level=off] .game-night-overlay{animation:none!important}
