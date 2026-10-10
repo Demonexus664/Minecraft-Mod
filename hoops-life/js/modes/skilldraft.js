@@ -911,6 +911,7 @@ HL.SkillDraft = (function () {
       }
       const res = home ? HL.simGame(tObj, objOf(opp), rules) : HL.simGame(objOf(opp), tObj, rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
+      HL.AbilityReplay?.accumulate(abilityCounts,res.events,home?'home':'away');
       const won = mine.score > theirs.score;
       if (won) w++; else l++;
       if(gameNight){
