@@ -101,7 +101,7 @@ HL.FX = (function () {
   }
   function countUp(el, to, ms = 900, fmt = v => Math.round(v)) {
     if (!el) return;
-    if (reduced()) { el.textContent = fmt(to); return; }
+    if (reduced()||fxLevel()==='off') { el.textContent = fmt(to); return; }
     const from = parseFloat(el.dataset.from || '0'), t0 = performance.now();
     const step = (t) => { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
     requestAnimationFrame(step);
@@ -120,7 +120,7 @@ HL.FX = (function () {
       for (let k = 0; k < spins; k++) seq.push(r.items[Math.floor(Math.random() * r.items.length)]);
       seq.push(r.items[r.final]);
       strip.innerHTML = seq.map(h => `<div class="reel-item" style="height:${ITEM}px">${h}</div>`).join('');
-      const dur = reduced() ? 50 : 1100 + i * 450;
+      const dur = reduced()||fxLevel()==='off'?50:fxLevel()==='lite'?Math.round((1100+i*450)*.65):1100+i*450;
       strip.style.transition = 'none'; strip.style.transform = 'translateY(0)';
       void strip.offsetHeight;
       strip.style.transition = `transform ${dur}ms cubic-bezier(.15,.7,.2,1.04)`;
@@ -128,7 +128,7 @@ HL.FX = (function () {
       // Ticks slow down with the reel.
       let t = 0, gap = 40;
       const tick = () => { if (t > dur - 120) return; sfx.tick(); t += gap; gap *= 1.12; setTimeout(tick, gap); };
-      if (!reduced()) tick();
+      if (!reduced()&&fxLevel()==='full') tick();
       setTimeout(() => { win.classList.add('landed'); sfx.land(); burst(win, opts.colors || ['#ffd84f', '#ffffff'], 10, 0.5); resolve(); }, dur);
     }));
     await Promise.all(jobs);
@@ -137,7 +137,7 @@ HL.FX = (function () {
   // ---------- cards ----------
   async function flipIn(cards, opts = {}) {
     const list = Array.from(cards);
-    if(reduced()){for(const c of list){c.classList.remove('down','charging');c.classList.add('up');}return;}
+    if(reduced()||fxLevel()==='off'){for(const c of list){c.classList.remove('down','charging');c.classList.add('up');}return;}
     for (const c of list) {
       const tier = +(c.dataset.tier || 0);
       // Rare pulls get a beat of suspense and a glow before they turn.
@@ -151,7 +151,7 @@ HL.FX = (function () {
   }
   // Pointer tilt for cards.
   function tilt(root) {
-    if (reduced()) return;
+    if (reduced()||fxLevel()==='off') return;
     root.querySelectorAll('.gcard').forEach(c => {
       c.onpointermove = (e) => { const r = c.getBoundingClientRect(); const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5; c.style.setProperty('--rx', (-y * 14) + 'deg'); c.style.setProperty('--ry', (x * 16) + 'deg'); c.style.setProperty('--mx', (x + 0.5) * 100 + '%'); c.style.setProperty('--my', (y + 0.5) * 100 + '%'); };
       c.onpointerleave = () => { c.style.setProperty('--rx', '0deg'); c.style.setProperty('--ry', '0deg'); };
