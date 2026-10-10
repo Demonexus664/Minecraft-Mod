@@ -362,6 +362,50 @@ HL.DNA = (function () {
   }
   function visual(f,{compact=false}={}){const detail=`<p>${esc(f.description)}</p><p><b>Unlocked by</b> ${esc(f.qualification)}</p><p><b>Activates</b> ${esc(f.activation)}</p>`;return `<article class="dna-effect dna-${esc(f.type)}" style="--dna-a:${f.colors[0]};--dna-b:${f.colors[1]}" data-dna="${esc(f.id)}"><div class="dna-mark" aria-hidden="true">${['mutation','evolved'].includes(f.type)?'✦':f.type.includes('trio')?'Ⅲ':f.type.includes('duo')?'Ⅱ':'★'}</div><div><span class="dna-kind">${esc(f.type.replaceAll('-',' '))}</span><b>${esc(f.name)}</b><details><summary>How it works</summary>${detail}</details>${compact?'':`<p>${esc(f.activation)}</p>`}</div></article>`;}
   function board(dna,{compact=false}={}){if(!dna)return '';const featured=[...dna.mutations,...dna.trios,...dna.pairs.slice(0,compact?2:6),...dna.signatures.slice(0,compact?1:3)],more=[...dna.pairs.slice(compact?2:6),...dna.signatures.slice(compact?1:3)];if(!featured.length)return '<p class="t3 sm">Draft compatible skills to discover chemistry. Transformations require verified elite tools and a matching build.</p>';return `<section class="dna-showcase"><div class="dna-section-label">${compact?'BUILD DNA':'SIGNATURES · CHEMISTRY · RARE TRANSFORMATIONS'}</div><div class="dna-effect-grid">${featured.map(f=>visual(f,{compact})).join('')}</div>${more.length?`<details><summary>Inspect ${more.length} more abilities</summary><div class="dna-effect-grid">${more.map(f=>visual(f,{compact})).join('')}</div></details>`:''}</section>`;}
+
+  function codex(dna){
+    if(!dna)return '';
+    const active=[...dna.signatures,...dna.pairs,...dna.trios,...dna.mutations];
+    const existing=new Set(active.map(x=>x.id));
+    const unlocked=active.filter(x=>!x.type.includes('signature'));
+    const show=f=>'<article class="dna-index-entry"><div class="dna-index-top"><b>'+
+      esc(f.name)+'</b><span class="dna-index-rank">'+esc(f.type.replaceAll('-',' ').toUpperCase())+'</span></div>'+
+      '<p>'+esc(f.activation)+'</p><div class="dna-index-tools">'+
+      Object.entries(f.mechanics||{}).map(([k,v])=>'<div><strong>'+esc(k.replace(/([A-Z])/g,' $1'))+
+      '</strong><span>'+esc(MECHANIC_TEXT[k]||'Specialized basketball advantage.')+
+      '</span><small>'+Math.round(v*100)+'% force</small></div>').join('')+'</div>'+
+      '<small class="dna-index-trigger">'+esc(f.qualification||'')+'</small></article>';
+    const locked=(id,name,cats,threshold,m,tone)=>'<article class="dna-index-entry locked">'+
+      '<div class="dna-index-top"><b>'+esc(name)+'</b><span class="dna-index-rank">NOT UNLOCKED</span></div>'+
+      '<p>Draft '+cats.map(x=>esc(x)).join(' + ')+' with verified ratings of '+threshold+
+      '+ in each category, then use the qualifying skills together.</p>'+
+      '<div class="dna-index-tools">'+Object.keys(m).map(k=>'<div><strong>'+esc(k.replace(/([A-Z])/g,' $1'))+
+      '</strong><span>'+esc(MECHANIC_TEXT[k]||'Tactical possession behavior')+'</span></div>').join('')+'</div></article>';
+    const lockedD=COMBO_DUOS.filter(([a,b])=>!existing.has('mix:'+a+':'+b));
+    const lockedT=COMBO_TRIOS.filter(([cats])=>!existing.has('triple:'+cats.join(':')));
+    const pending=dna.mode==='team'?TEAM_CHAINS.filter(([tools])=>!existing.has('scheme:'+tools.map(x=>x[0]).join(':'))):[];
+    return '<section class="block dna-codex"><header><h3>DNA ABILITY ENCYCLOPEDIA</h3>'+
+      '<span class="ml-auto t3 sm">'+unlocked.length+' ACTIVE · '+
+      (COMBO_DUOS.length+COMBO_TRIOS.length+TEAM_CHAINS.length)+' POSSIBLE POWER PATTERNS</span></header>'+
+      '<div class="body stack"><p class="t2 sm">Every unlocked link is an actual basketball possession mechanic. They do not provide automatic overall boosts. Rare mutations need verified elite historical evidence, and each form has its own activation condition.</p>'+
+      '<div class="dna-index-summary"><div><b>'+dna.pairs.length+'</b><span>Duos</span></div>'+
+      '<div><b>'+dna.trios.length+'</b><span>Trios</span></div>'+
+      '<div><b>'+dna.mutations.length+'</b><span>Rare forms</span></div>'+
+      '<div><b>'+dna.signatures.length+'</b><span>Signature tools</span></div></div>'+
+      '<details open><summary>ACTIVE SPECIAL SKILLS · '+active.length+'</summary>'+
+      '<div class="dna-index-grid">'+active.map(show).join('')+'</div></details>'+
+      (dna.mode==='skill'?'<details><summary>UNDISCOVERED ELITE DUOS · '+lockedD.length+'</summary>'+
+        '<div class="dna-index-grid">'+lockedD.map(([a,b,name,m,tone])=>
+        locked('mix:'+a+':'+b,name,[a,b],83,m,tone)).join('')+'</div></details>'+
+        '<details><summary>UNDISCOVERED POWER TRIOS · '+lockedT.length+'</summary>'+
+        '<div class="dna-index-grid">'+lockedT.map(([cats,name,m,tone])=>
+        locked('triple:'+cats.join(':'),name,cats,87,m,tone)).join('')+'</div></details>':
+        '<details><summary>TEAM POWER PLAYS TO ASSEMBLE · '+pending.length+'</summary>'+
+        '<div class="dna-index-grid">'+pending.map(([tools,name,m,tone])=>
+        locked('scheme:'+tools.map(x=>x[0]).join(':'),name,tools.map(x=>x[0]+' ≥ '+x[1]),'exact roster',m,tone)).join('')+
+        '</div></details>')+
+      '</div></section>';
+  }
   function preview(entries,candidate,options={}){const next=analyze([...entries,candidate],options),old=analyze(entries,options);return [...next.mutations,...next.trios,...next.pairs].find(f=>!old.active.some(o=>o.id===f.id))||null;}
-  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,COMBO_DUOS,COMBO_TRIOS,TEAM_CHAINS,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,preview,esc,PALETTE};
+  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,COMBO_DUOS,COMBO_TRIOS,TEAM_CHAINS,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,codex,preview,esc,PALETTE};
 })();
