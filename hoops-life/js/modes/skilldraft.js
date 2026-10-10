@@ -1346,41 +1346,28 @@ HL.SkillDraft = (function () {
     return `<div class="statstrip">${cells.map(([k, v]) => `<div><b>${v}</b><span>${k}</span></div>`).join('')}</div>`;
   }
 
-  function seasonReport(s) {
-    if (s.minors) return `<section class="block"><header><h3>${yrLabel(s.yr)} · Minor leagues</h3></header><div class="body t2">A year away from the NBA. Rating ${s.ovr}.</div></section>`;
-    const l = s.line;
-    const po = !s.made ? `Missed the playoffs (${ordinal(s.seed)} best record; ${s.spots} teams qualified)` : s.champion ? '<b>Won the championship</b>' : `Out in the ${s.series.filter(x => !x.bye).slice(-1)[0].name.toLowerCase()}`;
-    const ranks = [`MVP voting: ${ordinal(s.ranks.mvp)}`, `Defense: ${ordinal(s.ranks.dpoy)}`, `Impact rank: ${ordinal(s.ranks.value)}`];
-    const h = s.highs.pts;
-    const cnt = s.counts;
-    const extras = [cnt.g40 ? plural(cnt.g40, '40-point game') : '', cnt.g50 ? plural(cnt.g50, '50-point game') : '', cnt.td ? plural(cnt.td, 'triple-double') : '', cnt.dd ? plural(cnt.dd, 'double-double') : ''].filter(Boolean);
-    return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
-      ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
-      ${s.leagueRecap ? `<details open><summary>League evolution · new rookies, rising players & scoring rivals</summary>
-        <div class="cols c2" style="gap:12px">
-        <div class="stack"><div class="caps">New rookie class</div>${s.leagueRecap.rookies.map(p=>`<div class="kv"><span>${esc(p.name)} · ${esc(p.team)}</span><b>${p.ovr} OVR</b></div>`).join('')||'<div class="t3">No rookies in this class</div>'}</div>
-        <div class="stack"><div class="caps">Biggest developments</div>${s.leagueRecap.rising.map(p=>`<div class="kv"><span>${esc(p.name)}</span><b>+${p.change} → ${p.ovr}</b></div>`).join('')||'<div class="t3">No significant progress this offseason</div>'}</div>
-        <div class="stack"><div class="caps">Scoring-title competitors</div>${s.leagueRecap.scorers.map(p=>`<div class="kv"><span>${esc(p.name)}</span><b>${p.ppg} PPG</b></div>`).join('')||'<div class="t3">No eligible scorers</div>'}</div></div></details>` : ''}
-      <details><summary>${s.yr<1979?'No 3-point line · ':''}${yrLabel(s.yr)} era rules</summary><div class="t3 sm">${HL.eraContext(s.yr).facts.map(esc).join(' · ')}</div></details>
-      <div class="cols c2"><div class="stack" style="gap:6px">
-          <div class="caps">Team</div>
-          <div><b class="num" style="font-size:26px">${s.w}-${s.l}</b> <span class="t2">${ordinal(s.seed)} best record of ${s.nTeams} teams</span></div>
-          <div class="t2">${po}</div>
-          ${s.series.map(x => x.bye ? `<div class="ser t3 sm">${esc(x.name)}: bye</div>` : `<div class="ser"><span class="t3 sm">${esc(x.name)}</span><span class="row sm">${U.logo(x.opp, 18)} ${esc(x.opp.name)} <span class="t3">(${x.oppRec})</span></span><b class="${x.won ? 'win' : 'loss'}">${x.won ? 'W' : 'L'} ${x.w}-${x.l}</b></div>`).join('')}
-          ${s.realChamp ? `<div class="t3 sm">Real ${yrLabel(s.yr)} champion: ${esc(s.realChamp)}</div>` : ''}
-        </div><div class="stack" style="gap:6px">
-          <div class="caps">Honors</div>
-          <div class="row wrap" style="gap:6px">${s.awards.length ? s.awards.map(a => `<span class="tag ${['Champion', 'MVP', 'Finals MVP'].includes(awardName(a)) ? 'team' : ''}" ${a.over ? `title="Over ${esc(a.over)}"` : ''}>${esc(awardName(a))}</span>`).join('') : '<span class="t3 sm">None this season</span>'}</div>
-          <div class="t2 sm">${ranks.join(' · ')}</div>
-          ${h ? `<div class="t2 sm">Season high: ${h.v} points ${h.playoffs ? 'in the playoffs ' : ''}vs the ${esc(h.opp)} (${h.won ? 'W' : 'L'} ${h.sc})</div>` : ''}
-          ${extras.length ? `<div class="t2 sm">${extras.join(' · ')}</div>` : ''}
-          ${s.injury ? `<div class="loss sm">Missed ${plural(s.injury.games, 'game')}: ${esc(s.injury.name)}${s.injury.lasting ? ' (lasting damage)' : ''}</div>` : ''}
-          <div class="caps" style="margin-top:6px">Teammates</div>
-          ${s.mates.map(m => `<div class="row sm">${U.face({ name: m.name, nbaId: m.nbaId, real: true }, 24, s.team)}<span class="grow">${esc(m.name)}</span><span class="t3">${esc(m.pos)}</span>${U.rating(m.ovr)}</div>`).join('')}
-        </div></div>
-      ${s.pline.gp ? `<div class="caps">Playoffs</div>${statStrip(s.pline, s.pline.gp, (s.pline.min / s.pline.gp).toFixed(1))}` : ''}
-      ${s.altered.length ? `<div class="caps">History changed</div>${s.altered.map(a => `<div class="sm">${esc(a)}</div>`).join('')}` : ''}
-    </div></section>`;
+  function seasonReport(s){
+    if(s.minors)return '<section class="block"><header><h3>'+yrLabel(s.yr)+
+      ' · MINOR LEAGUES</h3></header><div class="body t2">Current '+s.ovr+
+      ' OVR. Preparing for the NBA.</div></section>';
+    const record=s.w+'-'+s.l;
+    const outcome=s.champion?'NBA CHAMPIONS':!s.made?'MISSED PLAYOFFS':
+      'PLAYOFFS · '+(s.series?.filter(x=>!x.bye).slice(-1)[0]?.name||'Eliminated');
+    const awards=(s.awards||[]).map(a=>awardName(a));
+    return '<section class="block season-compact"><header><h3>'+yrLabel(s.yr)+
+      ' · SEASON RECAP</h3><span class="ml-auto t3 sm">'+esc(s.team.name)+
+      ' · '+s.ovr+' OVR</span></header><div class="body stack">'+
+      '<div class="season-compact-head"><div><b>'+record+'</b><span>TEAM RECORD</span></div>'+
+      '<strong>'+outcome+'</strong></div>'+
+      statStrip(s.line,s.g,s.g?(s.line.min/s.g).toFixed(1):'0.0')+
+      (awards.length?'<div class="season-compact-awards"><b>HONORS</b>'+
+        awards.map(name=>'<span>'+esc(name)+'</span>').join('')+'</div>':'')+
+      '<details><summary>Playoff results & season context</summary><div class="stack">'+
+      (s.series||[]).filter(x=>!x.bye).map(x=>
+        '<div class="kv"><span>'+esc(x.name)+' · '+esc(x.opp?.name||'')+
+        '</span><b>'+(x.won?'W ':'L ')+x.w+'-'+x.l+'</b></div>').join('')+
+      '<p class="t3 sm">Your drafted abilities and historical NBA competition determine the results.</p>'+
+      '</div></details></div></section>';
   }
 
   function careerTable(c) {
@@ -1400,21 +1387,20 @@ HL.SkillDraft = (function () {
     return `<section class="block"><header><h3>Story so far</h3><span class="ml-auto t3 sm">Moves and the history he changed</span></header><div class="body flush">${items.map(x => `<div class="res-row" style="grid-template-columns:80px 1fr;cursor:default"><span class="t3">${yrLabel(x.yr)}</span><span class="${x.k === 'alt' ? 'hi' : ''}">${x.k === 'alt' ? '<b>History changed:</b> ' : ''}${esc(x.text)}</span></div>`).join('')}</div></section>`;
   }
 
-  function careerSide(c) {
-    const nba = c.seasons.filter(s => !s.minors);
-    const peak = nba.length ? Math.max(...nba.map(s => s.ovr)) : c.me.ovr;
-    const card = HL.GFX.jerseyCard(Object.assign({}, c.me, c.done ? { ovr: peak } : {}), c.minors ? null : c.teamMeta, { sub: c.done ? `Peak rating · ${plural(nba.length, 'season')}` : `${c.minors ? 'Minor leagues' : fullName(c.teamMeta)}` });
-    const count = name => c.awards.filter(a => a.award === name).length;
-    const cab = ['Champion', 'Finals MVP', 'MVP', 'DPOY', 'ROY', 'All-NBA 1st', 'All-NBA 2nd', 'All-NBA 3rd', 'All-Star', 'Scoring title', 'Rebounding title', 'Assists title'].map(k => [k === 'Champion' ? 'Championships' : k, count(k)]).filter(x => x[1]);
-    const H = c.highs;
-    const hi = [['Points', H.pts], ['Rebounds', H.reb], ['Assists', H.ast], ['Steals', H.stl], ['Blocks', H.blk]].filter(x => x[1]);
-    const cur = Object.fromEntries(CATS.filter(x => x[2].length&&!x[0].startsWith('tend')).map(([id, label, keys]) => [id, [label, avgOf(c.me.attrs, keys), avgOf(c.prime.attrs, keys)]]));
-    const habits=CATS.filter(x=>x[0].startsWith('tend')).map(([id,label,keys])=>`<details><summary>${esc(label)}</summary>${keys.map(k=>`<div class="kv"><span>${esc(k)}</span><b>${c.me.tend[k]??'—'}/100</b></div>`).join('')}</details>`).join('');
-    return `<div style="max-width:340px">${card}</div>
-      <section class="block"><header><h3>Trophy case</h3></header><div class="body">${cab.length ? cab.map(([k, n]) => `<div class="kv"><span>${esc(k)}</span><b>${n}</b></div>`).join('') : '<div class="t3 sm">Empty, for now.</div>'}</div></section>
-      ${hi.length ? `<section class="block"><header><h3>Career highs</h3></header><div class="body">${hi.map(([k, h]) => `<div class="kv"><span>${k}</span><b>${h.v} <span class="t3 xs">vs ${esc(h.opp)}, ${yrLabel(h.yr)}${h.playoffs ? ' (playoffs)' : ''}</span></b></div>`).join('')}</div></section>` : ''}
-      <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>
-      <section class="block"><header><h3>Playing habits</h3></header><div class="body stack"><p class="t3 sm">Frequency preferences, rather than skill grades. Open a group to inspect every inherited habit.</p>${habits}</div></section>`;
+  function careerSide(c){
+    const played=c.seasons.filter(x=>!x.minors),pts=c.totals.pts||0,
+      peak=played.length?Math.max(...played.map(x=>x.ovr)):c.me.ovr;
+    const card=HL.GFX.jerseyCard(Object.assign({},c.me,c.done?{ovr:peak}:{}),
+      c.minors?null:c.teamMeta,{sub:c.done?'Career complete':c.minors?
+        'Minor leagues':fullName(c.teamMeta)});
+    return '<div class="career-compact"><div class="career-compact-card">'+card+'</div>'+
+      '<div class="career-compact-stats">'+
+      [['OVR',c.me.ovr],['YEARS',played.length],['RINGS',c.rings],
+       ['CAREER PTS',Math.round(pts).toLocaleString()]].map(([name,n])=>
+        '<div><b>'+n+'</b><span>'+name+'</span></div>').join('')+
+      '</div><details><summary>Career honors</summary><p>'+
+      c.awards.slice(-15).map(a=>esc(a.award)).join(' · ')+
+      '</p></details></div>';
   }
 
   function careerDeepReport(c) {
