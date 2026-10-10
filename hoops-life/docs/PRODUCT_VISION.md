@@ -96,7 +96,7 @@ Keep the prior queued order in ROADMAP.md; this context import does not authoriz
 
 Verify relevant game flows in a browser and meaningful simulation effects headlessly. Maintain era calibration checks, save/reload coverage, scenario near-miss checks and balance measurements. The original full-vision targets included long season/career runs, rare GOAT outcomes, media diversity, integrity escalation and complete Simple/Detailed careers; those are goals to validate as their systems exist, not claims that they currently pass.
 
-Current limits: the first NBA Player Career is playable, while pre-NBA life, wider Career systems and Live Game remain unfinished, Franchise front-office depth remains incomplete, and most proposed scenarios still need systems. See the roadmap and ledger for exact progress rather than inferring completion from the transcript.
+Current limits: the first NBA Player Career is playable, while pre-NBA life, wider Career systems and the full Live Game scope remain unfinished; regular-season possession decisions are now playable, Franchise front-office depth remains incomplete, and most proposed scenarios still need systems. See the roadmap and ledger for exact progress rather than inferring completion from the transcript.
 
 
 ## Latest user reference corrections (2026-10-10)
@@ -104,3 +104,7 @@ Current limits: the first NBA Player Career is playable, while pre-NBA life, wid
 Media, people and the world responding are major product pillars, not an optional layer after basketball systems. Keep relationship memory, situational answers and delayed consequences in each new feature. The NFL Perry screenshots guide bold contrast, texture and focused sim stages. The BitLife screenshots guide person-focused actions, relationship visibility and meaningful consequence dialogs; they do not reduce the detailed basketball builder or prescribe the depicted activities.
 
 Real headshots must stay visible. Replace drawn player bodies/uniform overlays with photographic assets; generated alternate-team cutouts are also acceptable. Prefer reusable photographic jerseys in each team’s own colors and style, with numbers removed and added separately, so any player can wear them and jersey-number changes do not require regenerating the photograph. Preserve a real headshot fallback when a team-specific photograph or uniform template is unavailable.
+
+## Ongoing steering: immersive what-ifs and media context
+
+The user reaffirmed broad freedom, a world that remembers changes, realistic player posting and greater alternate-history depth in Franchise and Career. Prioritize organized actions with actual consequences and consistent timeline ownership. Add full interview statements, misleading excerpts and visible original context, then responses/corrections and delayed public judgments. Real photos may support fictional in-save scenes; generated quotes/posts must not masquerade as statements made by the real person outside the game. Modern screens should feel less square/flat: rounded personal choices combined with layered sports stages and satisfying reveals, retaining era adaptation.

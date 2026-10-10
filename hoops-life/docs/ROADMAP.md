@@ -22,7 +22,7 @@ The older percentage estimates below are inherited handoff estimates, not measur
 | Media | ~50% | Era voices, no-repeat engine, 21,520 ChatGPT pack lines wired, event stories (records, buzzer-beaters, comebacks...), media day and social threads with composed TikTok/YouTube/quote visuals and player responses. |
 | Scenario ledger | 27 implemented, 4 partial, 5 blocked, 1,104 not started (of 1,140), plus 9 of mine | See `docs/scenarios/LEDGER.md`. 605 of the scenarios need Player Career. |
 | Player Career (MyCareer + BitLife) | First NBA career playable | Detailed creation, earned training/minutes, personal tendencies, real games, people, money, pressers, delayed coverage, storyline, contracts and retirement/return. Pre-NBA and larger life systems remain. |
-| Live Game (make the calls during a game) | Not started | |
+| Live Game (make the calls during a game) | Regular-season first milestone playable | Actual possession steps, coach tactics or personal intentions, scoreboard/clock/PBP/box scores, mid-game save/resume and exact-once consequences. Postseason, substitutions, timeouts/challenges remain. |
 
 ## Your requests still in the queue (in order)
 
@@ -31,7 +31,7 @@ The older percentage estimates below are inherited handoff estimates, not measur
 3. **More "game" everywhere.** Bring the same feel (reveals, cards, banners) to Franchise: lottery and draft-night reveals now work. Continue trade announcement cards and playoff bracket animations.
 4. **Remaining front office** (task #5): picks/swaps and multi-team trades, staff, owner directives/business, advanced CBA and game plans. Player trades/Trade Finder, negotiated free agency/extensions/waivers, financial commitments and four player-meeting choices now work; the broader action space remains queued.
 5. **Broader Player Career** (task #6): add school/college, richer family and relationship scenes, health/longevity/PED consequences, businesses, accepted trade-request chains and complete life-after-retirement progression. Preserve the playable NBA career and its actual-game reactions.
-6. **Live Game mode**: make the calls in any game as coach or player, resolved by the same possession sim.
+6. **Broader Live Game**: regular-season possession decisions are playable. Add postseason/play-in fixtures, substitutions, timeouts/challenges and more detailed play calls using the same possession engine.
 7. **Remaining scenarios**, in batches by system (see the ledger), plus my own additions.
 
 ## How to continue (technical notes)
@@ -94,3 +94,14 @@ The scenario ledger remains 27 implemented and 4 partial; these foundations do n
 - Final review found two important defects, both reproduced failing then fixed: next-game stopping after the 300-entry log limit, and hardship recruitment/release taking control of a returning Career player. Tests now cover 299/300/350-log boundaries plus reload, unsigned returns and legacy hardship flags.
 - Historical validation completed for 2025, 1990 and 1964 (PPG correlation .96 each), plus the 400-game sample. These are statistical reports, not hard tolerance assertions; the existing efficiency, foul-rate and team-record gaps remain. The scenario ledger is unchanged: new foundations do not automatically complete all 1,140 proposals.
 - New checks: `node --test tools/test-career.js tools/test-draftroom.js tools/test-frontoffice.js tools/test-world.js tools/test-rules.js`, `node tools/test-career-browser.cjs`, `node tools/test-career-season.js`, `node tools/test-draftroom-browser.cjs`.
+
+
+## 2026-10-09 continuation: regular-season Live Game
+
+- Career and Franchise now offer Live Game. Step one possession, run twelve, or auto-finish. Coach changes offensive focus, coverage, pace and rebounding; Career changes only personal shot involvement, three/drive preferences and effort, with no forced playing time. Decisions change actual possessions. Full box scores include bench/DNPs; final lineups remain available.
+- A resumable generator wraps the existing engine. All nine pre-refactor result/RNG hashes across 2025, 1990 and 1964 are identical. Per-game era data no longer shares mutable global state. Live saves record snapshots, seed, possession count and a command journal; replay preserves the global league RNG and past outcomes.
+- Active games freeze other simulation and off-court/roster choices. Completion feeds the existing standings, stats, injuries, records, relationships and Career payment/interview pipeline once. Live-choice coverage uses the actual game date; a reproduced date-stamping regression was fixed. Malformed Career identities reject before acquiring coach controls.
+- Rounded stages and choices follow the NFL Perry/BitLife steering; old eras retain their style. Real faces are preserved, with six further source NBA headshots bundled for live current/historical examples. No simulated quote represents an actual outside-game statement by the real player.
+- Verification: 79 domain tests and all 34 event assertions pass. Live browser proof covers personal decisions, actual PBP/box scores, IndexedDB resume, mobile, Career final payment/media and 1964 coaching. An independent reviewer also verified Stop → save/exit → reload → finish → Franchise return without errors; no remaining Important/Critical findings. Historical seasons 2025/1990/1964 and the 400-game sample completed with the same existing model limits. Desktop/mobile/historical screenshots were inspected.
+- Still pending: postseason/play-in Live Game, manual substitutions, timeouts/challenges and detailed drawn-up plays. This completes the first live milestone, not the whole product vision. Current interview-context and realistic posting requests are recorded in PRODUCT_VISION.md for the next media batch.
+- New checks: `node --test tools/test-livegame.js` and `node tools/test-livegame-browser.cjs`.

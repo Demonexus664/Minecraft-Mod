@@ -353,20 +353,32 @@ HL.League = {};
 
   // ---------- Regular season ----------
   HL.League.simDay = function () {
+    if (HL.LiveGame?.active(L)) return 0;
     if (HL.Career && L.career && L.phase !== 'offseason') HL.Career.beforeDay(L);
     if (L.phase !== 'regular') return HL.League.simPostseasonDay();
     // Media day happens before the opener; social threads and follow-ups move day by day.
-    if (HL.MediaDay) { if (L.day === 0) HL.MediaDay.run(L); HL.MediaDay.tick(L); }
+    if (HL.MediaDay && L.livePreparedDay !== `${L.season}:${L.day}`) { if (L.day === 0) HL.MediaDay.run(L); HL.MediaDay.tick(L); }
     const games = L.schedule.filter(g => g.day === L.day && !g.res);
     for (const g of games) {
       ensureHealthy(g.home); ensureHealthy(g.away);
       const isUser = L.userTeamId != null && (g.home === L.userTeamId || g.away === L.userTeamId);
-      const res = HL.simGame(simTeamObj(L.teams[g.home]), simTeamObj(L.teams[g.away]), simRules(), { pbp: isUser });
+      const res = L.liveGame?.committed && L.liveGame.gid === g.gid && L.liveGame.season === L.season
+        ? L.liveGame.result : HL.simGame(simTeamObj(L.teams[g.home]), simTeamObj(L.teams[g.away]), simRules(), { pbp: isUser });
       applyResult(g, res, false);
     }
     L.day++;
     if (L.day > HL.League.lastDay()) { L.day += 1; startPostseason(); }
     return games.length;
+  };
+
+  HL.League.prepareLiveFixture = function (gid) {
+    const g = L.schedule.find(g => g.gid === gid && g.day === L.day && !g.res);
+    if (L.phase !== 'regular' || !g) return { ok: false, reason: 'This scheduled game is unavailable.' };
+    HL.Career && L.career && HL.Career.beforeDay(L);
+    if (HL.MediaDay && L.livePreparedDay !== `${L.season}:${L.day}`) { if (L.day === 0) HL.MediaDay.run(L); HL.MediaDay.tick(L); }
+    L.livePreparedDay = `${L.season}:${L.day}`;
+    ensureHealthy(g.home); ensureHealthy(g.away);
+    return { ok: true, home: simTeamObj(L.teams[g.home]), away: simTeamObj(L.teams[g.away]), rules: simRules() };
   };
 
   HL.League.standings = function (conf) {

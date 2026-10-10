@@ -9,6 +9,12 @@ window.HL_PHOTOS = {
   'real.sam-perkins': { src: 'media/players/sam-perkins-archive.png', kind: 'archive' },
   'real.michael-porter-jr': { src: 'media/players/michael-porter-jr-archive.png', kind: 'archive' },
   'real.day-ron-sharpe': { src: 'media/players/dayron-sharpe-archive.png', kind: 'archive' },
+  'real.kevin-durant': { src: 'media/players/kevin-durant-archive.png', kind: 'archive' },
+  'real.shai-gilgeous-alexander': { src: 'media/players/shai-gilgeous-alexander-archive.png', kind: 'archive' },
+  'real.amen-thompson': { src: 'media/players/amen-thompson-archive.png', kind: 'archive' },
+  'real.alperen-sengun': { src: 'media/players/alperen-sengun-archive.png', kind: 'archive' },
+  'real.nikola-jokic': { src: 'media/players/nikola-jokic-archive.png', kind: 'archive' },
+  'real.bill-russell': { src: 'media/players/bill-russell-archive.png', kind: 'archive' },
 };
 
 // Separate team-colored photographic garments have no player or number baked in.

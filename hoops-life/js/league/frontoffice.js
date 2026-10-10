@@ -8,7 +8,7 @@ HL.FrontOffice = (function () {
   const team = (L, tid) => L.teams.find(t => t.id === tid);
   const healthy = ps => ps.filter(p => !p.injury || p.injury.games <= 0).length;
   const failure = (...reasons) => ({ ok: false, reasons, response: reasons.join(' ') });
-  const manageable = L => L.userTeamId != null && !!team(L, L.userTeamId) && ['gm', 'owner'].includes(L.settings.role || 'gm');
+  const manageable = L => !HL.LiveGame?.active(L) && L.userTeamId != null && !!team(L, L.userTeamId) && ['gm', 'owner'].includes(L.settings.role || 'gm');
   const money = n => n >= 1 ? `$${n.toFixed(1)}M` : `$${Math.round(n * 1000)}K`;
 
   // Approximate historical cap anchors; current value is the 2025-26 cap.

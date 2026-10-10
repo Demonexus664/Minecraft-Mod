@@ -107,6 +107,7 @@ HL.Franchise = (function () {
 
   // ---------------- FRAME ----------------
   function open() {
+    if (HL.LiveGame?.active(L())) return HL.LiveGameUI.open();
     U.applyTeamTheme(me());
     U.setEra(L().settings.eraTheme && L().settings.eraTheme !== 'auto' ? L().settings.eraTheme : HL.eraForSeason(L().season));
     render();
@@ -131,6 +132,7 @@ HL.Franchise = (function () {
     root.querySelectorAll('[data-sec]').forEach(b => b.onclick = () => go(b.dataset.sec, b.dataset.first));
     root.querySelectorAll('[data-page]').forEach(b => b.onclick = () => go(section, b.dataset.page));
     root.querySelector('[data-quit]').onclick = async () => { await autosave(); HL.App.title(); };
+    root.querySelector('[data-live-start]')?.addEventListener('click', () => HL.LiveGameUI.start());
     root.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => sim(b.dataset.sim));
     renderPage();
   }
@@ -138,6 +140,7 @@ HL.Franchise = (function () {
   function simButtons() {
     const Lg = L();
     if (Lg.phase === 'regular') return `
+      <button class="btn small" data-live-start>Live game</button>
       <button class="btn go small" data-sim="next">${U.icon('play')}<span class="lbl">Play next</span></button>
       <button class="btn small" data-sim="week"><span>Week</span></button>
       <button class="btn small" data-sim="month"><span>Month</span></button>

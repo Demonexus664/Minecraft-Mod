@@ -74,6 +74,7 @@ HL.Career = (function () {
     if(c.progress[key]>=1&&p.attrs[key]<p.caps[key]){p.attrs[key]=Math.min(p.caps[key],p.attrs[key]+Math.floor(c.progress[key]));c.progress[key]%=1;p.ovr=HL.computeOvr(p.attrs,p.pos);log(L,'development',`${HL.ATTRS.find(a=>a.key===key).label} improves to ${p.attrs[key]} through practice and game use.`);}
   }
   function setTendencies(L,values) {
+    if(HL.LiveGame?.active(L))return fail('Use your live-game approach controls until the final whistle.');
     const p=L.career&&me(L);
     if(!p||!values||typeof values!=='object'||Array.isArray(values))return fail('Choose your player’s playing style.');
     const allowed=['usage','three','mid','drive','post','passFirst','gamble','crash','effort','foulAggr','drawFoul'];
@@ -94,6 +95,7 @@ HL.Career = (function () {
     endorsement:{label:'Discuss an endorsement',group:'media',desc:'Your agent checks your fame and reputation before an offer.'},
   };
   function act(L,key,params={}) {
+    if(HL.LiveGame?.active(L))return fail('Finish the live game before making off-court decisions.');
     const c=L.career,p=c&&me(L);if(!c||!p||(!ACTIONS[key]&&key!=='presser'))return fail('Choose an available career action.');
     const week=`${L.season}:${Math.floor(L.day/7)}`,remaining=c.week===week?c.decisions:3;
     if(key!=='presser'&&remaining<=0)return fail('You have used your three decisions this week. Advance the calendar to make time.');
@@ -170,6 +172,7 @@ HL.Career = (function () {
     return L.teams.slice().sort((a,b)=>a.id-b.id).filter(t=>Object.values(L.players).filter(q=>!q.retired&&q.teamId===t.id&&q.id!==p.id).length<15||t.id===p.teamId).slice(0,8).map(t=>({teamId:t.id,amount:Math.round(Math.max(1.2,HL.estimateSalary(p.ovr,p.age))*HL.salaryScale(year)*1000)/1000,years:2,year,role:Object.values(L.players).filter(q=>q.teamId===t.id&&q.ovr>p.ovr).length<5?'Starter competition':'Rotation competition'}));
   }
   function sign(L,teamId) {
+    if(HL.LiveGame?.active(L))return fail('Finish the live game before changing contracts.');
     const offer=offers(L).find(o=>o.teamId===teamId);if(!offer)return fail('That contract is not available. Honor your current deal or choose a valid offer.');
     const c=L.career,p=me(L),old=p.teamId,t=L.teams[teamId];
     p.teamId=teamId;p.retired=null;p.contract={amount:offer.amount,start:offer.year,exp:offer.year+offer.years-1};L.userTeamId=teamId;c.people.coach={like:50,respect:50,trust:50};
@@ -177,6 +180,7 @@ HL.Career = (function () {
     quote(L,`${p.name} agrees to terms with ${t.name}`,`${offer.years} years at $${offer.amount.toFixed(3)}M per season; ${offer.role.toLowerCase()}.`,'I want the opportunity to earn my role.','career.contract');role(L);return {ok:true};
   }
   function retire(L) {
+    if(HL.LiveGame?.active(L))return fail('Finish the live game before retiring.');
     const c=L.career,p=c&&me(L);if(!c||c.retired)return fail('This player has already retired.');
     c.retired=true;p.retired=L.season;p.teamId=null;c.pendingPress=null;c.watches.forEach(w=>{if(!w.resolved){w.resolved=true;w.cancelled='Retirement';}});
     log(L,'retirement',`${p.name} retired from the league. His life and career record remain in this save.`,true);quote(L,`${p.name} steps away from basketball`,'The player ends his current playing contract and keeps his life story open.','I need a new chapter.','retire');return {ok:true};

@@ -15,6 +15,8 @@ Other existing NBA players use their NBA IDs and the live NBA headshot URL. Miss
 
 Additional verified HTTPS NBA downloads on 2026-10-09 (local date): Michael Jordan (`893.png`), Sam Perkins (`64.png`), Michael Porter Jr. (`1629008.png`), and Day’Ron Sharpe (`1630549.png`), from the same `https://cdn.nba.com/headshots/nba/latest/1040x760/` path. Original PNGs are bundled under `media/players/` as archive headshots so draft/relationship examples can show real people offline; no image edits or certificate bypasses were used.
 
+The Live Game pass also bundles unmodified source headshots for Kevin Durant (`201142.png`), Shai Gilgeous-Alexander (`1628983.png`), Amen Thompson (`1641708.png`), Alperen Şengün (`1630578.png`), Nikola Jokić (`203999.png`), and Bill Russell (`78049.png`), verified using the same HTTPS source and labeled as archive photos. These support current and historical examples without depending on external image access at runtime.
+
 ## Generated game artwork
 
 `media/players/stephen-curry-lal-concept.png` is a generated fictional Lakers portrait based on Curry’s NBA source headshot. It demonstrates an optional full alternate-team cutout and does not assert a real transaction.

@@ -216,10 +216,11 @@ HL.DEFAULT_RULES = () => ({
     return { three: Math.max(0, three), mid: Math.max(1, mid), rim: Math.max(1, rim) };
   }
 
-  let E = { pace: 99.4, efg: 0, tov: 0, orb: 0, ftr: 1, common: 0.068 }; // era adjustments for the current game
-
   // ---------- Main ----------
-  HL.simGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
+  HL.createGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
+    // Live intentions belong to this game; never edit the league player's tendencies.
+    const own = t => ({ ...t, players: t.players.map(p => ({ ...p, tend: { ...p.tend } })) });
+    homeTeam = own(homeTeam); awayTeam = own(awayTeam);
     rules = Object.assign(HL.DEFAULT_RULES(), rules);
     const H = prepTeam(homeTeam, rules), A = prepTeam(awayTeam, rules);
     H.home = true;
@@ -238,7 +239,7 @@ HL.DEFAULT_RULES = () => ({
     // The sim is calibrated on 2025-26, so everything is relative to that season.
     const prof = rules.profile || null;
     const BASE = { pace: 99.4, efg: 0.546, tov: 12.7, orb: 26.0, ftr: 0.206 };
-    E = {
+    const E = {
       pace: prof && prof.pace ? prof.pace : BASE.pace,
       efg: prof && prof.efg ? prof.efg - BASE.efg + (prof.tpar != null && prof.tpar < 0.12 ? 0.028 : prof.tpar == null ? 0.03 : 0) : 0,
       tov: prof ? ((prof.tov != null ? prof.tov : 16.5) - BASE.tov) / 100 * 0.55 : 0,
@@ -249,7 +250,7 @@ HL.DEFAULT_RULES = () => ({
     };
     const paceAdj = ((H.strat.pace + A.strat.pace) / 2 - 50) * 0.12;
     const possPerTeam48 = E.pace * 1.045 + paceAdj + (opts.paceMod || 0);
-    const avgPossSec = 2880 / (possPerTeam48 * 2);
+    let avgPossSec = 2880 / (possPerTeam48 * 2);
     const regSeconds = rules.quarterLen * 60 * 4;
 
     let offense = R.chance(0.5) ? H : A;
@@ -257,8 +258,9 @@ HL.DEFAULT_RULES = () => ({
     let quarter = 0;
     const log = (txt, T) => { if (pbp) pbp.push({ q: quarter, t: clockStr, txt, team: T ? T.team.abbr : null, hs: H.score, as: A.score }); };
     let clockStr = '';
+    let remaining = rules.quarterLen * 60, finished = false;
 
-    const playPeriod = (lenSec, isOT) => {
+    const playPeriod = function* (lenSec, isOT) {
       quarter++;
       let clock = lenSec;
       const qStartH = H.score, qStartA = A.score;
@@ -354,6 +356,8 @@ HL.DEFAULT_RULES = () => ({
         }
 
         if (!result.keep) offense = D;
+        remaining = clock;
+        yield { period: quarter, clock: clockStr, seconds: clock };
       }
       H.quarters.push(H.score - qStartH);
       A.quarters.push(A.score - qStartA);
@@ -621,20 +625,17 @@ HL.DEFAULT_RULES = () => ({
       return { keep: false, transition: R.chance(0.13 + (D.strat.pace - 50) * 0.002) };
     }
 
-    for (let q = 0; q < 4; q++) playPeriod(rules.quarterLen * 60, false);
     let ot = 0;
-    while (H.score === A.score && ot < 8) { ot++; playPeriod(rules.otLen * 60, true); }
 
     const box = (T) => {
       const out = {};
       for (const id in T.st) {
-        const l = T.st[id].line;
-        l.min = Math.round(l.min * 10) / 10;
+        const l = { ...T.st[id].line, min: Math.round(T.st[id].line.min * 10) / 10 };
         if (l.min > 0 || l.gs) { l.gp = 1; out[id] = l; }
       }
       return out;
     };
-    return {
+    const result = () => ({
       home: { teamId: homeTeam.id, score: H.score, quarters: H.quarters, box: box(H) },
       away: { teamId: awayTeam.id, score: A.score, quarters: A.quarters, box: box(A) },
       ot, pbp, injuries,
@@ -644,6 +645,35 @@ HL.DEFAULT_RULES = () => ({
         qfg: { home: H.qfg, away: A.qfg }, trail: { home: H.maxTrail, away: A.maxTrail },
         charges: Object.assign({}, ...[H, A].map(T => Object.fromEntries(Object.entries(T.st).filter(([, x]) => x.charges).map(([id, x]) => [id, x.charges])))),
       },
+    });
+    function* run() {
+      for (let q = 0; q < 4; q++) yield* playPeriod(rules.quarterLen * 60, false);
+      while (H.score === A.score && ot < 8) { ot++; yield* playPeriod(rules.otLen * 60, true); }
+      finished = true;
+      return result();
+    }
+    const game = run();
+    return {
+      step: () => game.next(),
+      snapshot: () => ({ ...result(), period: quarter, seconds: remaining, clock: clockStr || `${rules.quarterLen}:00`, finished,
+        lineups: Object.fromEntries(teams.map(T => [T.team.id, T.onCourt.map(p => ({ pid: p.id, energy: T.st[p.id].energy, fouls: T.st[p.id].fouls }))])),
+        out: teams.flatMap(T => T.avail.filter(p => T.st[p.id].out).map(p => p.id)) }),
+      control(teamId, values) {
+        const T = teams.find(T => T.team.id === teamId); if (!T) return false;
+        Object.assign(T.strat, values);
+        if (rules.illegalDefense && T.strat.defense === 'zone') T.strat.defense = 'man';
+        avgPossSec = 2880 / ((E.pace * 1.045 + ((H.strat.pace + A.strat.pace) / 2 - 50) * .12 + (opts.paceMod || 0)) * 2);
+        return true;
+      },
+      playerControl(pid, values) {
+        const T = teams.find(T => T.st[pid]); if (!T) return false;
+        Object.assign(T.st[pid].p.tend, values); return true;
+      },
     };
+  };
+  HL.simGame = function (home, away, rules, opts) {
+    const game = HL.createGame(home, away, rules, opts);
+    let next; do { next = game.step(); } while (!next.done);
+    return next.value;
   };
 })();
