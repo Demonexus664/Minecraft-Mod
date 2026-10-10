@@ -31,6 +31,14 @@ test('defensive rotations and position actually alter contests and rebound advan
  const s=player('curryst01',1),d=HL.createPlayer({ovr:90,pos:'C',height:86});d.dna={mechanics:{rimIntimidation:1.6,rotations:1.4,boxPosition:1.4}};
  const result=HL.DNA.basketballContext(ctx(s,[],d,'rim'));assert.ok(result.make<0);assert.ok(result.block>0);assert.ok(result.rebOff<0);
 });
+test('passing precision belongs to the supporting passer, not the receiving shooter',()=>{
+ const shooter=player('thompkl01',1),passer=player('jamesle01',2),args={...ctx(shooter,[passer]),assisted:true,passer};passer.attrs.vision=95;
+ const base=HL.DNA.basketballContext(args);passer.dna={mechanics:{precision:1.4}};const supplied=HL.DNA.basketballContext(args);
+ assert.ok(supplied.assist>base.assist);assert.ok(supplied.make>base.make);assert.ok(supplied.actions.includes('precisionPass'));
+ passer.dna=null;shooter.dna={mechanics:{precision:1.4}};const received=HL.DNA.basketballContext(args);
+ assert.equal(received.assist,base.assist);assert.equal(received.make,base.make);assert.ok(!received.actions.includes('precisionPass'));
+ const solo=HL.DNA.basketballContext({...args,lineup:[shooter],passer:null});assert.equal(solo.assist,0);
+});
 test('actual simulated games expose DNA action counters and consistent score accounting',()=>{
  const rows=HL.History.seasonRows('2015'),make=(club,id)=>({id,abbr:club,strategy:HL.DEFAULT_STRATEGY(),players:rows.filter(r=>r.stints.some(x=>x[0]===club)).slice(0,12).map(r=>({...HL.History.makePlayer(r,2015,id),historicalPid:r.pid}))});
  const a=make('GSW',1),b=make('CLE',2);HL.DNA.applyTeam(a.players,a.players.map(p=>({pid:p.historicalPid,cat:p.pos,season:2015,row:rows.find(r=>r.pid===p.historicalPid)})));HL.RNG.setSeed(437);

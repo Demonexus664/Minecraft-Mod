@@ -1,6 +1,6 @@
 # Hoops Life: progress, roadmap and handoff
 
-Last updated: 2026-10-09. Previous handoff branch: `claude/eager-davinci-buz3b6`. The current cloud checkout is on `work`; local commits are separate from the previous handoff branch and have not been pushed.
+Last updated: 2026-10-10. Current development branch: `hoops-overhaul-2026-10`. Earlier handoff entries below remain as historical context; current DNA refinement and verified coverage are documented in [DNA_REFINEMENT.md](DNA_REFINEMENT.md).
 Open `hoops-life/index.html` in a browser; no build step. Real headshots and logos load from the NBA/ESPN CDNs in your browser.
 
 ## Product goal

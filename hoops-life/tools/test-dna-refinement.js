@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {load}=require('./load');
-const HL=load(['js/core/rng.js','data/names.js','data/injuries.js','data/nbaids.js','data/history/index.js','js/league/teams.js','js/league/ratings.js','js/league/player.js','js/league/history.js','js/league/legend-dna.js',...['1995','1999','2012','2015','2016','2020'].map(y=>`data/history/seasons/${y}.js`)]);
+const HL=load(['js/core/rng.js','data/names.js','data/injuries.js','data/nbaids.js','data/history/index.js','js/league/teams.js','js/league/ratings.js','js/league/player.js','js/league/history.js','js/league/legend-dna.js',...['1995','1999','2012','2015','2016','2020','2023'].map(y=>`data/history/seasons/${y}.js`)]);
 const entry=(pid,cat,season=2015)=>({pid,cat,season,row:HL.History.seasonRows(String(season)).find(r=>r.pid===pid)});
 const force=[entry('onealsh01','strength',1999),entry('onealsh01','inside',1999),entry('irvinky01','handle'),entry('curryst01','body')];
 test('ordinary partnerships and arbitrary famous trios do not automatically mutate',()=>{
@@ -39,7 +39,16 @@ test('historical Bay trio transforms only its verified peak seasons, and explain
  const good=[entry('curryst01','PG'),entry('thompkl01','SG'),entry('greendr01','PF')];
  const d=HL.DNA.analyze(good,{mode:'team'}),m=d.mutations.find(x=>x.id==='mutation:bay-motion');
  assert.ok(m);assert.ok(m.ingredients.length===3);assert.ok(m.qualification&&m.activation&&m.description);
+ assert.ok(m.qualification.includes('≥ 98'));
  assert.ok(m.mechanics.relocation);assert.equal(HL.DNA.analyze(good.map(e=>({...e,season:2020})),{mode:'team'}).mutations.length,0);
+});
+test('preview, reveal and final mutation qualification respect the same physical dependencies',()=>{
+ const ps=[entry('wembavi01','intD',2023),entry('jamesle01','iq'),entry('westbru01','speed'),entry('bogutan01','body'),entry('nowitdi01','vert')];
+ const low=HL.DNA.analyze(ps);assert.equal(low.build.attrs.block,89);assert.ok(!low.mutations.some(m=>m.id==='mutation:rim-network'));
+ const final=HL.DNA.analyze(ps,{build:{height:low.build.height,attrs:low.build.attrs}});assert.equal(JSON.stringify(low.mutations),JSON.stringify(final.mutations));
+ const incomplete=HL.DNA.analyze(ps.filter(e=>e.cat!=='vert'));assert.ok(!incomplete.mutations.some(m=>m.id==='mutation:rim-network'));
+ const strong=ps.map(e=>e.cat==='vert'?entry('cartevi01','vert'):e),high=HL.DNA.analyze(strong);assert.ok(high.mutations.some(m=>m.id==='mutation:rim-network'));
+ assert.equal(HL.DNA.preview(ps.slice(0,-1),ps.at(-1))?.id=== 'mutation:rim-network',false);
 });
 test('evolved shooting form replaces its precursor and duplicate inputs do not stack',()=>{
  const ps=[entry('curryst01','three'),entry('thompkl01','jumper'),entry('curryst01','handle'),entry('jamesle01','speed',2012),entry('jamesle01','iq',2012),entry('curryst01','body')];

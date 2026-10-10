@@ -170,10 +170,12 @@ HL.SkillDraft = (function () {
 
   // One league per season, reused while the career is on that season.
   let cache = null;
-  async function leagueFor(yr) {
+  async function leagueFor(yr,c=null) {
+    if(c?.cancelled)return null;
     if (cache && cache.yr === yr) { HL.League.set(cache.L); return cache.L; }
     const key = String(Math.min(yr, HL.LATEST_SEASON));
     await HL.History.load(key);
+    if(c?.cancelled)return null;
     const L = HL.League.createFromSeason({ seasonKey: key, seed: R.int(1, 1e9) });
     cache = { yr, L };
     return L;
@@ -271,7 +273,7 @@ HL.SkillDraft = (function () {
   }
 
   async function draft(c) {
-    const L = await leagueFor(c.yr);
+    const L = await leagueFor(c.yr,c);if(!L)return;
     setAge(c, 19);
     const n = L.teams.length, order = byRecord(L);
     const slot = Math.max(1, Math.round(31 - (c.me.ovr - 58) * 1.6 + R.normal(0, 3)));
@@ -297,7 +299,7 @@ HL.SkillDraft = (function () {
   }
 
   async function playSeason(c) {
-    const L = await leagueFor(c.yr);
+    const L = await leagueFor(c.yr,c);if(!L)return;
     const me = c.me;
     if (c.minors) {
       c.seasons.push({ age: c.age, yr: c.yr, minors: true, ovr: me.ovr, g: 0, ppg: 0, rpg: 0, apg: 0, awards: [], altered: [] });
@@ -338,7 +340,7 @@ HL.SkillDraft = (function () {
   async function offseason(c) {
     const from = c.me.ovr;
     c.age++; c.yr++;
-    const L = await leagueFor(c.yr);
+    const L = await leagueFor(c.yr,c);if(!L)return;
     setAge(c, c.age);
     const ovr = c.me.ovr;
     const pend = { type: 'season', from, to: ovr, offers: [], notes: [] };
@@ -456,13 +458,15 @@ HL.SkillDraft = (function () {
     // Long-lived builds must remain playable. Advance in bounded, saveable
     // batches rather than silently ending the career at a fixed age.
     let guard = 0;
-    while (!c.done && guard++ < seasons) {
+    while (!c.done && !c.cancelled && guard++ < seasons) {
       if (interactive && c.pendingStory) break;
       if (shouldPauseAuto(c)) {c.autoPaused='Two seasons without NBA demand. Choose a manual comeback attempt or retirement.';break;}
       if (c.pending) autoDecide(c);
       if (c.done) break;
       await playSeason(c);
+      if(c.cancelled)break;
       await offseason(c);
+      if(c.cancelled)break;
       if(shouldPauseAuto(c)){c.autoPaused='Two seasons without NBA demand. Choose a manual comeback attempt or retirement.';break;}
       if (!interactive && c.pendingStory) HL.Story.chooseDecision(c,'b');
       onProgress && onProgress(c);
@@ -742,7 +746,7 @@ HL.SkillDraft = (function () {
       ${buildPrime().constraints.length?`<section class="block"><div class="body"><h3>How your tools work together</h3>${buildPrime().constraints.map(x=>`<p class="t2 sm"><b>${esc(x.key)}: ${x.ceiling} drafted → ${x.effective} executable.</b> ${esc(x.reason)}</p>`).join('')}</div></section>`:''}
       ${buildDetail(buildPrime())}
       <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim next 10 seasons</button></div>
-      <div class="t3 sm">Chemistry DNA improves specific possession outcomes. Historical and fictional duos and trios can activate independently; mutations are revealed automatically. Every drafted attribute contributes to the same player on the court. Body determines height and weight, while shooting, finishing, defense and athleticism interact in the simulation. Prime is fully attainable throughout your selected prime-duration window.</div>
+      <div class="t3 sm">Chemistry DNA improves specific possession outcomes. Historical and fictional duos and trios can activate independently; rare mutations are revealed automatically. Body, strength, elevation and basketball tools determine what your player can execute. The prime window supports learned skill; physical decline and injuries can still reduce athleticism during it.</div>
       <div class="t3 sm">Season by season: see every season's numbers, awards and playoff run, then choose free agency offers, ask for trades or retire. Simming the whole career makes those calls for you.</div>
     </div></section>`;
   }
@@ -885,11 +889,13 @@ HL.SkillDraft = (function () {
     const cab = ['Champion', 'Finals MVP', 'MVP', 'DPOY', 'ROY', 'All-NBA 1st', 'All-NBA 2nd', 'All-NBA 3rd', 'All-Star', 'Scoring title', 'Rebounding title', 'Assists title'].map(k => [k === 'Champion' ? 'Championships' : k, count(k)]).filter(x => x[1]);
     const H = c.highs;
     const hi = [['Points', H.pts], ['Rebounds', H.reb], ['Assists', H.ast], ['Steals', H.stl], ['Blocks', H.blk]].filter(x => x[1]);
-    const cur = Object.fromEntries(CATS.filter(x => x[2].length).map(([id, label, keys]) => [id, [label, avgOf(c.me.attrs, keys), avgOf(c.prime.attrs, keys)]]));
+    const cur = Object.fromEntries(CATS.filter(x => x[2].length&&!x[0].startsWith('tend')).map(([id, label, keys]) => [id, [label, avgOf(c.me.attrs, keys), avgOf(c.prime.attrs, keys)]]));
+    const habits=CATS.filter(x=>x[0].startsWith('tend')).map(([id,label,keys])=>`<details><summary>${esc(label)}</summary>${keys.map(k=>`<div class="kv"><span>${esc(k)}</span><b>${c.me.tend[k]??'—'}/100</b></div>`).join('')}</details>`).join('');
     return `<div style="max-width:340px">${card}</div>
       <section class="block"><header><h3>Trophy case</h3></header><div class="body">${cab.length ? cab.map(([k, n]) => `<div class="kv"><span>${esc(k)}</span><b>${n}</b></div>`).join('') : '<div class="t3 sm">Empty, for now.</div>'}</div></section>
       ${hi.length ? `<section class="block"><header><h3>Career highs</h3></header><div class="body">${hi.map(([k, h]) => `<div class="kv"><span>${k}</span><b>${h.v} <span class="t3 xs">vs ${esc(h.opp)}, ${yrLabel(h.yr)}${h.playoffs ? ' (playoffs)' : ''}</span></b></div>`).join('')}</div></section>` : ''}
-      <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>`;
+      <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>
+      <section class="block"><header><h3>Playing habits</h3></header><div class="body stack"><p class="t3 sm">Frequency preferences, rather than skill grades. Open a group to inspect every inherited habit.</p>${habits}</div></section>`;
   }
 
   function careerDeepReport(c) {
@@ -967,20 +973,25 @@ HL.SkillDraft = (function () {
 
   // Run an async step with a progress card.
   async function busy(title, sub, fn) {
+    const run=st;
     st.busy = { title, sub, pct: 0 };
     render();
     await new Promise(r => setTimeout(r, 30));
-    try { await fn(); } catch (e) { console.error(e); U.toast('Something went wrong: ' + esc(e.message)); }
+    if(st!==run)return false;
+    try { await fn(); } catch (e) { if(st===run){console.error(e); U.toast('Something went wrong: ' + esc(e.message));} }
+    if(st!==run)return false;
     st.busy = null;
     render();
     window.scrollTo(0, 0);
+    return true;
   }
-  const setPct = (pct, sub) => { if (!st.busy) return; st.busy.pct = pct; if (sub) st.busy.sub = sub; const bar = document.querySelector('.simcard .track i'); if (bar) bar.style.width = pct + '%'; const s = document.querySelector('.block .body .t2.sm'); if (s && sub) s.textContent = sub; };
+  const setPct = (pct, sub) => { if (!st?.busy) return; st.busy.pct = pct; if (sub) st.busy.sub = sub; const bar = document.querySelector('.simcard .track i'); if (bar) bar.style.width = pct + '%'; const s = document.querySelector('.block .body .t2.sm'); if (s && sub) s.textContent = sub; };
 
   function bind() {
     const app = U.app();
-    app.querySelector('[data-home]').onclick = () => HL.App.title();
-    app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => { st = null; cache = null; render(); });
+    const abandon=()=>{if(st?.career)st.career.cancelled=true;HL.DNAFX?.reset();document.querySelectorAll('.fx-banner').forEach(e=>e.click());st=null;cache=null;};
+    app.querySelector('[data-home]').onclick = () => {abandon();HL.App.title();};
+    app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => {abandon();render();});
     FX.bindSound(app);
     const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin('all'); };
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; spin(k); });
@@ -992,26 +1003,27 @@ HL.SkillDraft = (function () {
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
     app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
-      await busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
-        st.career = newCareer();
-        await draft(st.career);
-        if (b.dataset.begin === 'auto') { st.career.stage = null; await runRest(); }
-      });
+      const run=st;
+      const proceeded=await busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
+        const cc=run.career=newCareer();
+        await draft(cc);if(st!==run)return;
+        if (b.dataset.begin === 'auto') { cc.stage = null; await runRest(cc); }
+      });if(!proceeded)return;
       const cc = st.career;
       if (cc.done) return verdictBanner(cc);
       await FX.banner(cc.pick ? `#${cc.pick}` : 'UNDRAFTED', cc.minors ? 'Heading to the minor leagues.' : `${esc(fullName(cc.teamMeta))} select ${esc(cc.me.name)}.`, { tier: !cc.pick ? 0 : cc.pick <= 3 ? 4 : cc.pick <= 10 ? 3 : cc.pick <= 30 ? 2 : 1, kicker: `Draft night · ${cc.debut}`, ms: 2400 });
     });
     const play = async () => {
-      await busy(`Playing the ${yrLabel(c.yr)} season`, c.minors ? 'In the minor leagues' : `With the ${fullName(c.teamMeta)}`, async () => {
+      const proceeded=await busy(`Playing the ${yrLabel(c.yr)} season`, c.minors ? 'In the minor leagues' : `With the ${fullName(c.teamMeta)}`, async () => {
         if (c.pending) decide(c, { type: 'stay' });
         c.stage = null;
         await playSeason(c);
         await offseason(c);
-      });
+      });if(!proceeded)return;
       await celebrate(c);
     };
     app.querySelectorAll('[data-play]').forEach(b => b.onclick = play);
-    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { await busy('Simulating the next ten seasons', '', async () => { c.stage = null; await runRest(); }); if (st.career.done) verdictBanner(st.career); });
+    app.querySelectorAll('[data-simrest]').forEach(b => b.onclick = async () => { const proceeded=await busy('Simulating the next ten seasons', '', async () => { c.stage = null; await runRest(c); }); if(proceeded&&st.career.done)verdictBanner(st.career); });
     app.querySelectorAll('[data-sign]').forEach(b => b.onclick = () => { decide(c, { type: 'sign', i: +b.dataset.sign }); render(); });
     app.querySelectorAll('[data-story-choice]').forEach(b=>b.onclick=()=>{HL.Story.chooseDecision(c,b.dataset.storyChoice);setAge(c,c.age);render();});
     app.querySelectorAll('[data-trade]').forEach(b => b.onclick = () => { decide(c, { type: 'trade' }); U.toast(`${esc(c.log[c.log.length - 1].text)}.`); render(); });
@@ -1024,6 +1036,7 @@ HL.SkillDraft = (function () {
   }
   // The payoff after each season: numbers count up, big honors get their own moment.
   async function celebrate(c) {
+    const run=st;if(run?.career!==c)return;
     const s = c.seasons[c.seasons.length - 1];
     if (s && !s.minors) {
       document.querySelectorAll('.statstrip b').forEach(b => { const v = parseFloat(b.textContent); if (!isNaN(v)) { const dec = (b.textContent.split('.')[1] || '').length; FX.countUp(b, v, 900, x => x.toFixed(dec)); } });
@@ -1039,7 +1052,7 @@ HL.SkillDraft = (function () {
       if (award('Scoring title')) queue.push(['SCORING TITLE', over('Scoring title'), 3]);
       if (award('All-NBA 1st') && !award('MVP')) queue.push(['ALL-NBA FIRST TEAM', '', 3]);
       if (firstAllStar) queue.push(['ALL-STAR', 'First selection', 2]);
-      for (const [t, sub, tier] of queue.slice(0, 3)) await FX.banner(t, sub, { tier, kicker: yrLabel(s.yr), ms: 2200 });
+      for (const [t, sub, tier] of queue.slice(0, 3)) {await FX.banner(t, sub, { tier, kicker: yrLabel(s.yr), ms: 2200 });if(st!==run)return;}
       if (!queue.length && s.injury && s.injury.games >= 30) FX.shake(document.querySelector('.page'), 0.6);
     }
     if (c.done) await verdictBanner(c);
@@ -1049,10 +1062,9 @@ HL.SkillDraft = (function () {
     const t = ['BROKEN', 'THE GOAT'].includes(tier) ? 4 : ['ALL-TIME GREAT', 'HALL OF FAMER'].includes(tier) ? 3 : ['SUPERSTAR', 'ALL-STAR'].includes(tier) ? 2 : ['STARTER', 'ROLE PLAYER'].includes(tier) ? 1 : 0;
     return FX.banner(tier, esc(line), { tier: t, kicker: 'The verdict', ms: 3600 });
   }
-  async function runRest() {
-    const c = st.career;
+  async function runRest(c=st.career) {
     const start = c.seasons.length;
-    await simRest(c, cc => setPct(Math.min(100, Math.round((cc.seasons.length-start)/10*100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`), 10, true);
+    await simRest(c, cc => {if(st?.career===cc)setPct(Math.min(100, Math.round((cc.seasons.length-start)/10*100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`);}, 10, true);
   }
 
   function draftView(hide, reveal) {

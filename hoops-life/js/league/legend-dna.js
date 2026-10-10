@@ -102,7 +102,12 @@ HL.DNA = (function () {
     return {...e,pid,row,attrs:row?HL.historicalAttributes(row):{},verified:!!row};
   }
   function buildContext(entries,supplied={}){const attrs={};for(const e of entries)for(const k of CATEGORY_ATTRS[e.cat]||[])if(e.verified)attrs[k]=e.attrs[k];
-    const body=entries.find(e=>e.cat==='body'&&e.verified),bio=body&&HL.HISTORY.players[body.pid];return {attrs:{...attrs,...supplied.attrs},height:supplied.height??bio?.[3],weight:supplied.weight??bio?.[4],body:!!body};}
+    const body=entries.find(e=>e.cat==='body'&&e.verified),bio=body&&HL.HISTORY.players[body.pid],height=supplied.height??bio?.[3],combined={...attrs,...supplied.attrs};
+    // Unfilled support tools contribute zero to qualification, never an assumed
+    // 65. Preview/reveal/final construction therefore share executable limits,
+    // and later weak physical cards cannot revoke a prematurely revealed form.
+    const effective=Number.isFinite(height)?reconcileAttributes({...Object.fromEntries((HL.ATTR_KEYS||[]).map(k=>[k,0])),...combined},height).attrs:combined;
+    return {attrs:effective,height,weight:supplied.weight??bio?.[4],body:!!body};}
   const N=(cat,pid,min)=>({cat,pid,min});
   // Conditions are exact authored evidence. No random famous trio or hash lottery qualifies.
   const RECIPES=[
@@ -160,10 +165,16 @@ HL.DNA = (function () {
   function selectedMechanics(pid,cats,mode){return Object.fromEntries(Object.entries(PROFILES[pid]||{}).filter(([k])=>mode==='team'||DOMAINS[k]?.some(c=>cats.includes(c))));}
   function effect(id,n,type,tone,ps,mechanics,extra={}){return {id,name:n,type,tone,players:ps,mechanics,bonus:{},boost:{},colors:PALETTE[tone]||PALETTE.arc,
     activation:'While the relevant skills are used together; team partners must share the floor.',description:Object.keys(mechanics).map(k=>MECHANIC_TEXT[k]).join(' '),...extra};}
+  function qualificationFor(r,es,b,mode){
+    const label=k=>HL.ATTRS?.find(a=>a.key===k)?.label||k;
+    const measured=(minimum,attrs)=>Object.entries(minimum||{}).map(([k,v])=>`${label(k)} ${Math.round(attrs[k])} ≥ ${v}`).join(', ');
+    if(mode==='team')return es.map(e=>`${name(e.pid)} · ${e.season}-${String(+e.season+1).slice(-2)}: ${measured(r.roleTools?.[e.pid],e.attrs)}`).join('; ');
+    return `${b.height} inch frame (requires ${r.frame[0]}–${r.frame[1]}); ${r.needs.map((n,i)=>`${name(es[i].pid)}’s ${n.cat}: ${measured(n.min,b.attrs)}`).join('; ')}. Values reflect the playable build.`;
+  }
   function qualify(r,entries,b,mode){
     if(r.mode){if(mode!==r.mode)return null;const es=r.p.map(pid=>entries.find(e=>e.pid===pid&&e.verified&&(!r.years||(+e.season>=r.years[0]&&+e.season<=r.years[1]))&&Object.entries(r.roleTools?.[pid]||{}).every(([k,v])=>e.attrs[k]>=v)));return es.every(Boolean)?es:null;}
     if(mode!=='skill'||!b.body||!Number.isFinite(b.height)||b.height<r.frame[0]||b.height>r.frame[1]||!Object.entries(r.tools||{}).every(([k,v])=>b.attrs[k]>=v))return null;
-    const es=r.needs.map(n=>entries.find(e=>e.cat===n.cat&&(!n.pid||n.pid===e.pid)&&e.verified&&Object.entries(n.min||{}).every(([k,v])=>e.attrs[k]>=v)));
+    const es=r.needs.map(n=>entries.find(e=>e.cat===n.cat&&(!n.pid||n.pid===e.pid)&&e.verified&&Object.entries(n.min||{}).every(([k,v])=>e.attrs[k]>=v&&b.attrs[k]>=v)));
     return es.every(Boolean)?[...es,entries.find(e=>e.cat==='body'&&e.verified)]:null;
   }
   function analyze(rawEntries,{mode='skill',build:supplied={}}={}){
@@ -184,7 +195,7 @@ HL.DNA = (function () {
       const ea=entries.find(e=>e.verified&&(PROFILES[e.pid]?.[a]||0)>=.8),eb=entries.find(e=>e.verified&&e.pid!==ea?.pid&&(PROFILES[e.pid]?.[b]||0)>=.8);
       if(ea&&eb&&!pairs.some(f=>f.players.includes(ea.pid)&&f.players.includes(eb.pid)))pairs.push(effect(`fit:${a}:${b}:${key([ea.pid,eb.pid])}`,n,'duo',tone,[ea.pid,eb.pid],m,{ingredients:[ea,eb],qualification:`${name(ea.pid)} + ${name(eb.pid)}; compatible ${a} and ${b} roles.`}));}
     const qualified=RECIPES.map(r=>({r,es:qualify(r,entries,build,mode)})).filter(x=>x.es).sort((a,b)=>(b.r.priority||1)-(a.r.priority||1)||a.r.id.localeCompare(b.r.id)),mutations=[],families=new Set();
-    for(const {r,es}of qualified){if(families.has(r.family)||mutations.length>=2)continue;families.add(r.family);mutations.push(effect(`mutation:${r.id}`,r.name,r.type||'mutation',r.tone,[...new Set(es.map(e=>e.pid))],r.mechanics,{...r,id:`mutation:${r.id}`,type:r.type||'mutation',ingredients:es,qualification:mode==='team'?es.map(e=>`${name(e.pid)} · ${e.season}-${String(+e.season+1).slice(-2)}`).join(' + '):`${build.height} inch frame; ${es.map(e=>`${name(e.pid)}’s ${e.cat}`).join(' + ')}.`,target:r.target||null}));}
+    for(const {r,es}of qualified){if(families.has(r.family)||mutations.length>=2)continue;families.add(r.family);mutations.push(effect(`mutation:${r.id}`,r.name,r.type||'mutation',r.tone,[...new Set(es.map(e=>e.pid))],r.mechanics,{...r,id:`mutation:${r.id}`,type:r.type||'mutation',ingredients:es,qualification:qualificationFor(r,es,build,mode),target:r.target||null}));}
     return {players,cats,mode,build,signatures,pairs,trios,mutations,active:[...signatures,...pairs,...trios,...mutations]};
   }
   function mergeMechanics(items){const out={};for(const f of items)for(const[k,v]of Object.entries(f.mechanics||{}))out[k]=Math.max(out[k]||0,v);return out;}
@@ -207,10 +218,12 @@ HL.DNA = (function () {
     cap('shotCreation',clamp(30+(attrs.handle??65)*.55+(attrs.footwork??65)*.2+(attrs.burst??65)*.15,25,100),'Shot creation needs handle, footwork and separation.');
     return {attrs,constraints};
   }
-  function basketballContext({shooter,defender,lineup=[],dline=[],type=null,transition=false,clutch=false,assisted=false,coverage='man',play=null,cache=null}){
+  function basketballContext({shooter,defender,lineup=[],dline=[],type=null,transition=false,clutch=false,assisted=false,passer=null,coverage='man',play=null,cache=null}){
     const m=mechanicsFor(shooter,lineup,cache),dm=dline.map(p=>mechanicsFor(p,dline,cache)),a=shooter.attrs||{};
     const best=k=>Math.max(0,...dm.map(x=>x[k]||0)),own=k=>m[k]||0;
     const gravity=Math.max(0,...lineup.filter(p=>p!==shooter).map(p=>mechanicsFor(p,lineup,cache).gravity||0));
+    const supportingPrecision=Math.max(0,...lineup.filter(p=>p!==shooter).map(p=>mechanicsFor(p,lineup,cache).precision||0));
+    const passingPrecision=passer&&passer!==shooter&&lineup.includes(passer)?mechanicsFor(passer,lineup,cache).precision||0:0;
     const height=shooter.height||78,dh=defender?.height||78;
     const screener=lineup.filter(p=>p!==shooter).reduce((v,p)=>Math.max(v,(p.attrs?.screen||50)/100*(.65+(mechanicsFor(p,lineup,cache).screen||0)*.35)),0);
     const screen=(own('screenMove')+own('screenRead')*.65+own('relocation')*.65)*screener;
@@ -224,7 +237,7 @@ HL.DNA = (function () {
     out.midWeight+=own('creation')*.18+own('highRelease')*.12;
     if(clutch){out.midWeight+=own('clutchChoice')*.22;out.threeWeight+=own('clutchChoice')*(a.three>=a.mid?.18:-.1);}
     out.turnover=best('laneDisruption')*.012-own('precision')*.012+postThreat*.015*(1-read*.45);
-    out.assist=own('precision')*.035+screen*.07+read*postThreat*.04;
+    out.assist=supportingPrecision*.035+screen*.07+read*postThreat*.04;
     out.kickChance=clamp(postThreat*read*.24,0,.6);
     out.rebOff=clamp(own('secondChance')*.025+own('boxPosition')*.01-best('boxPosition')*.025,-.06,.06);
     if(type==='rim'){
@@ -241,6 +254,7 @@ HL.DNA = (function () {
       out.make-=best('rotations')*.025;add('defensiveRecovery',best('rotations'));
       if(coverage==='drop'&&screen>0)out.make+=screen*.015;
     }
+    if(assisted&&type){out.make+=passingPrecision*.02;add('precisionPass',passingPrecision);}
     if(clutch&&type){out.make+=own('clutchChoice')*.025;add('clutchCounter',own('clutchChoice'));}
     if(type&&out.turnover>0)add('passingLanePressure',best('laneDisruption'));
     out.make=clamp(out.make,-.14,.18);return out;

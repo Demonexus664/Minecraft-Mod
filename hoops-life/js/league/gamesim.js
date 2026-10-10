@@ -635,7 +635,7 @@ HL.DEFAULT_RULES = () => ({
       if (transition) pAst += 0.1;
       if (!passer && R.chance(HL.clamp(pAst, 0.05, 0.95))) {
         const intended = play && ['pickPop','driveKick'].includes(play.play) ? play.pid : play?.partnerId;
-        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst) * (p.id === intended ? 3 : 1));
+        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst) * (p.id === intended ? 3 : 1) * (1+(hasDNA?(HL.DNA?.mechanicsFor(p,lineup,dnaCache).precision||0)*.5:0)));
       }
 
       let makeP, value = 2, blockP = 0, foulP = 0, label;
@@ -722,7 +722,7 @@ HL.DEFAULT_RULES = () => ({
       foulP *= HL.clamp(draw, 0.35, 2.4) * E.ftr;
       if (rules.noFouls) foulP = 0;
       if (rules.tackling && type === 'rim') { makeP -= 0.06; }
-      const basketball=dnaContext(shooter,sDef,{type,assisted:!!passer});
+      const basketball=dnaContext(shooter,sDef,{type,assisted:!!passer,passer});
       if(basketball){makeP+=basketball.make;blockP+=basketball.block;foulP*=1+basketball.foul;recordDNA(O,basketball.actions);}
       makeP = HL.clamp(makeP, 0.05, 0.9);
       if (heave) { makeP = 0.07; foulP = 0; label = 'heave'; }

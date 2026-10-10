@@ -227,16 +227,18 @@ HL.Challenge = (function () {
 
   // ---------- the season, played live ----------
   async function playSeason() {
+    const run=st;
     st.phase = 'season';
     render();
     const key = String(st.playSeason);
     await HL.History.load(key);
+    if(st!==run)return;
     const L = HL.League.createFromSeason({ seasonKey: key, seed: st.daily ? seedFor('820s-' + st.date) : Date.now() % 100000 });
     const games = L.games;
     const dream = { id: 999, abbr: 'YOU', city: 'Your', name: 'Five', color: '#c9a227', color2: '#111111', conf: 'East', strategy: HL.DEFAULT_STRATEGY() };
     const players = [];
     // Load archived seasons for unlocked historical forms before changing cards.
-    for(const form of st.dna?.mutations||[])if(form.year)await HL.History.load(String(form.year));
+    for(const form of st.dna?.mutations||[])if(form.year){await HL.History.load(String(form.year));if(st!==run)return;}
     const minutes = { PG: 34, SG: 34, SF: 34, PF: 33, C: 33, B1: 22, B2: 18, B3: 14 };
     for (const slot of SLOTS) {
       const c = st.lineup[slot];
@@ -333,14 +335,17 @@ HL.Challenge = (function () {
           const decision=document.createElement('div');decision.className='dna-first-loss';
           decision.innerHTML=`<b>The perfect season is over.</b><p>Continue chasing 73 wins, a championship and your team's legacy, or restart the challenge?</p><button class="btn go" data-keep>Continue the season</button> <button class="btn" data-restart>Restart</button>`;
           q('.ticker').appendChild(decision);
-          const continueRun=await new Promise(done=>{decision.querySelector('[data-keep]').onclick=()=>done(true);decision.querySelector('[data-restart]').onclick=()=>done(false);});
+          const continueRun=await new Promise(done=>{run.cancelSeason=()=>done(false);decision.querySelector('[data-keep]').onclick=()=>done(true);decision.querySelector('[data-restart]').onclick=()=>done(false);});
+          run.cancelSeason=null;
           decision.remove();
+          if(st!==run)return;
           if(!continueRun){st=null;render();return;}
         }
       }
       if (q('.ticker .sub')) q('.ticker .sub').textContent = `${(pf / (g + 1)).toFixed(1)} PPG · ${(pa / (g + 1)).toFixed(1)} allowed · ${streak > 1 ? `${streak}-game win streak` : streak === 1 ? 'won the last one' : 'lost the last one'}`;
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
+      if(st!==run)return;
     }
     st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog,specialEncounter:null, dna:st.dna, specialDraft:st.special?.label||null };
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
@@ -350,9 +355,10 @@ HL.Challenge = (function () {
     const [tier, line] = verdict(w, games);
     const t = w === games ? 4 : w / games >= 75 / 82 ? 3 : w / games >= 55 / 82 ? 2 : w / games >= 42 / 82 ? 1 : 0;
     await FX.banner(tier, `${w}-${l}. ${esc(line)}`, { tier: t, kicker: `${games}-0 Challenge · ${yrLabel(st.playSeason)}`, ms: 3200 });
+    if(st!==run)return;
     st.phase = 'result';
     render();
-    for (const a of st.result.unlocked.filter(x => x.fresh)) { await FX.wait(250); U.toast(`Achievement unlocked: <b>${esc(a.name)}</b>`); FX.sfx.pop(3); }
+    for (const a of st.result.unlocked.filter(x => x.fresh)) { await FX.wait(250);if(st!==run)return; U.toast(`Achievement unlocked: <b>${esc(a.name)}</b>`); FX.sfx.pop(3); }
   }
 
   // ---------- Postseason side quest: game by game, four best-of-seven series ----------
@@ -673,8 +679,9 @@ HL.Challenge = (function () {
   function bind() {
     const app = U.app();
     picked = null;
-    app.querySelector('[data-home]').onclick = () => HL.App.title();
-    app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => { st = null; render(); });
+    const abandon=()=>{st?.cancelSeason?.();HL.DNAFX?.reset();document.querySelectorAll('.fx-banner').forEach(e=>e.click());st=null;};
+    app.querySelector('[data-home]').onclick = () => {abandon();HL.App.title();};
+    app.querySelectorAll('[data-new]').forEach(b => b.onclick = () => {abandon();render();});
     FX.bindSound(app);
     const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin(); };
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });

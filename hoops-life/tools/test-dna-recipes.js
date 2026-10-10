@@ -5,7 +5,9 @@ test('every authored recipe has an achievable combination of real archived tools
  for(const r of HL.DNA.RECIPES){
   const es=r.mode?r.p.map(pid=>archive.find(e=>e.pid===pid&&(!r.years||(e.season>=r.years[0]&&e.season<=r.years[1]))&&Object.entries(r.roleTools?.[pid]||{}).every(([k,v])=>e.attrs[k]>=v))):r.needs.map(n=>{const e=archive.find(e=>(!n.pid||n.pid===e.pid)&&Object.entries(n.min||{}).every(([k,v])=>e.attrs[k]>=v));return e&&{...e,cat:n.cat};});
   assert.ok(es.every(Boolean),`${r.id}: no real archived ingredient reaches its authored threshold`);
-  if(!r.mode){const body=archive.find(e=>HL.HISTORY.players[e.pid][3]>=r.frame[0]&&HL.HISTORY.players[e.pid][3]<=r.frame[1]);es.push({...body,cat:'body'});}
+  if(!r.mode){const body=archive.find(e=>HL.HISTORY.players[e.pid][3]>=r.frame[0]&&HL.HISTORY.players[e.pid][3]<=r.frame[1]);es.push({...body,cat:'body'});
+   if((r.tools?.block||r.needs.some(n=>n.min?.block))&&!es.some(e=>e.cat==='vert'))es.push({...archive.find(e=>e.attrs.vert>=90&&e.attrs.burst>=90),cat:'vert'});
+  }
   const d=HL.DNA.analyze(es,{mode:r.mode||'skill'});
   assert.ok(d.mutations.some(m=>m.id===`mutation:${r.id}`||m.family===r.family&&m.type==='evolved'),`${r.id}: ingredients exist but form does not qualify`);
  }

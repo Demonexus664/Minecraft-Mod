@@ -11,7 +11,8 @@ HL.DNAFX=(function(){
   const groups=new Map();for(const e of effect.ingredients||[]){const k=`${e.pid}:${e.season}`,g=groups.get(k)||{...e,cats:[]};g.cats.push(e.cat);groups.set(k,g);}
   return [...groups.values()].slice(0,5).map(e=>{
    const bio=HL.HISTORY.players[e.pid]||[HL.DNA.STARS[e.pid]?.name||e.pid],club=e.row?.stints?.[0]?.[0],fr=HL.Challenge?.LINEAGE?.[club]||club,team=HL.TEAMS.find(t=>t.abbr===fr);
-   const keys=[...new Set([...Object.keys(effect.roleTools?.[e.pid]||{}),...e.cats.flatMap(c=>HL.DNA.CATEGORY_ATTRS[c]||[])])],a=e.attrs||{};
+   const required=(effect.needs||[]).filter(n=>e.cats.includes(n.cat)&&(!n.pid||n.pid===e.pid)).flatMap(n=>Object.keys(n.min||{}));
+   const keys=[...new Set([...required,...Object.keys(effect.roleTools?.[e.pid]||{}),...e.cats.flatMap(c=>HL.DNA.CATEGORY_ATTRS[c]||[])])],a=e.attrs||{};
    const values=keys.slice(0,3).map(k=>[k.toUpperCase(),a[k]??'—']);
    return `<div class="dna-fusion-input">${HL.Cards.card({pid:e.pid,name:bio[0],nbaId:bio[1],season:e.season,team,pos:e.row?.pos,rating:e.row?HL.historicalSeasonOvr(e.row):99,meta:e.season?`${e.season}-${String(+e.season+1).slice(-2)}`:'Inherited DNA',stat:values})}<b>${esc(e.cats.join(' · '))}</b></div>`;
   }).join('');
