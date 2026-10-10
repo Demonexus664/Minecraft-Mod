@@ -3,6 +3,23 @@ window.HL=window.HL||{};
 HL.FusionLab=(function(){
  const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
  let creations=[],history=[],tries={},serial=0;
+ const SAVE_KEY='hoops-life-genesis-v1';
+ function save(){
+  try{if(typeof localStorage!=='undefined')localStorage.setItem(SAVE_KEY,
+   JSON.stringify({v:1,creations,history,tries,serial}));return true;}catch{return false;}
+ }
+ function restore(){
+  try{
+   const data=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');
+   if(!data||data.v!==1)return false;
+   creations=Array.isArray(data.creations)?data.creations.filter(n=>n?.id&&n?.attrs&&Array.isArray(n.parentIds)):[];
+   history=Array.isArray(data.history)?data.history.slice(0,80):[];
+   tries=data.tries&&typeof data.tries==='object'&&!Array.isArray(data.tries)?data.tries:{};
+   serial=Math.max(+data.serial||0,...creations.map(n=>+(String(n.id).split(':')[1])||0),0);
+   return true;
+  }catch{return false;}
+ }
+ restore();
  const tagMap={curryst01:['gravity','range','quickRelease','relocation'],onealsh01:['deepSeal','postDouble','contactBalance','secondChance'],
   bryanko01:['creation','clutchChoice','highRelease'],jordami01:['creation','clutchChoice','transition'],
   jamesle01:['transition','postRead','contactBalance'],jokicni01:['postRead','precision','screenRead'],
@@ -90,7 +107,7 @@ HL.FusionLab=(function(){
     'The genetic roll did not stabilize a new basketball identity.';
    res.failureReason=mismatch;
    res.echo=r>.9?'A partial ability echo appeared, but the specimen did not stabilize.':'No viable hybrid was created.';
-   history.unshift(res);history=history.slice(0,80);return res;
+   history.unshift(res);history=history.slice(0,80);save();return res;
   }
   const height=frame==='left'?a.height:frame==='right'?b.height:Math.round((a.height+b.height)/2);
   const weight=frame==='left'?a.weight:frame==='right'?b.weight:Math.round((a.weight+b.weight)/2);
@@ -109,6 +126,7 @@ HL.FusionLab=(function(){
    strengths:combined.strengths,tradeoffs:cost,constraints:limited.constraints,
    dna:{mechanics:special,effects:{},links:[],mutations:[p.family]}};
   creations.unshift(node);res.node=node;history.unshift({...res,id});history=history.slice(0,80);
+  res.persisted=save();
   return res;
  }
  async function historical(pid){
@@ -156,7 +174,10 @@ HL.FusionLab=(function(){
    .slice(0,24).map(([pid,p])=>({id:'archive:'+pid,pid,name:p[0],height:p[3]}));
  }
  const find=id=>creations.find(x=>x.id===id);
- const reset=()=>{creations=[];history=[];tries={};serial=0;};
+ // Only an explicit delete action should wipe the user's multi-run genome library.
+ const reset=()=>{creations=[];history=[];tries={};serial=0;save();};
+ const status=()=>({creations:creations.length,experiments:history.length,persisted:typeof localStorage!=='undefined'});
+
  return {tags,overall,rating,preview,attempt,historical,project,search,find,reset,
-  creations:()=>creations,history:()=>history};
+  creations:()=>creations,history:()=>history,status,save,restore};
 })();
