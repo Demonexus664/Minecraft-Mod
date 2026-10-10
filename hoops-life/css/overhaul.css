@@ -438,3 +438,36 @@ html[data-fx-level="off"] .btn.go::after{display:none;}
   .fx-selector{font-size:9px;gap:4px;}
   .fx-selector select{max-width:94px;padding:5px;}
 }
+
+
+/* Season film reel uses actual game-by-game wins, losses and box scores. */
+.film-reel {
+  background:radial-gradient(ellipse at top right,rgba(92,147,225,.14),transparent 60%),
+    linear-gradient(165deg,#182236,#0e1724);
+}
+.film-track {display:flex;flex-wrap:wrap;gap:3px;padding:15px 12px;background:#0c1521;
+ border:1px solid rgba(136,177,238,.18);border-radius:11px;}
+.film-track i {width:8px;min-width:7px;flex:1 1 7px;height:15px;background:#77cfac;
+ border-radius:2px;box-shadow:0 0 6px rgba(109,203,159,.13);transition:height .2s,background .2s;}
+.film-track i.lost{background:#d77081;}
+.film-track i.boss{background:#efc56d;box-shadow:0 0 10px rgba(254,213,123,.54);}
+.film-track i:hover{height:24px;cursor:help;}
+.film-chapters{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:7px;}
+.film-chapters>div{background:rgba(15,27,44,.8);border:1px solid var(--rule);
+ border-radius:8px;padding:9px;display:grid;gap:4px;}
+.film-chapters b{font:800 12px var(--display);color:#c2d4ed;letter-spacing:.06em;}
+.film-chapters span{font:700 12px var(--body);color:var(--text-2);}
+.film-moments{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+.film-moment{display:flex;flex-direction:column;min-height:188px;gap:8px;
+ padding:19px;border:1px solid rgba(138,182,247,.22);border-radius:13px;
+ background:linear-gradient(144deg,rgba(50,65,91,.5),rgba(13,21,35,.91));}
+.film-moment.clutch,.film-moment.boss{border-color:rgba(241,199,119,.53);
+ background:linear-gradient(135deg,rgba(90,69,40,.36),rgba(18,27,41,.96));}
+.film-moment.loss{border-color:rgba(204,111,134,.38);}
+.film-moment .caps{color:#93add0;}
+.film-moment h3{font:850 23px var(--display);text-transform:uppercase;line-height:1;}
+.film-moment strong{font:900 47px/.95 var(--display);}
+.film-moment p{font:450 12px/1.5 var(--body);color:var(--text-2);flex:1;margin:0;}
+.film-hero{border-top:1px solid var(--rule);padding-top:9px;
+ font:700 11px/1.4 var(--body);color:#f7dcaa;}
+@media(max-width:600px){.film-moments{grid-template-columns:1fr 1fr}.film-moment{padding:12px;min-height:175px}.film-moment h3{font-size:19px}.film-track i{flex-basis:5px;min-width:4px}}
