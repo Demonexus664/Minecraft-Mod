@@ -121,6 +121,7 @@ HL.SkillPress=(function(){
       '<h2>'+esc(b.title)+'</h2><p>'+esc(b.prompt)+'</p>'+
       '<div class="press-meters">'+meters+'</div>'+
       '<div class="press-deals">Future contract-market perception: '+Math.round(market(c)*100)+'% of a normal offer, capped within ±9%. Ratings and possessions stay unchanged.</div></div></div>'+
+      (oldReceipt&&oldReceipt.year!==c.yr?'<div class="press-prior"><b>LAST SEASON’S RECEIPT</b><span>'+esc(oldReceipt.headline)+'</span><strong class="'+(oldReceipt.outcome==='won'?'win':'loss')+'">'+(oldReceipt.outcome==='won'?'DELIVERED':'EXPOSED')+'</strong><small>'+esc(oldReceipt.receipt||'')+'</small></div>':'')+
       (rec?'<div class="press-receipt"><b>YOUR STATEMENT IS ON RECORD</b><p>'+esc(rec.quote)+'</p>'+
         '<small>'+(rec.outcome==='pending'?'Results will determine whether the promise holds.':
           'Outcome: '+esc(rec.outcome)+' · '+esc(rec.receipt||''))+'</small></div>':
