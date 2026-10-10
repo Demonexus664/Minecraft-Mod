@@ -5,6 +5,10 @@ window.HL_PHOTOS = {
   'logo.GSW': { src: 'media/players/gsw-logo.png' },
   'real.stephen-curry': { src: 'media/players/stephen-curry-archive.png', kind: 'archive' },
   'real.lebron-james': { src: 'media/players/lebron-james-archive.png', kind: 'archive' },
+  'real.michael-jordan': { src: 'media/players/michael-jordan-archive.png', kind: 'archive' },
+  'real.sam-perkins': { src: 'media/players/sam-perkins-archive.png', kind: 'archive' },
+  'real.michael-porter-jr': { src: 'media/players/michael-porter-jr-archive.png', kind: 'archive' },
+  'real.day-ron-sharpe': { src: 'media/players/dayron-sharpe-archive.png', kind: 'archive' },
 };
 
 // Separate team-colored photographic garments have no player or number baked in.

@@ -749,6 +749,64 @@ html[data-era="60s"] .court { background: linear-gradient(#8d8d8d, #6f6f6f); }
 @media(max-width:900px) { .draft-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .lottery-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } }
 @media(max-width:600px) { .draft-stage { padding: 20px; } .draft-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; } .lottery-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .draft-prospect { padding: 14px 10px; } .draft-clock { align-items: flex-start; } .draft-tick { gap: 10px; padding: 12px; } }
 @media(prefers-reduced-motion:reduce) { .lottery-envelope.revealed { animation: none; } }
+
+/* Player Career: one person at the center of a responsive basketball world. */
+.career-creator { display: grid; grid-template-columns: minmax(0,2fr) minmax(250px,1fr); gap: 28px; }
+.career-fields { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.career-fields label { display: flex; flex-direction: column; gap: 7px; color: var(--text-2); font-size: 13px; }
+.career-fields input,.career-fields select { width: 100%; min-width: 0; }
+.career-preview { min-width: 0; }
+.career-preview-stats { padding: 20px; background: var(--surface); }
+.career-preview-stats h3 { margin-bottom: 16px; }
+.career-identity { display: flex; align-items: center; gap: 30px; border-bottom: 1px solid var(--rule); padding: 14px 0 26px; margin-bottom: 26px; }
+.career-identity h1 { font-size: clamp(30px,4vw,52px); margin: 7px 0; }
+.career-meters { margin-left: auto; display: grid; grid-template-columns: repeat(3,minmax(80px,1fr)); gap: 18px; min-width: 320px; }
+.career-today { display: grid; grid-template-columns: minmax(0,2fr) minmax(260px,1fr); gap: 24px; }
+.career-game-stage { padding: 30px; margin-bottom: 24px; background: var(--surface-2); border: 1px solid var(--rule); border-left: 4px solid var(--team); }
+.career-game-stage h2 { font-size: clamp(30px,4vw,52px); margin: 12px 0 20px; }
+.career-game-stage p { color: var(--text-2); margin: 0 0 22px; max-width: 740px; }
+.career-game-stage > .btn { margin-top: 10px; }
+.career-opponents { display: flex; gap: 24px; margin: 22px 0; }
+.career-opponents > div { display: flex; align-items: center; gap: 12px; }
+.career-statline { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin: 22px 0; font-size: 11px; color: var(--text-3); }
+.career-statline b { display: block; font: 700 40px/1.1 var(--display); color: var(--text); }
+.career-result h3 { font-size: 32px; margin-top: 12px; }
+.career-actions { display: grid; gap: 12px; margin: 16px 0 24px; }
+.career-actions button { display: flex; flex-direction: column; text-align: left; gap: 6px; background: var(--surface); border: 1px solid var(--rule); padding: 16px 18px; color: var(--text); cursor: pointer; }
+.career-actions button:hover { border-color: var(--team); }
+.career-actions strong { font-family: var(--display); font-size: 22px; }
+.career-actions span { font-size: 13px; color: var(--text-2); }
+.career-style { display: flex; align-items: center; gap: 15px; }
+.career-style span { flex: 1; }.career-style input { width: 75px; }
+.career-attributes { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 20px; }
+.career-attributes > div { display: flex; flex-direction: column; border-bottom: 1px solid var(--rule); padding-bottom: 10px; }
+.career-attributes b { font: 700 32px var(--display); }.career-attributes small { color: var(--text-3); }
+.career-circle { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 24px; }.career-circle h3 { margin-bottom: 16px; }
+.career-mate,.career-offer { text-align: left; padding: 20px; border: 1px solid var(--rule); background: var(--surface); color: var(--text); min-width: 0; cursor: pointer; }
+.career-mate h3,.career-offer h3 { font-size: 24px; margin-top: 12px; }.career-mate:hover,.career-offer:hover { border-color: var(--team); }
+.career-offers { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+.career-story { border-bottom: 1px solid var(--rule); padding: 12px 0 20px; }.career-story h3 { font-size: 24px; margin: 10px 0; }
+.career-story blockquote { background: var(--surface-2); border-left: 2px solid var(--team); margin: 12px 0; padding: 12px 16px; }.career-story small { display: block; color: var(--text-3); margin-top: 7px; }
+/* A choice has a consequence; a real game has a reveal. */
+[data-action-result] { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; }
+.career-choice-stamp { font: 700 13px var(--display); text-transform: uppercase; letter-spacing: .12em; color: var(--team); }
+.career-choice-feedback { display: flex; flex-wrap: wrap; gap: 8px; }
+.career-choice-feedback > span { padding: 8px 12px; background: var(--surface-2); border: 1px solid var(--rule); font: 700 14px var(--display); animation: draft-reveal .3s ease-out; }
+.career-choice-feedback .up { border-left: 3px solid #51b985; }.career-choice-feedback .down { border-left: 3px solid #d59d55; }
+.career-game-reveal { text-align: center; padding: 18px 0 4px; animation: draft-reveal .35s ease-out; }
+.career-scoreboard { display: flex; align-items: center; justify-content: center; gap: 32px; margin: 22px 0 30px; }
+.career-scoreboard span { font: 700 14px var(--display); letter-spacing: .18em; }.career-scoreboard h2 { font: 800 clamp(48px,9vw,78px)/1 var(--display); margin: 8px 0; }.career-scoreboard b { font: 700 13px var(--display); letter-spacing: .14em; color: var(--team); }
+.career-game-reveal > h3 { font-size: 24px; }.career-game-reveal .career-statline { border-block: 1px solid var(--rule); padding: 24px 0; }.career-game-reveal .career-statline b { font-size: clamp(32px,7vw,56px); }
+.career-game-reveal .career-story { text-align: left; }.career-game-reveal > .row { margin-top: 26px; }
+html:not([data-era]) .career-frame { background: radial-gradient(circle at 1px 1px,#0008 1px,transparent 2px) 0 0 / 20px 20px,repeating-linear-gradient(135deg,transparent 0 150px,#ffffff03 150px 155px,transparent 155px 280px),#101113; min-height: 100vh; }
+html:not([data-era]) .career-frame .career-game-stage { background: radial-gradient(ellipse at top right,#ff792b18,transparent 65%),#191d23; border: 1px solid #ff792b70; border-left: 4px solid #ff792b; box-shadow: 0 12px 36px #0003; }
+html:not([data-era]) .career-frame .btn.go { background: #ff792b; color: #101113; border-color: #ff792b; }
+.career-actions button,.career-mate,.career-offer { transition: transform .15s ease,border-color .15s ease,box-shadow .15s ease; }.career-actions button:hover,.career-mate:hover,.career-offer:hover { transform: translateY(-2px); box-shadow: 0 6px 18px #0002; }.career-actions button:active { transform: translateY(1px); }
+.career-actions button:focus-visible,.career-mate:focus-visible,.career-offer:focus-visible { outline: 2px solid var(--team); outline-offset: 3px; }
+@media(max-width:600px) { .career-scoreboard { gap: 14px; }.career-scoreboard .team-logo { max-width: 48px; }.career-frame .bar { flex-wrap: wrap; } }
+@media(prefers-reduced-motion:reduce) { .career-game-reveal,.career-choice-feedback > span { animation: none; }.career-actions button,.career-mate,.career-offer { transition: none; }.career-actions button:hover,.career-mate:hover,.career-offer:hover { transform: none; } }
+@media(max-width:900px) { .career-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }.career-identity { align-items: flex-start; flex-direction: column; }.career-meters { margin-left: 0; width: 100%; }.career-today { grid-template-columns: 1fr; }.career-attributes { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media(max-width:600px) { .career-creator { grid-template-columns: 1fr; }.career-preview { max-width: 340px; }.career-game-stage { padding: 20px; }.career-opponents { flex-wrap: wrap; gap: 12px; }.career-meters { min-width: 0; gap: 12px; }.career-attributes { grid-template-columns: repeat(2,minmax(0,1fr)); }.career-circle { grid-template-columns: 1fr; }.career-offers { grid-template-columns: 1fr; }.career-identity { gap: 22px; }.career-game-stage .row .btn { max-width: 100%; white-space: normal; } }
 .face { display: inline-grid; place-items: center; }
 .face-initials { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--text-2); }
 .face.ok .face-initials, .gfx-head.ok .gfx-placeholder { visibility: hidden; }

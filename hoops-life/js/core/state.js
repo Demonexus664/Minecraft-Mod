@@ -33,7 +33,7 @@ HL.Saves = (function () {
       league.saveId = id;
       const rec = {
         id, mode: league.mode || 'franchise', savedAt: Date.now(),
-        label: `${t ? t.city + ' ' + t.name : 'League'} · ${league.season}-${String(league.season + 1).slice(2)}`,
+        label: `${league.mode === 'career' && league.career ? league.players[league.career.pid].name + ' · ' : ''}${t ? t.city + ' ' + t.name : 'League'} · ${league.season}-${String(league.season + 1).slice(2)}`,
         teamAbbr: t ? t.abbr : null, season: league.season, phase: league.phase,
         record: t ? `${t.w}-${t.l}` : '',
         data: JSON.stringify(league),

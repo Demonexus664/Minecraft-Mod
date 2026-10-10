@@ -7,7 +7,7 @@ HL.App = (function () {
 
   const MODES = [
     { id: 'franchise', name: 'Franchise', live: true, desc: 'Take over any real NBA team from any season since 1946. Real rosters and ratings, the full schedule, era playoffs and media. Rewrite history, and change every rule.' },
-    { id: 'career', name: 'Player Career', desc: 'Live a whole life, from a kid with a ball to a Hall of Fame speech (or not). MyCareer meets BitLife, in any era.' },
+    { id: 'career', name: 'Player Career', live: true, desc: 'Create a detailed prospect in any era. Earn your skills and role, shape your playing style, handle money and relationships, and live with what the media remembers.' },
     { id: '820', name: '82-0 Challenge', live: true, desc: 'Spin a franchise and a decade, draft one real player per spot, then drop your five into any real season and see if they can run the table.' },
     { id: 'skill', name: 'Skill Draft Career', live: true, desc: 'Build one player from real players\' skills, drop him into any real draft class, sim the whole career against the real league, and get the verdict.' },
   ];
@@ -39,6 +39,7 @@ HL.App = (function () {
       if (b.dataset.mode === 'franchise') return HL.Franchise.setup();
       if (b.dataset.mode === '820') return HL.Challenge.open();
       if (b.dataset.mode === 'skill') return HL.SkillDraft.open();
+      if (b.dataset.mode === 'career') return HL.CareerUI.setup();
       const m = MODES.find(x => x.id === b.dataset.mode);
       U.toast(`<b>${esc(m.name)}</b> is in development and is coming in an upcoming milestone.`);
     });
@@ -61,7 +62,7 @@ HL.App = (function () {
       e.stopPropagation();
       const L = await HL.Saves.load(el.dataset.load);
       U.closeSheet();
-      if (L) HL.Franchise.open();
+      if (L) (L.mode === 'career' && L.career ? HL.CareerUI : HL.Franchise).open();
     });
     m.querySelectorAll('[data-del]').forEach(el => el.onclick = async (e) => {
       e.stopPropagation();
@@ -78,7 +79,7 @@ HL.App = (function () {
         HL.League.set(L);
         HL.RNG.setSeed(L.rngSeed || Date.now());
         U.closeSheet();
-        HL.Franchise.open();
+        (L.mode === 'career' && L.career ? HL.CareerUI : HL.Franchise).open();
       } catch (err) { U.toast('That file is not a valid save.'); }
     };
   }

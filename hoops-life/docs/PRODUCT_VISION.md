@@ -80,7 +80,7 @@ Depth is optional: Simple/Detailed presets and individual automation toggles sho
 - Media Day includes portraits and composed short-video, thumbnail and quote formats, washed takes, bad clips, corrections, responses, backlash and redemption. Continue expanding the context and consequences beyond the existing batch.
 - Era adaptation covers both language and format: old newspaper/radio presentation, monochrome and subtle grain/static for the 60s; period TV/cable, then blogs/forums, then social/video/podcasts. No modern social counters or voices pasted into early eras.
 - Aim for a polished sports/broadcast game at desktop and mobile widths, using team colors, deliberate typography and clear hierarchy. Avoid a flat wall of lists, generic card grids or endless unrelated buttons.
-- Research relevant games and sports UI; NFL Perry is a requested visual reference that still needs direct inspection or a usable reference.
+- Research relevant games and sports UI; The supplied NFL Perry screenshots guide contrast, textured stages and focused reveals; BitLife guides personal choices and consequence dialogs.
 - Use real player photos and team logos where available, with local overrides and reliable fallbacks. Ask for image-generation prompts when pieces cannot be sourced. Compose jerseys, backgrounds, trophies, matchup graphics, trade/award posters and celebration layers from this save's data.
 - Make decisions and milestones satisfying through reels, card deals/flips, rarity treatments, lottery reveals, count-ups, live tickers, bursts and banners. Effects should support an enjoyable loop and understandable stakes.
 
@@ -96,7 +96,7 @@ Keep the prior queued order in ROADMAP.md; this context import does not authoriz
 
 Verify relevant game flows in a browser and meaningful simulation effects headlessly. Maintain era calibration checks, save/reload coverage, scenario near-miss checks and balance measurements. The original full-vision targets included long season/career runs, rare GOAT outcomes, media diversity, integrity escalation and complete Simple/Detailed careers; those are goals to validate as their systems exist, not claims that they currently pass.
 
-Current limits: full Player Career and Live Game are unbuilt, Franchise front-office depth remains incomplete, and most proposed scenarios still need systems. See the roadmap and ledger for exact progress rather than inferring completion from the transcript.
+Current limits: the first NBA Player Career is playable, while pre-NBA life, wider Career systems and Live Game remain unfinished, Franchise front-office depth remains incomplete, and most proposed scenarios still need systems. See the roadmap and ledger for exact progress rather than inferring completion from the transcript.
 
 
 ## Latest user reference corrections (2026-10-10)

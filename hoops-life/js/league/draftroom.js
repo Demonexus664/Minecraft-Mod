@@ -2,7 +2,7 @@
 window.HL = window.HL || {};
 HL.DraftRoom = (function () {
   const R = HL.RNG, fail = reason => ({ ok: false, reason });
-  const manager = L => L.userTeamId != null && L.settings.role !== 'coach';
+  const manager = L => L.userTeamId != null && ['gm','owner'].includes(L.settings.role || 'gm');
   const available = d => d.prospects.filter(p => !d.selections.some(s => s.pid === p.id));
   const current = L => L.draftRoom?.slots[L.draftRoom.selections.length] || null;
   const prospect = (L, pid) => L.draftRoom?.prospects.find(p => p.id === pid);

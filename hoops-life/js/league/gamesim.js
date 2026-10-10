@@ -188,7 +188,7 @@ HL.DEFAULT_RULES = () => ({
     // Relationships can affect focus; keep the influence modest and preserve the
     // calibrated baseline (70 morale), including older players without this field.
     const focus = HL.clamp(1 + ((p.morale ?? 70) - 70) * 0.0005, 0.97, 1.015);
-    return p.attrs[key] * (0.86 + 0.14 * Math.min(1, e + 0.15)) * focus;
+    return p.attrs[key] * (0.86 + 0.14 * Math.min(1, e + 0.15)) * focus * (p.careerFitness ?? 1);
   };
   // How dangerous a scorer is (used for the on-floor pecking order).
   const offRating = (p) => {

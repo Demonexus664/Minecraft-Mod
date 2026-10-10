@@ -317,6 +317,7 @@ HL.League = {};
     if (!covered) HL.News && HL.News.game && HL.News.game(L, g, res, playoffs);
     HL.MediaDay && HL.MediaDay.afterGame(L, res);
     HL.World && HL.World.afterGame(L, g, res);
+    HL.Career && HL.Career.afterGame(L, g, res);
   }
 
   function healPlayer(p) {
@@ -333,7 +334,7 @@ HL.League = {};
     let guard = 0;
     while (healthy(tid).length < 8 && guard++ < 8) {
       const t = L.teams[tid];
-      let p = Object.values(L.players).filter(x => x.teamId == null && !x.retired && !x.away && (!x.injury || x.injury.games <= 0)).sort((a, b) => b.ovr - a.ovr)[0];
+      let p = Object.values(L.players).filter(x => x.id !== L.career?.pid && x.teamId == null && !x.retired && !x.away && (!x.injury || x.injury.games <= 0)).sort((a, b) => b.ovr - a.ovr)[0];
       if (!p) {
         const pos = R.pick(HL.POSITIONS);
         p = HL.createPlayer({ name: `${R.pick(HL.NAMES.first)} ${R.pick(HL.NAMES.last)}`, pos, age: R.int(23, 31), height: { PG: 75, SG: 77, SF: 79, PF: 81, C: 83 }[pos] + R.int(-1, 1), ovr: R.int(55, 63), arch: R.pick(['3d', 'twoway', 'rimbig', 'defguard', 'sniper']), real: false, season: L.season, potential: 0 });
@@ -346,12 +347,13 @@ HL.League = {};
       L.transactions.push({ season: L.season, day: L.day, type: 'hardship', teamId: tid, pid: p.id });
       HL.News && HL.News.hardship && HL.News.hardship(L, t, p);
     }
-    const hs = HL.League.teamPlayers(tid).filter(p => p.hardship);
+    const hs = HL.League.teamPlayers(tid).filter(p => p.hardship && p.id !== L.career?.pid);
     if (hs.length && healthy(tid).length - hs.length >= 9) for (const p of hs) { p.teamId = null; p.hardship = false; }
   }
 
   // ---------- Regular season ----------
   HL.League.simDay = function () {
+    if (HL.Career && L.career && L.phase !== 'offseason') HL.Career.beforeDay(L);
     if (L.phase !== 'regular') return HL.League.simPostseasonDay();
     // Media day happens before the opener; social threads and follow-ups move day by day.
     if (HL.MediaDay) { if (L.day === 0) HL.MediaDay.run(L); HL.MediaDay.tick(L); }
@@ -728,6 +730,7 @@ HL.League = {};
     const diff = { rookie: 1.2, pro: 1, allstar: 0.9, hof: 0.8 }[L.settings.difficulty] || 1;
     const realRows = real ? new Map(HL.History.seasonRows(String(next)).map(r => [r.pid, r])) : null;
     for (const p of Object.values(L.players)) {
+      if (L.career && p.id === L.career.pid) continue;
       if (p.retired && !(real && p.hid && realRows.has(p.hid) && p.retiredBecause === 'history')) continue;
       const isNew = p.draft && p.draft.year === next;
       if (isNew) continue;
@@ -773,6 +776,7 @@ HL.League = {};
     for (const p of Object.values(L.players)) if (p.hardship) { p.hardship = false; p.teamId = null; }
     const fa = [];
     for (const p of Object.values(L.players)) {
+      if (L.career && p.id === L.career.pid) continue;
       if (p.retired) continue;
       if (p.teamId == null) { fa.push(p); continue; }
       if (p.contract.exp <= season) {
@@ -792,7 +796,7 @@ HL.League = {};
         setContract(p, next);
       }
       // Preserve negotiated roster moves ahead of automatic depth signings and draft additions.
-      const priority = p => p.userRosterMove ? (p.draft?.year === next ? 2 : 1) : 0;
+      const priority = p => L.career && p.id === L.career.pid ? 3 : p.userRosterMove ? (p.draft?.year === next ? 2 : 1) : 0;
       const r = roster().sort((a, b) => priority(a) - priority(b) || a.ovr - b.ovr);
       while (r.length > 15) { const cut = r.shift(); cut.teamId = null; }
     }

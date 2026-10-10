@@ -13,6 +13,8 @@ Verified HTTPS downloads on 2026-10-10:
 
 Other existing NBA players use their NBA IDs and the live NBA headshot URL. Missing photos use neutral initials, with no illustrated person. Latest headshots are archive/source photographs, not season-specific historical evidence. Headshot and logo rights remain with their original owners.
 
+Additional verified HTTPS NBA downloads on 2026-10-09 (local date): Michael Jordan (`893.png`), Sam Perkins (`64.png`), Michael Porter Jr. (`1629008.png`), and Day’Ron Sharpe (`1630549.png`), from the same `https://cdn.nba.com/headshots/nba/latest/1040x760/` path. Original PNGs are bundled under `media/players/` as archive headshots so draft/relationship examples can show real people offline; no image edits or certificate bypasses were used.
+
 ## Generated game artwork
 
 `media/players/stephen-curry-lal-concept.png` is a generated fictional Lakers portrait based on Curry’s NBA source headshot. It demonstrates an optional full alternate-team cutout and does not assert a real transaction.
