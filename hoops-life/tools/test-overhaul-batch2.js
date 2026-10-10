@@ -19,7 +19,7 @@ const skillReturn='return { open: () => { st = null; cache = null; render(); }';
 const challengeReturn='return { open: () => { st = null; render(); }';
 assert.ok(skill.includes(skillReturn)&&challenge.includes(challengeReturn));
 vm.runInContext(skill.replace(skillReturn,
- 'return { __overhaul2:{leagueFor,simSeason,customizeRole,finishAgenda,rememberRival,rivalryView,ROLES},open:()=>{st=null;cache=null;render();}'),
+ 'return { __overhaul2:{leagueFor,simSeason,simSeasonInteractive,customizeRole,finishAgenda,rememberRival,rivalryView,ROLES},open:()=>{st=null;cache=null;render();}'),
  ctx,{filename:'skilldraft.js'});
 vm.runInContext(challenge.replace(challengeReturn,
  'return { __overhaul2:{gauntletSchedule,newRun,state:()=>st},open:()=>{st=null;render();}'),
@@ -121,4 +121,47 @@ test('swapping roles or replaying a season cannot stack usage tendency boosts',(
  assert.equal(p.tend.usage,first,'role bonuses do not stack each time a mode is selected');
  career.customizeRole(p,'balanced');
  assert.equal(p.tend.usage,base.usage,'switching back to balanced restores the natural role');
+});
+
+test('interactive NBA campaign pauses at live third-quarter scores and applies real tactics',async()=>{
+ HL.RNG.setSeed(1801);
+ const L=await career.leagueFor(2026),club=L.teams[0];
+ const donor=HL.League.teamPlayers(club.id).sort((a,b)=>b.ovr-a.ovr)[0];
+ const me=HL.createPlayer({name:'Live Decision Test',pos:'PG',age:25,height:75,ovr:88,
+  arch:'scorer',real:false,season:2026});
+ me.id=999999;me.teamId=club.id;me.attrs={...donor.attrs};
+ me.ovr=HL.computeOvr(me.attrs,me.pos);
+ const original=HL.GameNights;
+ const choices=[];
+ HL.GameNights={
+  PLANS:{
+   takeover:{title:'Call your own number',pace:62,focus:'star',defense:'man',crash:52,usage:1.27,wear:2},
+   lockdown:{title:'Win with stops',pace:31,focus:'balanced',defense:'switch',crash:73,usage:.95,wear:1}
+  },
+  apply(team,star,id,record){
+   const plan=this.PLANS[id]||this.PLANS.takeover;
+   Object.assign(team.strategy,{pace:plan.pace,focus:plan.focus,defense:plan.defense,
+     crash:plan.crash,usageLock:{[star.id]:plan.usage}});
+   if(record){record.title=plan.title;record.wear=plan.wear;}
+   return plan;
+  },
+  prompt:async context=>{
+   choices.push(context);
+   return context.type==='game-night-adjustment'?'lockdown':'takeover';
+  }
+ };
+ try{
+  const result=await career.simSeasonInteractive(L,club,me,0,'scorer');
+  const pre=choices.filter(x=>x.type==='game-night');
+  const live=choices.filter(x=>x.type==='game-night-adjustment');
+  assert.equal(pre.length,4,'four featured game-night setups');
+  assert.equal(live.length,4,'live third-quarter decisions in all four featured games');
+  assert.ok(live.every(x=>Number.isFinite(x.ours)&&Number.isFinite(x.theirs)));
+  assert.ok(result.gameNights.every(x=>x.adjustment&&x.adjustment.title==='Win with stops'));
+  assert.ok(result.gameNights.every(x=>x.points>0&&x.allowed>0));
+  assert.ok(Number.isFinite(result.ppg));
+  assert.equal(result.w+result.l,L.games);
+ } finally {
+  HL.GameNights=original;
+ }
 });
