@@ -139,3 +139,39 @@
 @media(prefers-reduced-motion:reduce){.gf-overlay,.gf-result,.gf-result .gf-portrait,.gf-portrait::before{animation:none!important}}
 html[data-fx-level=off] .gf-overlay,html[data-fx-level=off] .gf-result,
 html[data-fx-level=off] .gf-result .gf-portrait,html[data-fx-level=off] .gf-portrait::before{animation:none!important}
+
+
+/* Tactical DNA Codex: ability descriptions are visible, not hidden in stat boosts. */
+.dna-codex{background:radial-gradient(ellipse at 90% 0%,rgba(116,97,205,.14),transparent),
+ linear-gradient(155deg,#161e32,#0d1524);}
+.dna-codex>.body{gap:15px;}
+.dna-codex details{border:1px solid rgba(147,168,222,.23);border-radius:11px;
+ background:rgba(12,20,34,.65);padding:12px;}
+.dna-codex summary{cursor:pointer;color:#cbd7f5;font:850 13px var(--body);
+ letter-spacing:.075em;text-transform:uppercase;padding:6px;}
+.dna-index-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.dna-index-summary>div{background:rgba(48,57,86,.54);padding:14px 8px;border-radius:9px;
+ border:1px solid rgba(164,191,247,.2);display:flex;flex-direction:column;align-items:center;}
+.dna-index-summary b{font:900 35px var(--display);color:#fff;}
+.dna-index-summary span{font:800 11px var(--body);color:#9fb2d0;text-transform:uppercase;}
+.dna-index-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:9px;padding:8px 0;}
+.dna-index-entry{padding:15px;border:1px solid #9cb2ed50;background:
+ radial-gradient(ellipse at top right,#ab9dff17,transparent 65%),#182336;
+ border-radius:11px;min-width:0;}
+.dna-index-entry.locked{opacity:.68;filter:saturate(.65);background:#131c2b;}
+.dna-index-top{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dna-index-top>b{font:900 19px/1 var(--display);text-transform:uppercase;letter-spacing:.03em;}
+.dna-index-rank{font:800 9px var(--body);color:#f5d09e;text-transform:uppercase;
+ border:1px solid #efb58258;padding:5px;border-radius:5px;white-space:nowrap;}
+.dna-index-entry.locked .dna-index-rank{color:#91a2ba;border-color:#a0aec849;}
+.dna-index-entry>p{font:450 12px/1.5 var(--body);color:#bbc6dd;margin:11px 0;}
+.dna-index-tools{display:grid;gap:7px;}
+.dna-index-tools>div{display:flex;flex-direction:column;gap:4px;border-left:2px solid #8db6ff93;
+ padding:5px 8px;background:#b9c7ef0a;}
+.dna-index-tools strong{font:900 13px var(--display);text-transform:uppercase;color:#e7ecff;}
+.dna-index-tools span{font:450 11px/1.4 var(--body);color:#9eb2cf;}
+.dna-index-tools small{font:800 10px var(--body);color:#d8baff;}
+.dna-index-trigger{display:block;color:#92a5c1;font:600 10px/1.4 var(--body);
+ margin-top:11px;}
+@media(max-width:680px){.dna-index-summary b{font-size:27px}
+ .dna-index-summary span{font-size:9px}.dna-index-grid{grid-template-columns:1fr}}
