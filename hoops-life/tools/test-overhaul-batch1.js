@@ -172,3 +172,25 @@ test('Season contracts pay modest training rewards only when real thresholds are
   assert.match(h.rolePanel(c),/data-role="scorer"/);
   assert.match(h.rolePanel(c),/data-agenda/);
 });
+
+test('Visual effects intensity persists between screens and can disable motion',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'../js/core/fx.js'),'utf8');
+  const prefs=new Map();
+  const root={attrs:{},setAttribute(k,v){this.attrs[k]=v;}};
+  const sandbox={
+    HL:{UI:{esc:String}},document:{documentElement:root},
+    localStorage:{getItem:k=>prefs.get(k)||null,setItem:(k,v)=>prefs.set(k,v)},
+    window:{matchMedia:()=>({matches:false})},setTimeout:()=>{},console
+  };
+  sandbox.window.HL=sandbox.HL;
+  vm.runInNewContext(src,sandbox,{filename:'fx.js'});
+  const fx=sandbox.HL.FX;
+  assert.equal(fx.fxLevel(),'full');
+  fx.setFxLevel('lite');
+  assert.equal(root.attrs['data-fx-level'],'lite');
+  assert.equal(fx.fxLevel(),'lite');
+  assert.match(fx.soundToggle(),/value="lite" selected/);
+  fx.setFxLevel('off');
+  assert.equal(fx.fxLevel(),'off');
+  assert.equal(root.attrs['data-fx-level'],'off');
+});
