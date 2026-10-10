@@ -38,6 +38,14 @@ HL.GameNights=(function(){
   const {game,total,record,opp}=context,played=record.w+record.l;
   const percentage=played?record.w/played:.5;
   const elite=(opp?.players||[]).filter(p=>p.ovr>=88).length;
+  if(context.type==='game-night-adjustment'){
+    const d=(context.ours||0)-(context.theirs||0);
+    return {title:d<=-10?'THE COMEBACK DECISION':d>=10?'PROTECT THE LEAD':'ONE GAME, TWO HALVES',
+      sub:'Third-quarter adjustment · '+(d>0?'Up '+d:d<0?'Down '+Math.abs(d):'Score tied'),
+      story:d<=-10?'Your opponent exposed weaknesses in the first half. Change the coverage or trust your original plan.':
+        d>=10?'You built an advantage. The other team is preparing its answer. Make your next move.':
+        'The first half did not settle anything. How do you approach the remaining possessions?'};
+  }
   if(game===1)return {title:'THE FIRST NIGHT',sub:'The debut sets the tone',
     story:'The cameras are following every warmup. A new face is walking onto an NBA court for the first time.'};
   if(game<=21&&percentage<.48)return {title:'THE LOCKER ROOM IS RESTLESS',sub:'Change the early narrative',
@@ -71,16 +79,21 @@ HL.GameNights=(function(){
    '<p class="game-night-dek">'+esc(beat.sub)+'</p><p>'+esc(beat.story)+'</p>'+
    '<p>The '+esc(team?.name||'team')+' are '+record.w+'-'+record.l+
    '. Tonight: '+esc(opp?.city||'')+' '+esc(opp?.name||'the visitors')+'.</p>'+
+   (context.type==='game-night-adjustment'?'<div class="game-night-live"><span>'+esc(team?.abbr||'MY TEAM')+
+     '</span><strong>'+Number(context.ours||0)+' – '+Number(context.theirs||0)+'</strong><span>'+
+      esc(opp?.abbr||'OPP')+'</span></div>':'')+
    '<div class="game-night-opposition"><b>SCOUTING TAPE</b><span>'+
    (top.length?top.map(p=>esc(p.name)+' · '+p.ovr+' OVR').join(' / '):
     'The opponent is preparing its regular rotation.')+'</span></div>'+
-   '</div></div><div class="caps">CHOOSE YOUR GAME PLAN · CHANGES THE NEXT 20 GAMES</div>'+
+   '</div></div><div class="caps">'+(context.type==='game-night-adjustment'?
+      'YOUR RESPONSE CHANGES THE REMAINING POSSESSIONS':'CHOOSE YOUR GAME PLAN · AFFECTS THE NEXT STRETCH OF GAMES')+'</div>'+
    '<div class="game-night-options">'+Object.entries(PLANS).map(([id,p])=>
     '<button class="game-night-choice" data-game-night="'+id+'"><span class="game-night-tag">'+
     esc(p.slogan)+'</span><strong>'+esc(p.title)+'</strong><p>'+esc(p.flavor)+
     '</p><div class="game-night-effect"><span>'+esc(p.payoff)+'</span><small>'+
     esc(p.risk)+'</small></div></button>').join('')+'</div>'+
    '<footer><span>Every outcome comes from the actual possession simulator.</span>'+
+   (context.type==='game-night-adjustment'?'<button data-night-keep class="btn small">Keep my current plan</button>':'')+
    '<button data-night-default class="btn small">Stay balanced</button></footer></div>';
   document.body.appendChild(ref);document.body.style.overflow='hidden';
   HL.FX?.sfx?.arena?.('clutch');
@@ -91,11 +104,12 @@ HL.GameNights=(function(){
     if(finished)return;finished=true;document.removeEventListener('keydown',key);
     document.body.style.overflow=oldScroll;ref.remove();
     if(prior?.isConnected&&prior.focus)prior.focus();
-    resolve(id==='trust:automatic'?id:PLANS[id]?id:'trust');
+    resolve(id==='keep'||id==='trust:automatic'?id:PLANS[id]?id:'trust');
    }
    document.addEventListener('keydown',key);
    ref.querySelectorAll('[data-game-night]').forEach(el=>el.onclick=()=>finish(el.dataset.gameNight));
    ref.querySelector('[data-night-default]').onclick=()=>finish('trust');
+   ref.querySelector('[data-night-keep]')?.addEventListener('click',()=>finish('keep'));
    ref.querySelector('[data-night-skip]').onclick=()=>finish('trust:automatic');
    ref.querySelector('[data-game-night]')?.focus();
   });
