@@ -27,7 +27,7 @@ HL.SkillDraft = (function () {
   // Debut: a real draft year. Random debuts leave room for a full career inside the real data.
   const randomDebut = () => R.int(1956, HL.LATEST_SEASON - 14);
   function newRun(mode, debut) {
-    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 1, era: 1, stat: 1 }, career: null, name: 'Your Player' };
+    st = { mode, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 1, era: 1, stat: 1 }, career: null, name: 'Your Player', pos: 'auto' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -91,7 +91,7 @@ HL.SkillDraft = (function () {
     // Position: whichever spot this body could play where the skill set rates best.
     const fits = { PG: [0, 77], SG: [74, 79], SF: [77, 81], PF: [79, 83], C: [80, 99] };
     const open = Object.keys(fits).filter(k => height >= fits[k][0] && height <= fits[k][1]);
-    const pos = (open.length ? open : [height < 74 ? 'PG' : 'C']).sort((a, b) => HL.computeOvr(attrs, b) - HL.computeOvr(attrs, a))[0];
+    const pos = st.pos && st.pos!=='auto' ? st.pos : (open.length ? open : [height < 74 ? 'PG' : 'C']).sort((a,b)=>HL.computeOvr(attrs,b)-HL.computeOvr(attrs,a))[0];
     return { attrs, height, weight, pos };
   }
 
@@ -613,7 +613,7 @@ HL.SkillDraft = (function () {
     return `<section class="block"><div class="body stack"><h3>Your player is built</h3>
       <div class="setting"><div class="grow"><b>Name</b></div><input type="text" value="${esc(st.name)}" data-name maxlength="30"></div>
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
-      <div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim the whole career</button></div>
+      <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Changes lineup role, positional OVR and matchups. All five spots are available for unusual builds.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto · best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p}</option>`).join('')}</select></div><div class="row wrap" style="gap:10px"><button class="btn go big" data-begin="season">Play it season by season</button><button class="btn big" data-begin="auto">Sim the whole career</button></div>
       <div class="t3 sm">Season by season: see every season's numbers, awards and playoff run, then choose free agency offers, ask for trades or retire. Simming the whole career makes those calls for you.</div>
     </div></section>`;
   }
@@ -829,6 +829,7 @@ HL.SkillDraft = (function () {
     app.querySelectorAll('.hand .gcard').forEach(card => card.onclick = () => { if (!card.classList.contains('down')) take(+card.dataset.hand); });
     FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
+    const position=app.querySelector('[data-position]'); if(position) position.onchange=()=>{st.pos=position.value;render();};
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
     app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
