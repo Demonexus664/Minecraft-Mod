@@ -319,12 +319,17 @@ HL.SkillDraft = (function () {
       if(c?.cancelled)return null;
       HL.League.set(futureWorld);
       futureWorld.settings.history='generated';
+      const previousRatings=new Map(Object.values(futureWorld.players).map(p=>[p.id,p.ovr]));
       // Feed the league's existing offseason engine plausible previous records.
       for(const t of futureWorld.teams){t.w=t.real.w;t.l=t.real.l;}
       futureWorld.phase='offseason';
       const next=HL.League.advanceToNextSeason();
       if(next?.ok===false)throw new Error(next.reason||'League offseason could not advance');
       if(futureWorld.season<=HL.LATEST_SEASON)throw new Error('Future league failed to advance');
+      futureWorld._careerDevelopment=Object.values(futureWorld.players).filter(p=>
+        !p.retired&&p.teamId!=null&&previousRatings.has(p.id)).map(p=>
+        ({name:p.name,ovr:p.ovr,change:p.ovr-previousRatings.get(p.id)}))
+        .sort((a,b)=>b.change-a.change);
       projectFutureSeason(futureWorld);
     }
     cache={yr,L:futureWorld};
@@ -476,6 +481,17 @@ HL.SkillDraft = (function () {
     }
     const res = simSeason(L, team, me, missed);
     const s = { age: c.age, yr: c.yr, key: String(L.season), team: metaOf(team), ovr: me.ovr, salary: c.contract ? c.contract.amount : 0, injury, ...res };
+    if(L.season>HL.LATEST_SEASON){
+      s.leagueRecap={
+        rookies:Object.values(L.players).filter(p=>p.draft?.year===c.yr&&p.teamId!=null)
+          .sort((a,b)=>b.ovr-a.ovr).slice(0,5).map(p=>
+            ({name:p.name,ovr:p.ovr,team:L.teams[p.teamId]?.name||'NBA'})),
+        rising:(L._careerDevelopment||[]).filter(p=>p.change>0).slice(0,4),
+        scorers:(L._careerAwardField||[]).filter(p=>p.qual)
+          .sort((a,b)=>b.row.pts-a.row.pts).slice(0,5)
+          .map(p=>({name:p.name,ppg:p.row.pts.toFixed(1)}))
+      };
+    }
     c.seasons.push(s);
     addLine(c.totals, res.line); addLine(c.ptotals, res.pline);
     c.earnings += s.salary;
@@ -975,7 +991,7 @@ HL.SkillDraft = (function () {
   function debutSelect() {
     const years = [];
     for (let y = HL.LATEST_SEASON; y >= 1947; y--) years.push(y);
-    return `<select data-debut>${years.map(y => `<option value="${y}" ${y === st.debut ? 'selected' : ''}>${y} draft · ${yrLabel(y)} season${y > HL.LATEST_SEASON - 15 ? ` (later years replay ${yrLabel(HL.LATEST_SEASON)})` : ''}</option>`).join('')}</select>`;
+    return `<select data-debut>${years.map(y => `<option value="${y}" ${y === st.debut ? 'selected' : ''}>${y} draft · ${yrLabel(y)} season${y > HL.LATEST_SEASON - 15 ? ' (future seasons generate rookies and evolving rosters)' : ''}</option>`).join('')}</select>`;
   }
 
   function teamBand(c) {
@@ -1063,6 +1079,11 @@ HL.SkillDraft = (function () {
     const extras = [cnt.g40 ? plural(cnt.g40, '40-point game') : '', cnt.g50 ? plural(cnt.g50, '50-point game') : '', cnt.td ? plural(cnt.td, 'triple-double') : '', cnt.dd ? plural(cnt.dd, 'double-double') : ''].filter(Boolean);
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
+      ${s.leagueRecap ? `<details open><summary>League evolution · new rookies, rising players & scoring rivals</summary>
+        <div class="cols c2" style="gap:12px">
+        <div class="stack"><div class="caps">New rookie class</div>${s.leagueRecap.rookies.map(p=>`<div class="kv"><span>${esc(p.name)} · ${esc(p.team)}</span><b>${p.ovr} OVR</b></div>`).join('')||'<div class="t3">No rookies in this class</div>'}</div>
+        <div class="stack"><div class="caps">Biggest developments</div>${s.leagueRecap.rising.map(p=>`<div class="kv"><span>${esc(p.name)}</span><b>+${p.change} → ${p.ovr}</b></div>`).join('')||'<div class="t3">No significant progress this offseason</div>'}</div>
+        <div class="stack"><div class="caps">Scoring-title competitors</div>${s.leagueRecap.scorers.map(p=>`<div class="kv"><span>${esc(p.name)}</span><b>${p.ppg} PPG</b></div>`).join('')||'<div class="t3">No eligible scorers</div>'}</div></div></details>` : ''}
       <details><summary>${s.yr<1979?'No 3-point line · ':''}${yrLabel(s.yr)} era rules</summary><div class="t3 sm">${HL.eraContext(s.yr).facts.map(esc).join(' · ')}</div></details>
       <div class="cols c2"><div class="stack" style="gap:6px">
           <div class="caps">Team</div>
@@ -1091,7 +1112,7 @@ HL.SkillDraft = (function () {
       if (s.minors) return `<tr><td class="l">${yrLabel(s.yr)}</td><td>${s.age}</td><td class="l t3">Minor leagues</td><td>${U.rating(s.ovr)}</td><td colspan="12"></td></tr>`;
       const l = s.line, g = s.g || 1;
       const po = !s.made ? '<span class="t3">—</span>' : s.champion ? '<b class="win">Won title</b>' : esc(s.series.filter(x => !x.bye).slice(-1)[0].name.replace('Conference ', 'Conf. ').replace('Division ', 'Div. '));
-      return `<tr><td class="l">${yrLabel(s.yr)}${s.key !== String(s.yr) ? ' <span class="t3 xs" title="Replays the latest real league">*</span>' : ''}</td><td>${s.age}</td><td class="l"><div class="row">${U.logo(s.team, 20)} ${esc(s.team.name)}</div></td><td>${U.rating(s.ovr)}</td><td>${s.g}</td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl / g).toFixed(1)}</td><td>${(l.blk / g).toFixed(1)}</td><td>${pctOf(l.fgm, l.fga)}</td><td>${pctOf(l.tpm, l.tpa)}</td><td>${s.w}-${s.l}</td><td class="l sm">${po}</td><td class="l sm">${s.awards.filter(a => awardName(a) !== 'Champion').map(a => `<span class="tag ${['MVP', 'Finals MVP'].includes(awardName(a)) ? 'team' : ''}" ${a.over ? `title="Over ${esc(a.over)}"` : ''}>${esc(awardName(a))}</span>`).join(' ')}</td></tr>`;
+      return `<tr><td class="l">${yrLabel(s.yr)}${s.leagueSource==='Generated' ? ' <span class="t3 xs" title="Evolving generated-league season">◆</span>' : ''}</td><td>${s.age}</td><td class="l"><div class="row">${U.logo(s.team, 20)} ${esc(s.team.name)}</div></td><td>${U.rating(s.ovr)}</td><td>${s.g}</td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl / g).toFixed(1)}</td><td>${(l.blk / g).toFixed(1)}</td><td>${pctOf(l.fgm, l.fga)}</td><td>${pctOf(l.tpm, l.tpa)}</td><td>${s.w}-${s.l}</td><td class="l sm">${po}</td><td class="l sm">${s.awards.filter(a => awardName(a) !== 'Champion').map(a => `<span class="tag ${['MVP', 'Finals MVP'].includes(awardName(a)) ? 'team' : ''}" ${a.over ? `title="Over ${esc(a.over)}"` : ''}>${esc(awardName(a))}</span>`).join(' ')}</td></tr>`;
     }).join('');
     const foot = T.g ? `<tfoot><tr><td class="l" colspan="4">Career</td><td>${T.g}</td><td>${pg(T, 'min').toFixed(1)}</td><td>${pg(T, 'pts').toFixed(1)}</td><td>${pg(T, 'reb').toFixed(1)}</td><td>${pg(T, 'ast').toFixed(1)}</td><td>${pg(T, 'stl').toFixed(1)}</td><td>${pg(T, 'blk').toFixed(1)}</td><td>${pctOf(T.fgm, T.fga)}</td><td>${pctOf(T.tpm, T.tpa)}</td><td colspan="3"></td></tr></tfoot>` : '';
     return `<section class="block"><header><h3>Career</h3><span class="ml-auto t3 sm">${Math.round(T.pts).toLocaleString()} points · ${U.money(c.earnings)} earned</span></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Season</th><th>Age</th><th class="l">Team</th><th>OVR</th><th>GP</th><th>MPG</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG%</th><th>3P%</th><th>Record</th><th class="l">Playoffs</th><th class="l">Honors</th></tr></thead><tbody>${rows}</tbody>${foot}</table></div></div></section>`;
@@ -1155,7 +1176,7 @@ HL.SkillDraft = (function () {
       <div class="dossier-two"><article><div class="caps">The media argument</div><p>${esc(film.debate[0])}</p></article><article><div class="caps">The skeptical take</div><p>${esc(film.debate[1])}</p></article></div>
       ${top.length?`<div class="caps">The most explosive scoring years</div><div class="dossier-grid">${top.map(s=>`<article class="dossier-honor"><div class="caps">${year(s.yr)} · ${esc(s.team.name)}</div><h3>${(s.ppg||0).toFixed(1)} PPG</h3><p>${(s.rpg||0).toFixed(1)} rebounds · ${(s.apg||0).toFixed(1)} assists · ${s.w}-${s.l} record</p></article>`).join('')}</div>`:''}
       ${turns.length?`<div class="caps">Turning points</div><div class="dossier-turns">${turns.map((x,i)=>`<div class="dossier-turn"><b>${String(i+1).padStart(2,'0')}</b><span>${x}</span></div>`).join('')}</div>`:''}
-      <details><summary>How this verdict was judged</summary><p>Historical rank compares weighted awards and long-term production to real NBA career baselines. Special titles require actual simulated output, sustained seasons and, where noted, modeled scouting traits. Neither an individual 99 rating nor first place on a single score automatically establishes GOAT status.</p><p>${changed} historical award or title outcomes changed. Seasons beyond the latest verified archive replay that archive’s league and are alternate-history projections, not actual historical results.</p></details>
+      <details><summary>How this verdict was judged</summary><p>Historical rank compares weighted awards and long-term production to real NBA career baselines. Special titles require actual simulated output, sustained seasons and, where noted, modeled scouting traits. Neither an individual 99 rating nor first place on a single score automatically establishes GOAT status.</p><p>${changed} historical award or title outcomes changed. Future seasons evolve through generated rookie drafts, development, retirements and roster changes; their simulated outcomes are alternate-history projections, not verified real results.</p></details>
     </div></section>`;
   }
 
