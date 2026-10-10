@@ -11,7 +11,7 @@ Verified HTTPS downloads on 2026-10-10:
 - `media/players/lal-logo.png`: ESPN, https://a.espncdn.com/i/teamlogos/nba/500/lal.png
 - `media/players/gsw-logo.png`: ESPN, https://a.espncdn.com/i/teamlogos/nba/500/gs.png
 
-Other existing NBA players use their NBA IDs and the live NBA headshot URL. Missing photos use neutral initials, with no illustrated person. Latest headshots are archive/source photographs, not season-specific historical evidence. Headshot and logo rights remain with their original owners.
+Players without a bundled portrait use their NBA IDs and the live NBA headshot URL. Missing photos use neutral initials, with no illustrated person. Latest headshots are archive/source photographs, not season-specific historical evidence. Headshot and logo rights remain with their original owners.
 
 Additional verified HTTPS NBA downloads on 2026-10-09 (local date): Michael Jordan (`893.png`), Sam Perkins (`64.png`), Michael Porter Jr. (`1629008.png`), and Day’Ron Sharpe (`1630549.png`), from the same `https://cdn.nba.com/headshots/nba/latest/1040x760/` path. Original PNGs are bundled under `media/players/` as archive headshots so draft/relationship examples can show real people offline; no image edits or certificate bypasses were used.
 
@@ -39,3 +39,13 @@ window.HL_ASSETS = {
 ```
 
 Season + team photo overrides take priority, followed by team photo overrides, a generic player source photograph and the NBA CDN. A full matching team photo does not get a second jersey drawn over it. Missing custom photographs retry the NBA source; a missing jersey leaves the real source portrait visible. The cutout should match the provided transparent garment canvas/framing. Number changes update the separate layer, so no per-player/per-number jersey image is required.
+
+## Expanded local portrait library (2026-10-09 local date)
+
+`data/portraits.js` adds 596 unmodified NBA CDN archive portraits under `media/players/library/`. Small roster portraits use 260×190 originals; selected historical stars use 1040×760 originals. The download checked 1,020 additional candidates and rejected 424 unavailable or generic-placeholder results. Identical files shared by three or more distinct NBA IDs were excluded. Older curated sharp portraits and custom team/season overrides retain priority.
+
+Four further unmodified ESPN source PNGs are bundled for Kobe Bryant (ESPN ID 110), Shaquille O’Neal (614), Tim Duncan (215) and Kevin Garnett (261), from `https://a.espncdn.com/i/headshots/nba/players/full/<id>.png`. These were visually inspected as source images and through the game renderer. The expanded library therefore adds 600 photographs, for 612 bundled player portraits in total. Missing players continue to use their live source URL or neutral initials. These are source/archive portraits, not season-specific evidence or footage.
+
+`docs/portrait-sources.json` records source URL, local path, resolution, byte count and SHA-256 for all 600 additions, plus unsuccessful candidates. `node tools/test-portraits-browser.cjs` verifies every local source hash, registry mapping and browser decode, preserves the sharper Curry override, and captures desktop/mobile galleries.
+
+`data/jersey-fits.js` records person-specific garment offsets and scale where a portrait has been inspected. Other portraits use the lower default position; the .98 default scale is retained. Matching complete team photos bypass the garment. Fit settings follow the person across simulated trades and number changes. These are visual approximations for cropped bust photos; remaining portraits and historical uniform variants still need individual artwork/fit refinement.

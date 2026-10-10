@@ -446,7 +446,7 @@ HL.Franchise = (function () {
       if (filter === 'mine') items = items.filter(n => (n.teamIds || []).includes(t.id));
       if (filter === 'top') items = items.filter(n => n.importance >= 2);
       return `<div class="page-title"><h2>News</h2><div class="ml-auto">${U.seg('filter', [['all', 'All'], ['top', 'Top stories'], ['mine', esc(t.name)]], filter)}</div></div>
-        <section class="block" style="max-width:860px">${items.length ? leadStory(items[0]) + items.slice(1, 80).map(n => story(n)).join('') : '<div class="empty">No news yet. Sim some games.</div>'}</section>`;
+        ${HL.InterviewUI.panel(Lg)}<section class="block" style="max-width:860px">${items.length ? leadStory(items[0]) + items.slice(1, 80).map(n => story(n)).join('') : '<div class="empty">No news yet. Sim some games.</div>'}</section>`;
     },
 
     mediaday() {
@@ -719,7 +719,7 @@ HL.Franchise = (function () {
 
   // ---------------- page bindings ----------------
   const BIND = {
-    news(el) { el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { pageState.filter = b.dataset.v; renderPage(); }); },
+    news(el) { HL.InterviewUI?.bind(el,L(),renderPage);el.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { pageState.filter = b.dataset.v; renderPage(); }); },
     mediaday(el) { const b = el.querySelector('[data-md-run]'); if (b) b.onclick = () => { HL.MediaDay.run(L()); renderPage(); }; },
     roster(el) { el.querySelector('[data-team-select]').onchange = (e) => { pageState.team = +e.target.value; renderPage(); }; },
     players(el) {

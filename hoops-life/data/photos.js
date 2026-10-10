@@ -1,6 +1,10 @@
 // Bundled alternate-timeline photographs. Original NBA headshots remain the fallback.
 // User assets/manifest.js overrides take priority. Record provenance in docs/IMAGE_SOURCES.md.
 window.HL_PHOTOS = {
+  'real.kevin-garnett': { src: 'media/players/kevin-garnett-archive.png', kind: 'archive' },
+  'real.tim-duncan': { src: 'media/players/tim-duncan-archive.png', kind: 'archive' },
+  'real.shaquille-o-neal': { src: 'media/players/shaquille-o-neal-archive.png', kind: 'archive' },
+  'real.kobe-bryant': { src: 'media/players/kobe-bryant-archive.png', kind: 'archive' },
   'logo.LAL': { src: 'media/players/lal-logo.png' },
   'logo.GSW': { src: 'media/players/gsw-logo.png' },
   'real.stephen-curry': { src: 'media/players/stephen-curry-archive.png', kind: 'archive' },

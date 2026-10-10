@@ -128,5 +128,6 @@ HL.World = (function () {
     }
     L.world.watches = L.world.watches.filter(w => !w.resolved || L.season <= w.season + 1).slice(-200);
   }
-  return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame };
+  function onInterview(L,p,text,delta) { memory(L,club(L,p.teamId??L.userTeamId),'interview_context',text,{fans:delta.fans||0});memory(L,person(L,p.id),'interview_context',text,{trust:delta.trust||0}); }
+  return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame, onInterview };
 })();

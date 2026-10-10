@@ -161,5 +161,5 @@ HL.UI = (function () {
     else document.documentElement.setAttribute('data-era', era);
   }
 
-  return { app, esc, icon, teamAccent, applyTeamTheme, logo, face, photo, photoImage, initials, rating, rtClass, money, pct, fx, ordinal, sheet, closeSheet, toast, runWithProgress, seg, asset, setEra };
+  return { app, esc, icon, teamAccent, applyTeamTheme, logo, face, photo, photoImage, initials, slugOf, rating, rtClass, money, pct, fx, ordinal, sheet, closeSheet, toast, runWithProgress, seg, asset, setEra };
 })();
