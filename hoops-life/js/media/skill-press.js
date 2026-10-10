@@ -69,7 +69,7 @@ HL.SkillPress=(function(){
       trust:clamp(v.trust+option.trust,0,100),
       heat:clamp(v.heat+option.heat,0,100),
       pledge:option.pledge?{kind:option.pledge,year:year(c),status:'pending',
-        rivalId:last(c)?.rival?.pid??null}:null,
+        rivalId:last(c)?.rival?.pid??null,rivalName:last(c)?.rival?.name||null}:null,
       lastYear:year(c),history:v.history.slice(-23)
     };
     const rec={year:year(c),kind:b.id,response:id,quote:option.quote,
@@ -84,9 +84,20 @@ HL.SkillPress=(function(){
     let won=false,measure='';
     if(p.kind==='30ppg'){won=s.g>=s.games*.5&&s.ppg>=30;measure=s.ppg.toFixed(1)+' PPG';}
     if(p.kind==='playoffs'){won=!!s.made;measure=s.made?'Made playoffs':'Missed playoffs';}
-    if(p.kind==='rival'){won=!!s.rival?.win;measure=s.rival?
-      (s.rival.win?'Outperformed '+s.rival.name:'Finished behind '+s.rival.name):
-      'Rival not in the field';}
+    if(p.kind==='rival'){
+      const target=s.pressTarget;
+      if(!target?.available){
+        const measure=(p.rivalName||'Challenged rival')+' did not qualify this season.';
+        c.press={...v,pledge:{...p,status:'void',measure,settled:s.yr},
+          history:v.history.map(h=>h.year===p.year&&h.outcome==='pending'?
+            {...h,outcome:'void',receipt:measure}:h)};
+        s.pressResult={kind:p.kind,won:null,measure,impact:0};
+        return s.pressResult;
+      }
+      won=target.won;
+      measure=(won?'Outperformed ':'Finished behind ')+target.name+
+        ' ('+target.myScore+' vs '+target.theirScore+' impact)';
+    }
     // The response settles against basketball, and reputation only changes
     // how much interest the next contract receives. Never modify attributes.
     const change=won?9:-11;
@@ -104,7 +115,7 @@ HL.SkillPress=(function(){
   }
   function panel(c){
     const b=beat(c);if(!b||c.done)return '';
-    const v=values(c),rec=v.history.findLast(x=>x.year===c.yr),oldReceipt=v.history.findLast(x=>x.outcome==='won'||x.outcome==='lost');
+    const v=values(c),rec=v.history.findLast(x=>x.year===c.yr),oldReceipt=v.history.findLast(x=>['won','lost','void'].includes(x.outcome));
     const buttons=choices(c).map(x=>'<button class="press-choice" data-press="'+x.id+'">'+
       '<div class="press-choice-kicker">'+(x.pledge?'HIGH STAKES · PUBLIC PROMISE':'MEDIA RESPONSE')+'</div>'+
       '<strong>'+esc(x.title)+'</strong><p>'+esc(x.quote)+'</p><small>'+esc(x.detail)+'</small></button>').join('');
@@ -121,7 +132,7 @@ HL.SkillPress=(function(){
       '<h2>'+esc(b.title)+'</h2><p>'+esc(b.prompt)+'</p>'+
       '<div class="press-meters">'+meters+'</div>'+
       '<div class="press-deals">Future contract-market perception: '+Math.round(market(c)*100)+'% of a normal offer, capped within ±9%. Ratings and possessions stay unchanged.</div></div></div>'+
-      (oldReceipt&&oldReceipt.year!==c.yr?'<div class="press-prior"><b>LAST SEASON’S RECEIPT</b><span>'+esc(oldReceipt.headline)+'</span><strong class="'+(oldReceipt.outcome==='won'?'win':'loss')+'">'+(oldReceipt.outcome==='won'?'DELIVERED':'EXPOSED')+'</strong><small>'+esc(oldReceipt.receipt||'')+'</small></div>':'')+
+      (oldReceipt&&oldReceipt.year!==c.yr?'<div class="press-prior"><b>LAST SEASON’S RECEIPT</b><span>'+esc(oldReceipt.headline)+'</span><strong class="'+(oldReceipt.outcome==='won'?'win':oldReceipt.outcome==='void'?'t3':'loss')+'">'+(oldReceipt.outcome==='won'?'DELIVERED':oldReceipt.outcome==='void'?'NO CONTEST':'EXPOSED')+'</strong><small>'+esc(oldReceipt.receipt||'')+'</small></div>':'')+
       (rec?'<div class="press-receipt"><b>YOUR STATEMENT IS ON RECORD</b><p>'+esc(rec.quote)+'</p>'+
         '<small>'+(rec.outcome==='pending'?'Results will determine whether the promise holds.':
           'Outcome: '+esc(rec.outcome)+' · '+esc(rec.receipt||''))+'</small></div>':
