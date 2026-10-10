@@ -1,5 +1,33 @@
 # Hoops Life: Arena Edition Overhaul Checkpoint
 
+## CURRENT DIRECTION: DRAFTING FIRST (user correction, 2026-10-10)
+
+This section supersedes earlier ideas about expanding Skill Draft seasons with media, game-night decisions, press rooms, career training and role studios. The user explicitly rejected that bloat. **Do not re-add these career UI systems unless specifically requested.** Spend the development effort on the actual card drafting, skill inheritance, team-building, duo/trio interactions and mutation displays.
+
+### Now implemented
+
+- **82-0 team workshop** uses separate My Team, Combos and Fusion tabs in a compact two-column, independently scrolling UI. Both sides remain immediately accessible without a full-page DNA and highs wall. HoopIQ/Daily do not show fusion.
+- **Genesis moves exclusively to 82-0**, usable as soon as two Classic-mode players are drafted (not after eight). The selector can choose only from players the user actually rolled into the current lineup. Every parent card is eligible for exactly **one attempt per run**, regardless of success/failure. Fusion odds are computed from real player skill profiles, size, similarity and tension, capped below certainty even for two players at the same position. Repeated attempts never improve odds.
+- Success consumes both source cards and creates one hybrid with inherited ratings, frame and special mechanics. One spot opens for another draft roll; an equipped hybrid can later become a source if its own attempt is unused. Failure leaves both original cards on the team but permanently consumes their fusion opportunities for this run.
+- Real 82-0 sim creates fused players with real attributes, out-of-position penalties, tendencies, body frame and actual possession mechanics. The original parent no longer quietly contributes double team DNA. Hybrid lineup cards show a split source portrait and can be dragged between slots.
+- Every rolled 82-0 card now shows a compact **best open position / effective OVR / potential new duo, trio or rare DNA** indicator. This is information at the moment of selecting a player, not a distant results panel.
+- **Skill Draft** has separate My Skills and Abilities & Combos tabs. Skill cells can be filtered to All, Collected or Empty, with an independently scrolling grid. Free Choice's list of available skills is grouped into tabs for Skills, Playstyle and Career Traits, and potential new duos, trios and rare DNA reactions are previewed *before* selection.
+- **Skill Draft career was slimmed down on purpose**: recurrent Press Room, training, role selection, public promise, gameplay-night, rivalry reports, repeated DNA telemetry and auto-generated media were removed from its active gameplay path. The career sidebar is a compact player card and basic numbers, while season recaps contain team record, player box-score strip, awards and an optional playoff details fold. Existing basketball league evolution, records, free agency, playoffs, aging and retirement remain.
+- Legacy unused helpers/files may remain for compatibility with older tests, but are not presented in Skill Draft or invoked by its standard career loop. The user does not want these reintroduced.
+- Regression suites were updated for no-roll-farming probability and no hidden offseason rating boosts. New `tools/test-draft-first.js` validates successful two-into-one fusion, one-attempt failures, unavailable fusion in HoopIQ/Daily and draft-only tabs. CI invokes it with the other season/draft tests.
+- Last fully verified hosted regression before the final UI cleanup: **76 passed, 0 failed** (run `38095129692`). Recheck latest CI before claiming the final post-cleanup build is green.
+
+### Next iteration targets
+
+1. Observe *actual browser UI*, especially short screens and mobile. Fix overflow, sticky sidebar behavior, touch dragging, fusion modal controls, keyboard navigation, and cramped role/skill selection. The authorized remote PC has been offline: do not claim screenshot verification.
+2. More **draft-time** interaction and clarity: card-to-card comparison, candidate chemistry/effective OVR, selected skill interplay, and transparent rare mutation requirements. Improve duo/trio and ability consequences *inside actual possessions* with careful tests.
+3. Improve fusion outcomes and readable tradeoffs, rather than adding random effects. Keep one attempt per parent and fair odds. Avoid a giant archive-search laboratory or automatic stat inflation.
+4. Keep career simulation simple. Do not add narrative management or training menus unless user opts in.
+
+---
+
+
+
 Branch: hoops-overhaul-2026-10 | Updated: 2026-10-10
 
 ## Purpose
