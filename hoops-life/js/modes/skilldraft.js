@@ -83,6 +83,33 @@ HL.SkillDraft = (function () {
     render(true);
   }
 
+
+  // Unlike the Original Draft's five specialist cards (and the 82-0 min-20-
+  // game candidate filter), this mode lists EVERY player recorded with the
+  // franchise in the decade, including brief appearances. Each player appears
+  // once; their skill choices may use different team-season years.
+  const freeRosterCache = new Map();
+  function freeRosterCandidates(franchise, decade) {
+    const key = franchise + ':' + decade;
+    if (freeRosterCache.has(key)) return freeRosterCache.get(key);
+    const best = new Map();
+    for (const yr of HL.HISTORY.seasons) {
+      if (yr.includes('-') || Math.floor(+yr / 10) * 10 !== decade || !HL.HISTORY_SEASONS[yr]) continue;
+      for (const row of HL.History.seasonRows(yr)) {
+        const teamStint = row.stints.find(t => C().LINEAGE[t[0]] === franchise && t[1] > 0);
+        if (!teamStint) continue;
+        const candidate = { row, season:+yr, club:teamStint[0] };
+        const old = best.get(row.pid);
+        if (!old || HL.historicalSeasonOvr(candidate.row) > HL.historicalSeasonOvr(old.row))
+          best.set(row.pid, candidate);
+      }
+    }
+    const players = [...best.values()].sort((a,b) =>
+      HL.historicalSeasonOvr(b.row) - HL.historicalSeasonOvr(a.row));
+    freeRosterCache.set(key, players);
+    return players;
+  }
+
   // Free Choice drafts spin only franchise and decade. Every qualifying player
   // is selectable, rather than restricting the hand to five specialists.
   async function spinFree(what = 'all') {
@@ -99,7 +126,7 @@ HL.SkillDraft = (function () {
       if (!franchises.length) throw new Error('This decade has no eligible franchises');
       if (what === 'all' || what === 'team' || !franchises.includes(run.team))
         run.team = R.pick(franchises.filter(f => f !== run.team || franchises.length === 1));
-      run.hand = C().candidates(run.team, run.decade);
+      run.hand = freeRosterCandidates(run.team, run.decade);
       render();
       const host = document.querySelector('#reels');
       if (host) {
@@ -130,7 +157,7 @@ HL.SkillDraft = (function () {
     const career = [];
     for (const key of seasons) for (const row of HL.History.seasonRows(key)) {
       if (row.pid !== player.row.pid) continue;
-      const club = row.stints.find(t => C().LINEAGE[t[0]] === st.team && t[1] >= 20);
+      const club = row.stints.find(t => C().LINEAGE[t[0]] === st.team && t[1] > 0);
       if (club) career.push({ row, season: +key, club: club[0] });
     }
     const choices = {};
@@ -1187,7 +1214,7 @@ HL.SkillDraft = (function () {
       skip('team') + skip('era') + '</div>';
     if (!ready) return '<section class="machine"><div class="lights">' + '<i></i>'.repeat(14) +
       '</div>' + wheels + controls +
-      (!Object.keys(st.picks).length ? '<p class="t2" style="max-width:62ch;margin:16px auto;text-align:center">Only the franchise and decade are random. Browse every eligible player, pick anyone, and decide which unfilled skill you want from their best qualifying season.</p>' : '') + '</section>';
+      (!Object.keys(st.picks).length ? '<p class="t2" style="max-width:62ch;margin:16px auto;text-align:center">Only the franchise and decade are random. Browse every player who appeared for that franchise, pick anyone, and decide which unfilled skill you want from their best qualifying season.</p>' : '') + '</section>';
 
     const query = (st.rosterQuery || '').trim().toLowerCase();
     let roster = st.hand.map((c, i) => ({ c, i })).filter(({c}) => {
@@ -1218,7 +1245,7 @@ HL.SkillDraft = (function () {
     }).join('');
     return '<section class="machine"><div class="lights">' + '<i></i>'.repeat(14) + '</div>' +
       wheels + controls + '<div class="result">' + esc(team.city + ' ' + team.name) +
-      ' · ' + st.decade + 's · ' + st.hand.length + ' eligible players</div>' +
+      ' · ' + st.decade + 's · ' + st.hand.length + ' players across the decade</div>' +
       '<div class="stack" style="gap:12px;margin-top:20px">' +
       '<p class="t2 sm" style="text-align:center;margin:0">Choose any player, then pick any unfilled skill. Each skill uses that player’s strongest qualifying season with this franchise in this decade.</p>' +
       '<div class="row wrap" style="gap:10px;align-items:center">' +
