@@ -631,7 +631,7 @@ HL.SkillDraft = (function () {
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
       if (missed > 0) injury = { name: inj.name, games: missed, lasting: !!inj.lasting };
     }
-    const res = simSeason(L, team, me, missed,c.role);
+    const res = simSeason(L, team, me, missed,c.role,c.press?.pledge);
     const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
     s.agenda=finishAgenda(c,s,L.games);
     HL.SkillPress?.resolve(c,s);
@@ -852,7 +852,7 @@ HL.SkillDraft = (function () {
   }
 
   // ---------- one season: real schedule, awards voted against the real field, playoff path ----------
-  function simSeason(L, team, me, missed, role='balanced') {
+  function simSeason(L, team, me, missed, role='balanced',pressPledge=null) {
     const roster = HL.League.teamPlayers(team.id).sort((a, b) => b.ovr - a.ovr).slice(0, 14);
     const historical=L.season<=HL.LATEST_SEASON;
     const realRows=historical?HL.History.seasonRows(String(L.season)):[];
@@ -969,6 +969,16 @@ HL.SkillDraft = (function () {
       ppg:+topRival.row.pts.toFixed(1)
     }:null;
 
+    const target=pressPledge?.kind==='rival'?
+      field.find(f=>String(f.pid)===String(pressPledge.rivalId)&&f.qual):null;
+    const pressTarget=pressPledge?.kind==='rival'?{
+      pid:pressPledge.rivalId,available:!!target,
+      name:target?.name||pressPledge.rivalName||'Challenged rival',
+      won:target?mvpScore(mine)>mvpScore(target):null,
+      myScore:+mvpScore(mine).toFixed(1),
+      theirScore:target?+mvpScore(target).toFixed(1):null
+    }:null;
+
     // ---- Playoffs: that year's qualifying spots, format and opponents ----
     const fmt = HL.playoffFormat(L.season);
     const realPlayoff = L.teams.filter(t => t.real.playoffs);
@@ -1036,7 +1046,7 @@ HL.SkillDraft = (function () {
     return {
       g, line, pline, ppg, rpg, apg, leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
       ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
-      w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,rival,
+      w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,rival,pressTarget,
       realChamp: rcT ? fullName(rcT) : realChamp || null, games: L.games, nTeams: L.teams.length,
     };
   }
