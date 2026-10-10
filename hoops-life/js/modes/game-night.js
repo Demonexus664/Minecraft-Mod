@@ -122,7 +122,11 @@ HL.GameNights=(function(){
     '<div class="game-night-recap-item '+(d.win?'won':'lost')+'">'+
     '<div class="caps">GAME '+d.game+' · '+esc(d.opponent)+'</div>'+
     '<strong>'+esc(d.title)+'</strong><p>'+esc(d.win?'WON':'LOST')+' '+d.points+'-'+d.allowed+
-    ' · Team '+d.record+'</p><small>Chosen adjustments applied to real possessions, not player OVR.</small></div>').join('')+
+    ' · Team '+d.record+'</p>'+
+    (d.adjustment?'<div class="game-night-half"><span>THIRD-QUARTER ADJUSTMENT</span>'+
+      '<b>'+esc(d.adjustment.title)+'</b><small>Live score: '+d.adjustment.ours+'-'+
+      d.adjustment.theirs+'</small></div>':'')+
+    '<small>Chosen strategies affected actual possessions, not player OVR.</small></div>').join('')+
    '</div></div></section>';
  }
  return {PLANS,apply,prompt,recap,scenario};
