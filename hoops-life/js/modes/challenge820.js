@@ -413,6 +413,7 @@ HL.Challenge = (function () {
       const home = g % 2 === 0;
       const res = home ? HL.simGame(dream, oppObj, rules) : HL.simGame(oppObj, dream, rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
+      HL.AbilityReplay?.accumulate(abilityCounts,res.events,home?'home':'away');
       // Injury duration is consumed after the player actually misses a game.
       for (const p of players) if(p.injury?.games>0) p.injury.games--;
       // Treat in-game injuries as future-game absences; only our players persist.
