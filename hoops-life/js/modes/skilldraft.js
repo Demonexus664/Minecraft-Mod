@@ -244,6 +244,71 @@ HL.SkillDraft = (function () {
     return HL.DNA.applyBuild({ attrs:effective.attrs, draftedAttrs:{...attrs}, constraints:effective.constraints, height, weight, pos, tendencies, longevity, primeLength },HL.DNA.analyze(entries,{build:{attrs:effective.attrs,height,weight}}));
   }
 
+
+  // Offseason training is a real, modest attribute investment, not a free OVR
+  // multiplier. It persists across seasons while age, health and DNA still rule.
+  const TRAINING={
+    balanced:{name:'Complete Player',detail:'Split time between skill work and recovery. Slower improvement, less accumulated wear.',keys:['iq','stam','dur'],rate:.8},
+    shooting:{name:'Shot Lab',detail:'Improve off-dribble touch, release consistency and shot-making. Neglecting conditioning adds modest wear.',keys:['three','mid','shotArc','releaseSpeed'],rate:1.35},
+    finishing:{name:'Rim Pressure',detail:'Develop your handle, contact finishing and above-the-rim timing.',keys:['dunk','layup','contactFinish','handle'],rate:1.35},
+    playmaking:{name:'Floor General',detail:'Build passing vision, accuracy and decision-making.',keys:['pass','vision','passingAccuracy','iq'],rate:1.35},
+    defense:{name:'Defensive Clinic',detail:'Improve positioning, perimeter containment and timing at the rim.',keys:['perD','intD','helpD','steal','block'],rate:1.35},
+    athletic:{name:'Explosive Conditioning',detail:'Sprint, jump and stamina training. Most effective early; heavy workloads can increase injury risk.',keys:['speed','burst','vert','stam'],rate:1.2}
+  };
+  function trainSummer(c) {
+    if(!c.training)c.training={};
+    const id=TRAINING[c.trainingFocus]?c.trainingFocus:'balanced';
+    const t=TRAINING[id],old=c.training[id]||0;
+    // One training camp per offseason, diminishing returns across the career.
+    const gain=HL.clamp(t.rate*(1-old/9),.15,t.rate);
+    c.training[id]=Math.round((old+gain)*100)/100;
+    c.trainingHistory ||= [];
+    c.trainingHistory.push({year:c.yr,program:id,gain:+gain.toFixed(2)});
+    if(c.trainingHistory.length>26)c.trainingHistory.shift();
+    return t.name;
+  }
+  function trainingView(c) {
+    if(c.done)return '';
+    return '<section class="block training-lab"><header><h3>OFFSEASON TRAINING LAB</h3>'+
+      '<span class="ml-auto t3 sm">Every camp shapes the next season</span></header><div class="body stack">'+
+      '<p class="t2 sm">Choose a specialization. It raises specific skills gradually, with diminishing returns and natural aging still active. Your selection applies at the next offseason.</p>'+
+      '<div class="training-grid">'+Object.entries(TRAINING).map(([id,t])=>
+      '<button class="training-choice '+(c.trainingFocus===id?'active':'')+'" data-training="'+id+'">'+
+      '<span>'+ (c.trainingFocus===id?'● SELECTED':'○ PROGRAM')+'</span><b>'+esc(t.name)+'</b>'+
+      '<small>'+esc(t.detail)+'</small>'+
+      '<em>Investment '+(c.training?.[id]||0).toFixed(1)+'/9</em></button>').join('')+'</div>'+
+      (c.trainingHistory?.length?'<p class="t3 sm">Most recent camp: '+
+      esc(TRAINING[c.trainingHistory.at(-1).program]?.name||'Training')+
+      ' · '+yrLabel(c.trainingHistory.at(-1).year)+'</p>':'')+
+      '</div></section>';
+  }
+  function milestoneView(c) {
+    const count=name=>c.awards.filter(a=>a.award===name).length;
+    const played=c.seasons.filter(x=>!x.minors);
+    const best=played.reduce((m,x)=>Math.max(m,x.ppg||0),0);
+    const quests=[
+      ['First 10K','Score 10,000 career points',c.totals.pts,10000],
+      ['30K Club','Score 30,000 career points',c.totals.pts,30000],
+      ['Walking Bucket','Average 30 PPG in a season',best,30],
+      ['Award Season','Win your first MVP',count('MVP'),1],
+      ['Ring Collector','Win three championships',c.rings,3],
+      ['Scoring King','Win five scoring titles',count('Scoring title'),5],
+      ['Iron Veteran','Complete 15 NBA seasons',played.length,15],
+      ['GOAT Case','Reach a top-three legacy ranking',c.legacy?.rank<=3?1:0,1]
+    ];
+    const completed=quests.filter(q=>q[2]>=q[3]).length;
+    return '<section class="block legacy-quests"><header><h3>LEGACY QUESTS</h3><span class="ml-auto t3 sm">'+
+      completed+'/'+quests.length+' complete</span></header><div class="body"><div class="legacy-quest-grid">'+
+      quests.map(([title,desc,v,target])=>{
+        const pct=Math.round(Math.min(1,v/target)*100),done=v>=target;
+        return '<article class="legacy-quest '+(done?'complete':'')+'"><div class="row"><b>'+
+          esc(title)+'</b><span class="ml-auto">'+(done?'COMPLETE':pct+'%')+'</span></div>'+
+          '<p>'+esc(desc)+'</p><div class="quest-track"><i style="width:'+pct+'%"></i></div>'+
+          '<small>'+ (Number.isInteger(v)?v.toLocaleString():v.toFixed(1))+
+          ' / '+target.toLocaleString()+'</small></article>';
+      }).join('')+'</div></div></section>';
+  }
+
   // ---------- career engine ----------
   // Historical seasons use their actual rosters. Once recorded history ends,
   // advance one persistent league through generated drafts, player development,
@@ -399,7 +464,11 @@ HL.SkillDraft = (function () {
       const earlyPhysical=physical?Math.max(0,age-(exceptional?30:28))*(exceptional?.35:.46+(99-c.prime.longevity)*.01):0;
       const fade=decline*(physical?1.45:skillFade)+earlyPhysical+(physical?wear*1.6:wear*.2);
       const gap=physical?5:13;
-      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,Math.max(99,goal)));
+      const earned=Object.entries(c.training||{}).reduce((total,[id,invested])=>
+        total+(TRAINING[id]?.keys.includes(k)?Math.min(5.5,invested*.9):0),0);
+      const physicalTaper=physical?Math.max(.2,1-Math.max(0,age-31)*.055):1;
+      out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade+earned*physicalTaper,
+        25,Math.max(99,goal)));
     }
     return HL.DNA.reconcileAttributes(out,c.prime.height||c.me.height||78).attrs;
   }
@@ -423,6 +492,7 @@ HL.SkillDraft = (function () {
       seasons: [], awards: [], rings: 0, teams: [], pick: null, altered: [], earnings: 0, log: [], lastRecords: {},
       totals: blankTotals(), ptotals: blankTotals(), highs: {}, tradeRequests: 0,
       pending: null, done: false, end: null, legacy: null, dna: prime.dna, story: [], pendingStory:null, franchiseLoyalty:0,
+       trainingFocus:'balanced',training:{},trainingHistory:[],
     };
   }
 
@@ -520,10 +590,11 @@ HL.SkillDraft = (function () {
       end(c, 'Retired after '+played+' NBA seasons at age '+c.age+'.');
       return;
     }
+    const earnedCamp=trainSummer(c);
     const L = await leagueFor(c.yr,c);if(!L)return;
     setAge(c, c.age);
     const ovr = c.me.ovr;
-    const pend = { type: 'season', from, to: ovr, offers: [], notes: [] };
+    const pend = { type: 'season', from, to: ovr, offers: [], notes: ['Completed '+earnedCamp+' camp. Specific practiced skills have improved, subject to aging.'] };
     const cur = c.franchise && !c.minors ? L.teams.find(t => fr(t) === c.franchise) : null;
     if (c.franchise && !c.minors && !cur) pend.notes.push(`The ${c.teamMeta.city} ${c.teamMeta.name} no longer exist. He is a free agent.`);
     // Leaving the NBA is not the same as retiring. Even at 50+, the player
@@ -1022,6 +1093,7 @@ HL.SkillDraft = (function () {
         <div class="kv"><span>Rookie rating</span><b>${c.me.ovr} OVR</b></div>
         <div class="kv"><span>Achievable prime (age 28–29)</span><b>${c.primeOvr} OVR</b></div>
         <div class="kv"><span>Work ethic</span><b>${c.me.traits.workEthic >= 75 ? 'Gym rat' : c.me.traits.workEthic >= 55 ? 'Solid' : c.me.traits.workEthic >= 40 ? 'Inconsistent' : 'Questionable'}</b></div>
+        ${trainingView(c)}
         <div class="row wrap" style="gap:10px"><button class="btn go big" data-play>Play the ${yrLabel(c.yr)} season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div>
       </div></section>
       ${cls.length ? `<section class="block"><header><h3>The real ${c.debut} draft</h3><span class="ml-auto t3 sm">He joins this class</span></header><div class="body flush">${cls.map(r => `<div class="res-row" style="grid-template-columns:40px 1fr auto;cursor:default"><b class="num">${r.pick}</b><div class="row">${U.face({ name: r.name, nbaId: r.nbaId, real: true }, 26, null)}<span>${esc(r.name)}</span></div><span class="t3 sm">${esc(r.club)}${r.college ? ' · ' + esc(r.college) : ''}</span></div>`).join('')}</div></section>` : ''}`;
@@ -1052,6 +1124,8 @@ HL.SkillDraft = (function () {
     const last = c.seasons[c.seasons.length - 1];
     if(c.pendingStory){const e=c.pendingStory;out.unshift(`<section class="block dna-story-choice"><div class="body stack"><span class="dna-section-label">A CAREER TURNING POINT</span><h2>${esc(e.title)}</h2><p>${esc(e.subtitle)}</p><div class="row wrap"><button class="btn go" data-story-choice="a">${esc(e.a)}</button><button class="btn" data-story-choice="b">${esc(e.b)}</button></div></div></section>`);}
     if (last) out.push(seasonReport(last));
+    out.push(trainingView(c));
+    if (c.seasons.length) out.push(milestoneView(c));
     if (c.seasons.length) out.push(careerTable(c));
     if (c.log.length) out.push(timeline(c));
     return out.join('');
@@ -1267,6 +1341,10 @@ HL.SkillDraft = (function () {
       if (selected && remaining().includes(id)) finishPick(selected, id);
     });
     app.querySelectorAll('[data-wild-cat]').forEach(btn=>btn.onclick=()=>finishPick(st.wildCandidate,btn.dataset.wildCat));
+    app.querySelectorAll('[data-training]').forEach(btn=>btn.onclick=()=>{
+      const c=st.career;if(!c||c.done||!TRAINING[btn.dataset.training])return;
+      c.trainingFocus=btn.dataset.training;FX.sfx.pop(1);render();
+    });
     FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
     const position = app.querySelector('[data-position]'); if (position) position.onchange = () => { st.pos=position.value; render(); };
