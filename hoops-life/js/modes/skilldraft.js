@@ -1488,6 +1488,10 @@ HL.SkillDraft = (function () {
     const position = app.querySelector('[data-position]'); if (position) position.onchange = () => { st.pos=position.value; render(); };
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
+    app.querySelector('[data-open-fusion]')?.addEventListener('click',()=>HL.FusionUI?.open(node=>{
+      if(st&&!st.career){st.fusionEquipped=node;render();FX.sfx.achievement?.();}
+    }));
+    app.querySelector('[data-unequip-fusion]')?.addEventListener('click',()=>{st.fusionEquipped=null;render();});
     app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
       const run=st;
       const proceeded=await busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
