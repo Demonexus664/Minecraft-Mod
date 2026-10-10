@@ -826,6 +826,7 @@ HL.Challenge = (function () {
       ${identityReport(r)}
        ${mission}${gauntlet}${rivals}
        ${filmReel(r.gameLog)}
+        ${HL.FilmIQ?.render(r.gameLog,r.schemeRecords)||''}
        ${HL.FanFeed?HL.FanFeed.render(HL.FanFeed.season82(r)):''}
       <section class="block"><header><h3>Postseason: The second challenge</h3></header><div class="body stack"><p>Now take your drafted superteam through four best-of-seven playoff series, one game at a time. Close finishes can become interactive clutch possessions. The regular-season 82–0 record stays separate.</p><button class="btn go" data-start-playoffs>Start the playoffs</button>${st.playoffs?.completed?`<p>${st.playoffs.champion?'NBA CHAMPIONS':'Playoff run ended'} · ${st.playoffs.history.length} games played.</p>`:''}</div></section>
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
