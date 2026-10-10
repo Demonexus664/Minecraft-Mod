@@ -431,7 +431,14 @@ HL.Challenge = (function () {
       if(boss){boss.played=true;boss.win=won;boss.margin=mine.score-theirs.score;
         if(won){FX.sfx.achievement?.();FX.burst(q('.ticker .rec'),['#ffe4a5','#9bc9ff'],22,.85);}
         else FX.sfx.rival?.();}
-      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won,boss:!!boss});
+      const heroLine=Object.entries(mine.box||{}).filter(([id,b])=>
+        b.gp&&players.some(p=>p.id===+id))
+        .sort((a,b)=>b[1].pts-a[1].pts)[0];
+      const hero=heroLine?{name:players.find(p=>p.id===+heroLine[0])?.name||'Player',
+        pts:heroLine[1].pts||0,reb:(heroLine[1].orb||0)+(heroLine[1].drb||0),ast:heroLine[1].ast||0}:null;
+      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won,boss:!!boss,hero});
+      if(won&&mine.score-theirs.score<=2&&mine.score-theirs.score>=0)FX.sfx.clutch?.();
+      if(hero?.pts>=50)FX.sfx.swish?.();
       if(Math.abs(mine.score-theirs.score)<=5){closeGames++;if(won)closeWins++;}
       if(marqueeIds.has(opp.id)){marqueeLog.push({g:g+1,opp:opp.name,won,for:mine.score,against:theirs.score});FX.sfx.rival?.();}
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
@@ -732,6 +739,54 @@ HL.Challenge = (function () {
     </div></section>`;
   }
 
+
+  // Each run's film reel is earned through the individual box scores and
+  // margins, not generated from a random sentence pool.
+  function seasonMoments(log) {
+    if(!log?.length)return [];
+    const wins=log.filter(g=>g.win),losses=log.filter(g=>!g.win);
+    const entries=[];
+    const add=(key,title,g,detail)=>{
+      if(!g||entries.some(e=>e.g===g.g))return;
+      entries.push({key,title,g:g.g,opponent:g.opp,margin:g.for-g.against,detail,hero:g.hero});
+    };
+    const highest=wins.slice().sort((a,b)=>(b.for-b.against)-(a.for-a.against))[0];
+    add('blowout','Statement Win',highest,'The strongest point differential of the season.');
+    const close=wins.filter(g=>g.for-g.against<=5).sort((a,b)=>(a.for-a.against)-(b.for-b.against))[0];
+    add('clutch','Narrow Escape',close,'A one-possession or two-possession escape from defeat.');
+    const best=log.filter(g=>g.hero).sort((a,b)=>b.hero.pts-a.hero.pts)[0];
+    add('scorer','Player Takeover',best,best?.hero?.name+' scored '+best?.hero?.pts+' points in this game.');
+    const worst=losses.slice().sort((a,b)=>(a.for-a.against)-(b.for-b.against))[0];
+    add('loss','The Toughest Night',worst,'The worst defeat on the schedule.');
+    const boss=log.find(g=>g.boss&&g.win);
+    add('boss','Boss Defeated',boss,'An elite roster fell on its scheduled Gauntlet date.');
+    return entries.slice(0,5);
+  }
+  function filmReel(log) {
+    const moments=seasonMoments(log);
+    const segments=[];
+    for(let i=0;i<log.length;i+=10){
+      const games=log.slice(i,i+10),w=games.filter(g=>g.win).length;
+      segments.push({start:i+1,end:i+games.length,w,l:games.length-w});
+    }
+    const strip='<div class="film-track" aria-label="Full season win loss history">'+
+      log.map(g=>'<i class="'+(g.win?'won':'lost')+(g.boss?' boss':'')+'" title="Game '+g.g+
+        ' · '+esc(g.opp)+' · '+(g.win?'W':'L')+' '+g.for+'-'+g.against+'"></i>').join('')+'</div>';
+    const cards=moments.map(m=>'<article class="film-moment '+m.key+'">'+
+      '<div class="caps">GAME '+m.g+' · '+esc(m.title)+'</div>'+
+      '<h3>'+esc(m.opponent)+'</h3><strong class="'+(m.margin>=0?'win':'loss')+'">'+
+      (m.margin>0?'+':'')+m.margin+'</strong><p>'+esc(m.detail)+'</p>'+
+      (m.hero?'<div class="film-hero">'+esc(m.hero.name)+' · '+m.hero.pts+' PTS · '+
+        m.hero.reb+' REB · '+m.hero.ast+' AST</div>':'')+'</article>').join('');
+    return '<section class="block film-reel"><header><h3>THE SEASON FILM REEL</h3>'+
+      '<span class="ml-auto t3 sm">Real games · No scripted highlights</span></header>'+
+      '<div class="body stack">'+strip+'<div class="film-chapters">'+
+      segments.map(x=>'<div><b>GAMES '+x.start+'-'+x.end+'</b><span>'+
+        x.w+' W · '+x.l+' L</span></div>').join('')+'</div>'+
+      '<div class="film-moments">'+(cards||'<p class="t3">No notable events yet.</p>')+
+      '</div></div></section>';
+  }
+
   function resultView() {
     const r = st.result;
     const [tier, line] = verdict(r.w, r.games);
@@ -766,6 +821,7 @@ HL.Challenge = (function () {
       ${HL.DNA.board(st.dna)}
       ${identityReport(r)}
        ${mission}${gauntlet}${rivals}
+       ${filmReel(r.gameLog)}
       <section class="block"><header><h3>Postseason: The second challenge</h3></header><div class="body stack"><p>Now take your drafted superteam through four best-of-seven playoff series, one game at a time. Close finishes can become interactive clutch possessions. The regular-season 82–0 record stays separate.</p><button class="btn go" data-start-playoffs>Start the playoffs</button>${st.playoffs?.completed?`<p>${st.playoffs.champion?'NBA CHAMPIONS':'Playoff run ended'} · ${st.playoffs.history.length} games played.</p>`:''}</div></section>
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
       <section class="block"><header><h3>Season scouting report</h3></header><div class="body stack">
