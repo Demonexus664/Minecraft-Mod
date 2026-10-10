@@ -63,7 +63,7 @@ test('visual designs have mechanical specificity, mobile layout and motion escap
 test('career season shows press receipts as story outcomes, not fabricated boosts',()=>{
  const mode=read('js/modes/skilldraft.js'),press=read('js/media/skill-press.js');
  assert.match(mode,/HL\.SkillPress\?\.resolve\(c,s\)/);
- assert.match(mode,/HL\.SkillPress\.market\(c\)/);
+ assert.match(mode,/HL\.SkillPress\?\.market\(c\)/);
  assert.match(mode,/data-press/);
  assert.match(mode,/PUBLIC PROMISE/);
  assert.match(mode,/originalMinutes/);
