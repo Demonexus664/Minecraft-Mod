@@ -23,19 +23,19 @@ HL.SkillPress=(function(){
       prompt:'You just won it all. Everybody wants to know how you handle the attention next season.',
       context:'NBA champion · '+s.w+'-'+s.l+' regular season.'};
     if(s.rival&&!s.rival.win)return {id:'rival',title:'THE RIVALRY IS REAL',
-      prompt:'ClipFeed is replaying the other star beating you in the MVP race. Are you answering?',
+      prompt:(year(c)>=2010?'ClipFeed edits are replaying':'The sports pages keep replaying')+' the other star beating you in the MVP race. Are you answering?',
       context:s.rival.name+' took the previous round · '+s.rival.myScore+' vs '+s.rival.theirScore+' impact.'};
     if((s.ppg||0)>=30)return {id:'scorer',title:'IS IT ONLY POINTS?',
-      prompt:'The clips love the buckets, but the skeptical shows say scoring is all you can do.',
+      prompt:(year(c)>=2010?'The highlight edits':'The sports reporters')+' love the buckets, but skeptical commentators say scoring is all you can do.',
       context:s.ppg.toFixed(1)+' PPG · '+s.apg.toFixed(1)+' APG · '+s.w+'-'+s.l+'.'};
     if((c.age||19)>=34)return {id:'washed',title:'THE WASHED ALLEGATIONS',
-      prompt:'The old-head accounts are comparing your old clips with this season. They say the decline has started.',
+      prompt:(year(c)>=2010?'Veteran commentators are comparing your old clips':'Sports columnists are comparing earlier performances')+' with this season. They say the decline has started.',
       context:'Age '+c.age+' · most recent season '+s.ovr+' OVR.'};
     if(!s.made)return {id:'missed',title:'PLAYOFF RECEIPTS',
-      prompt:'Fan edits are pointing at the missed postseason. What do you say when the cameras turn on?',
+      prompt:(year(c)>=2010?'Fan edits are pointing':'Newspaper columns are pointing')+' at the missed postseason. What do you say when reporters turn your way?',
       context:'Your club finished '+s.w+'-'+s.l+' and missed the playoffs.'};
     return {id:'future',title:'ALL EYES ON NEXT SEASON',
-      prompt:'The city has expectations and the studio analysts are arguing about your ceiling.',
+      prompt:'The city has expectations and the analysts are arguing about your ceiling.',
       context:s.ppg.toFixed(1)+' PPG · '+s.w+'-'+s.l+' · '+(s.awards||[]).length+' season honors.'};
   }
   function choices(c){
@@ -110,16 +110,17 @@ HL.SkillPress=(function(){
       '<strong>'+esc(x.title)+'</strong><p>'+esc(x.quote)+'</p><small>'+esc(x.detail)+'</small></button>').join('');
     const meters=[['Fan approval',v.image],['Locker-room trust',v.trust],['Narrative heat',v.heat]]
       .map(([label,n])=>'<div class="press-meter"><span>'+label+'</span><div><i style="width:'+n+'%"></i></div><b>'+n+'</b></div>').join('');
-    return '<section class="block press-center"><header><h3>THE PRESS ROOM · CLIPFEED</h3>'+
+    const modern=c.yr>=2010;
+    return '<section class="block press-center '+(modern?'press-modern':'press-classic')+'"><header><h3>THE PRESS ROOM · '+(modern?'CLIPFEED':'SPORTS DESK')+'</h3>'+
       '<span class="ml-auto t3 sm">'+c.yr+' OFFSEASON</span></header><div class="body stack">'+
       '<div class="press-stage"><div class="press-phone"><div class="press-screen">'+
-      '<div class="press-live"><i></i> CLIPFEED · TONIGHT</div>'+
-      '<div class="press-story-mark">THE DISCOURSE</div><div class="press-big">'+esc(b.title)+'</div>'+
-      '<p>'+esc(b.context)+'</p><div class="press-caption">SWIPE FOR THE FULL CONTEXT</div>'+
+      '<div class="press-live"><i></i> '+(modern?'CLIPFEED · TONIGHT':'COURTSIDE SPORTS · FRONT PAGE')+'</div>'+
+      '<div class="press-story-mark">'+(modern?'THE DISCOURSE':'THE HEADLINE')+'</div><div class="press-big">'+esc(b.title)+'</div>'+
+      '<p>'+esc(b.context)+'</p><div class="press-caption">'+(modern?'SWIPE FOR THE FULL CONTEXT':'CONTINUED IN THE SPORTING PRESS')+'</div>'+
       '</div></div><div class="press-content"><div class="caps">TODAY AT THE PODIUM</div>'+
       '<h2>'+esc(b.title)+'</h2><p>'+esc(b.prompt)+'</p>'+
       '<div class="press-meters">'+meters+'</div>'+
-      '<div class="press-deals">Contract-market perception: '+Math.round(market(c)*100)+'% of the normal offer, capped within ±9%. Actual ratings and possessions remain unchanged.</div></div></div>'+
+      '<div class="press-deals">Future contract-market perception: '+Math.round(market(c)*100)+'% of a normal offer, capped within ±9%. Ratings and possessions stay unchanged.</div></div></div>'+
       (rec?'<div class="press-receipt"><b>YOUR STATEMENT IS ON RECORD</b><p>'+esc(rec.quote)+'</p>'+
         '<small>'+(rec.outcome==='pending'?'Results will determine whether the promise holds.':
           'Outcome: '+esc(rec.outcome)+' · '+esc(rec.receipt||''))+'</small></div>':
