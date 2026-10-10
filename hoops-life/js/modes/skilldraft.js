@@ -242,7 +242,8 @@ HL.SkillDraft = (function () {
     const pos = st.pos && st.pos !== 'auto' ? st.pos : (open.length ? open : [height < 74 ? 'PG' : 'C']).sort((a,b)=>HL.computeOvr(attrs,b)-HL.computeOvr(attrs,a))[0];
     const entries=Object.entries(st.picks).map(([cat,c])=>({pid:c.row.pid,cat,row:c.row,season:c.season}));
     const effective=HL.DNA.reconcileAttributes(attrs,height);
-    return HL.DNA.applyBuild({ attrs:effective.attrs, draftedAttrs:{...attrs}, constraints:effective.constraints, height, weight, pos, tendencies, longevity, primeLength },HL.DNA.analyze(entries,{build:{attrs:effective.attrs,height,weight}}));
+    const base=HL.DNA.applyBuild({ attrs:effective.attrs, draftedAttrs:{...attrs}, constraints:effective.constraints, height, weight, pos, tendencies, longevity, primeLength },HL.DNA.analyze(entries,{build:{attrs:effective.attrs,height,weight}}));
+    return st.fusionEquipped&&HL.FusionLab?HL.FusionLab.project(base,st.fusionEquipped):base;
   }
 
 
