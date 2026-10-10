@@ -128,7 +128,7 @@ HL.SkillDraft = (function () {
     const seasons = HL.HISTORY.seasons.filter(k =>
       !k.includes('-') && Math.floor(+k / 10) * 10 === st.decade && HL.HISTORY_SEASONS[k]);
     const career = [];
-    for (const key of seasons) for (const row of C().candidates ? HL.History.seasonRows(key) : []) {
+    for (const key of seasons) for (const row of HL.History.seasonRows(key)) {
       if (row.pid !== player.row.pid) continue;
       const club = row.stints.find(t => C().LINEAGE[t[0]] === st.team && t[1] >= 20);
       if (club) career.push({ row, season: +key, club: club[0] });
@@ -1072,7 +1072,32 @@ HL.SkillDraft = (function () {
     FX.bindSound(app);
     const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin('all'); };
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; spin(k); });
-    app.querySelectorAll('.hand .gcard').forEach(card => card.onclick = () => { if (!card.classList.contains('down')) take(+card.dataset.hand); });
+    app.querySelectorAll('.hand .gcard').forEach(card => card.onclick = () => {
+      if (card.classList.contains('down')) return;
+      if (st.draftStyle === 'free') chooseFreePlayer(+card.dataset.freePlayer);
+      else take(+card.dataset.hand);
+    });
+    const rosterSearch = app.querySelector('[data-roster-query]');
+    if (rosterSearch) rosterSearch.oninput = () => {
+      const cursor = rosterSearch.selectionStart ?? rosterSearch.value.length;
+      st.rosterQuery = rosterSearch.value; st.rosterPage = 0;
+      render();
+      const refreshed = U.app().querySelector('[data-roster-query]');
+      if (refreshed) { refreshed.focus(); refreshed.setSelectionRange(cursor, cursor); }
+    };
+    const rosterSort = app.querySelector('[data-roster-sort]');
+    if (rosterSort) rosterSort.onchange = () => { st.rosterSort = rosterSort.value; st.rosterPage = 0; render(); };
+    app.querySelectorAll('[data-roster-page]').forEach(btn => btn.onclick = () => {
+      st.rosterPage = Math.max(0, st.rosterPage + (btn.dataset.rosterPage === 'next' ? 1 : -1));
+      render();
+    });
+    const rosterBack = app.querySelector('[data-back-roster]');
+    if (rosterBack) rosterBack.onclick = () => { st.phase = 'hand'; st.selected = null; st.skillChoices = null; render(); };
+    app.querySelectorAll('[data-free-cat]').forEach(btn => btn.onclick = () => {
+      if (st.phase !== 'choose-skill') return;
+      const id = btn.dataset.freeCat, selected = st.skillChoices && st.skillChoices[id];
+      if (selected && remaining().includes(id)) finishPick(selected, id);
+    });
     app.querySelectorAll('[data-wild-cat]').forEach(btn=>btn.onclick=()=>finishPick(st.wildCandidate,btn.dataset.wildCat));
     FX.tilt(app);
     const nm = app.querySelector('[data-name]'); if (nm) nm.oninput = () => { st.name = nm.value || 'Your Player'; };
@@ -1144,6 +1169,103 @@ HL.SkillDraft = (function () {
     await simRest(c, cc => {if(st?.career===cc)setPct(Math.min(100, Math.round((cc.seasons.length-start)/10*100)), `${yrLabel(cc.yr)} · age ${cc.age} · ${cc.seasons.length} seasons`);}, 10, true);
   }
 
+
+  function freeDraftView(hide) {
+    const ready = st.phase === 'hand' && !!st.team;
+    const team = st.team ? tm(st.team) : null;
+    const reel = (label, inner) => '<div class="reel ' + (ready ? 'landed' : '') + '"><div class="reel-label">' + label +
+      '</div><div class="reel-win"><div class="reel-item" style="height:96px">' + inner + '</div></div></div>';
+    const wheels = '<div id="reels"><div class="reels">' +
+      reel('Franchise', ready ? U.logo(team, 62) : '?') +
+      reel('Decade', ready ? st.decade + 's' : '?') + '</div></div>';
+    const skip = k => '<button class="btn" data-skip="' + k + '" ' +
+      (!st.skips[k] || !ready ? 'disabled' : '') + '>' +
+      (k === 'team' ? 'New franchise' : 'New decade') + ' (' + st.skips[k] + ')</button>';
+    const controls = '<div class="row wrap" style="justify-content:center;gap:10px;margin-top:16px">' +
+      '<button class="btn spin" data-spin ' + (st.phase !== 'spin' ? 'disabled' : '') + '>' +
+      (Object.keys(st.picks).length ? 'Roll for your next skill' : 'Spin franchise & decade') + '</button>' +
+      skip('team') + skip('era') + '</div>';
+    if (!ready) return '<section class="machine"><div class="lights">' + '<i></i>'.repeat(14) +
+      '</div>' + wheels + controls +
+      (!Object.keys(st.picks).length ? '<p class="t2" style="max-width:62ch;margin:16px auto;text-align:center">Only the franchise and decade are random. Browse every eligible player, pick anyone, and decide which unfilled skill you want from their best qualifying season.</p>' : '') + '</section>';
+
+    const query = (st.rosterQuery || '').trim().toLowerCase();
+    let roster = st.hand.map((c, i) => ({ c, i })).filter(({c}) => {
+      const name = HL.HISTORY.players[c.row.pid]?.[0] || '';
+      return !query || name.toLowerCase().includes(query);
+    });
+    if (st.rosterSort === 'name')
+      roster.sort((a, b) => HL.HISTORY.players[a.c.row.pid][0].localeCompare(HL.HISTORY.players[b.c.row.pid][0]));
+    const pageSize = 24;
+    const pages = Math.max(1, Math.ceil(roster.length / pageSize));
+    const page = Math.min(st.rosterPage || 0, pages - 1);
+    const visible = roster.slice(page * pageSize, (page + 1) * pageSize);
+    const pagination = pages > 1 ? '<div class="row wrap" style="gap:10px;justify-content:center">' +
+      '<button class="btn small" data-roster-page="prev" ' + (page === 0 ? 'disabled' : '') + '>Previous</button>' +
+      '<span class="t2 sm">Page ' + (page + 1) + ' of ' + pages + '</span>' +
+      '<button class="btn small" data-roster-page="next" ' + (page >= pages - 1 ? 'disabled' : '') + '>Next</button></div>' : '';
+    const cards = visible.map(({c,i}) => {
+      const bio = HL.HISTORY.players[c.row.pid], r = c.row;
+      const star = HL.DNA.STARS[c.row.pid];
+      return '<div class="dna-card-shell ' + (star ? 'dna-star-card' : '') + '">' +
+        HL.Cards.card({
+          pid:r.pid, name:bio[0], nbaId:bio[1], team:tm(C().LINEAGE[c.club]) || team,
+          pos:r.pos, rating:HL.historicalSeasonOvr(r), ratingLabel:'OVR',
+          meta:'Best overall: ' + yrLabel(c.season) + ' · ' + c.club,
+          stat:[['PTS',r.pts],['REB',r.trb],['AST',r.ast]],
+          hidden:hide, attrs:'data-free-player="' + i + '"'
+        }) + (star ? '<div class="dna-card-hint">★ ' + esc(star.title) + '</div>' : '') + '</div>';
+    }).join('');
+    return '<section class="machine"><div class="lights">' + '<i></i>'.repeat(14) + '</div>' +
+      wheels + controls + '<div class="result">' + esc(team.city + ' ' + team.name) +
+      ' · ' + st.decade + 's · ' + st.hand.length + ' eligible players</div>' +
+      '<div class="stack" style="gap:12px;margin-top:20px">' +
+      '<p class="t2 sm" style="text-align:center;margin:0">Choose any player, then pick any unfilled skill. Each skill uses that player’s strongest qualifying season with this franchise in this decade.</p>' +
+      '<div class="row wrap" style="gap:10px;align-items:center">' +
+      '<input data-roster-query type="search" aria-label="Find a player" placeholder="Search players..." value="' + esc(st.rosterQuery || '') + '" style="min-width:180px;flex:1">' +
+      '<select data-roster-sort aria-label="Sort players">' +
+      '<option value="rating" ' + (st.rosterSort !== 'name' ? 'selected' : '') + '>Highest OVR</option>' +
+      '<option value="name" ' + (st.rosterSort === 'name' ? 'selected' : '') + '>A to Z</option></select>' +
+      '<span class="t2 sm">' + roster.length + ' shown</span></div>' +
+      (visible.length ? '<div class="hand">' + cards + '</div>' : '<p class="t2">No matching players. Try another name or reroll.</p>') +
+      pagination + '</div></section>';
+  }
+
+  function freeSkillChoiceView(hide) {
+    const selected = st.selected;
+    if (!selected || !st.skillChoices) return freeDraftView(hide);
+    const bio = HL.HISTORY.players[selected.row.pid];
+    const picks = Object.entries(st.picks).map(([cat, c]) =>
+      ({ pid:c.row.pid, cat, row:c.row, season:c.season }));
+    const groups = [
+      ['Basketball skills', CATS.filter(c => !c[0].startsWith('tend') && !['longevity','primeLength'].includes(c[0]))],
+      ['Playing tendencies', CATS.filter(c => c[0].startsWith('tend'))],
+      ['Career traits', CATS.filter(c => ['longevity','primeLength'].includes(c[0]))]
+    ];
+    const options = groups.map(([heading, cats]) => {
+      const available = cats.filter(c => st.skillChoices[c[0]]);
+      if (!available.length) return '';
+      return '<div class="stack" style="gap:8px"><h3>' + heading + '</h3><div class="dna-choice-grid">' +
+        available.map(cat => {
+          const option = st.skillChoices[cat[0]];
+          const v = skillValue(option, cat);
+          const fusion = HL.DNA.preview(picks, { pid:option.row.pid, cat:cat[0], row:option.row, season:option.season });
+          return '<button class="dna-choice" data-free-cat="' + cat[0] + '">' +
+            '<span class="stack" style="gap:4px;text-align:left"><b>' + esc(cat[1]) + '</b>' +
+            '<span class="t3 sm">' + yrLabel(option.season) + (fusion ? ' · ✦ Fusion possibility' : '') + '</span></span>' +
+            '<strong>' + (hide ? '?' : cat[0] === 'body' ? HL.fmtHeight(bio[3]) : v) + '</strong></button>';
+        }).join('') + '</div></div>';
+    }).join('');
+    return '<section class="block"><header><h3>Select a skill from ' + esc(bio[0]) + '</h3></header>' +
+      '<div class="body stack" style="gap:14px"><div class="row wrap" style="gap:12px;align-items:center">' +
+      HL.Cards.card({ pid:selected.row.pid, name:bio[0], nbaId:bio[1], team:tm(C().LINEAGE[selected.club]) || tm(st.team), pos:selected.row.pos,
+        rating:HL.historicalSeasonOvr(selected.row), ratingLabel:'OVR', meta:'Selected player · ' + st.decade + 's',
+        stat:[['PTS',selected.row.pts],['REB',selected.row.trb],['AST',selected.row.ast]], hidden:hide }) +
+      '<div class="grow"><p class="t2">Which skill do you want to inherit? All unfilled categories are available. The year beside each choice is this player’s best season for that specific skill.</p>' +
+      '<button class="btn" data-back-roster>Back to full roster</button></div></div>' +
+      options + '</div></section>';
+  }
+
   function draftView(hide, reveal) {
     if (st.draftStyle === 'free') return freeDraftView(hide);
     const fm = st.team ? tm(st.team) : null, cat = st.cat ? catOf(st.cat) : null;
@@ -1168,19 +1290,22 @@ HL.SkillDraft = (function () {
 
   function setupScreen() {
     U.applyTeamTheme(null); U.setEra('modern');
-    let mode = 'classic';
+    let mode = 'classic', draftStyle = 'original';
     const draw = () => {
       U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">Skill Draft Career</button></div></div></div>
       <div class="page" style="max-width:900px"><div class="page-title"><h2>Skill Draft Career</h2></div>
       <section class="block"><div class="body stack">
-        <p class="t2" style="margin:0">Build one player out of real players' skills. Each spin gives a franchise, a decade and a skill (inside scoring, three-point shooting, rebounding, your body…). Choose from the five best available specialists for that exact skill and their best matching season. Then the game simulates your whole career in the real league and ranks it against every real NBA career. Broken, GOAT, all-time great… or a bust.</p>
+        <p class="t2" style="margin:0">Build one player from real historical players' skills, then play out a full NBA career. Original Draft spins a franchise, decade and skill, and deals five specialists. Free Choice spins only franchise and decade: browse the full qualifying roster, choose any player, then choose any unfilled skill. Both versions lead into the same realistic career simulator, legacy rankings, and DNA fusions.</p>
+        <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Draft rules</b><div class="d">Free Choice gives control over each skill, but the franchise and decade are still random for every pick.</div></div>
+          <select data-draft-style><option value="original" ${draftStyle === 'original' ? 'selected' : ''}>Original: three reels + five cards</option><option value="free" ${draftStyle === 'free' ? 'selected' : ''}>Free Choice: two reels + full roster</option></select></div>
         <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides the ratings.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], mode)}</div>
         <div class="row"><button class="btn go big ml-auto" data-go>Start</button></div>
       </div></section></div></div>`;
       const app = U.app();
       app.querySelector('[data-home]').onclick = () => HL.App.title();
       app.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { mode = b.dataset.v; draw(); });
-      app.querySelector('[data-go]').onclick = () => { newRun(mode); render(); };
+      app.querySelector('[data-draft-style]').onchange = e => { draftStyle = e.target.value; draw(); };
+      app.querySelector('[data-go]').onclick = () => { newRun(mode, null, draftStyle); render(); };
     };
     draw();
   }
