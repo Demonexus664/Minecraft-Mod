@@ -82,3 +82,27 @@ test('press consequences stay bounded even across a long career of callouts',()=
  assert.ok(P.market(c)>=.92&&P.market(c)<=1.09);
  assert.ok(c.press.history.length<=24);
 });
+
+test('named-rival callouts track that exact athlete, not an unrelated MVP contender',()=>{
+ const c=player(2032);
+ P.respond(c,'rival');
+ assert.equal(c.press.pledge.rivalId,42);
+ const win=P.resolve(c,{yr:2032,g:80,games:82,
+   rival:{pid:300,name:'Unrelated MVP Leader',win:false},
+   pressTarget:{pid:42,available:true,name:'MVP Rival',won:true,myScore:62,theirScore:55}});
+ assert.equal(win.won,true);
+ assert.match(win.measure,/Outperformed MVP Rival/);
+ assert.equal(c.press.pledge.status,'won');
+});
+test('a retiring or unqualified named rival voids the public challenge without slander penalty',()=>{
+ const c=player(2032);
+ P.respond(c,'rival');
+ const before=c.press.image;
+ const out=P.resolve(c,{yr:2032,g:82,games:82,pressTarget:{pid:42,available:false}});
+ assert.equal(out.won,null);
+ assert.equal(out.impact,0);
+ assert.equal(c.press.image,before);
+ assert.equal(c.press.pledge.status,'void');
+ assert.match(P.panel({...c,yr:2033,seasons:[...c.seasons,{yr:2032,ppg:23.1,
+   apg:5,rpg:5,w:40,l:42,made:false}]}),/NO CONTEST/);
+});
