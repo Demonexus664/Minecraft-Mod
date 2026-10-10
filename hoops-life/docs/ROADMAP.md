@@ -1,6 +1,8 @@
 # Hoops Life: progress, roadmap and handoff
 
 Last updated: 2026-10-10. Current development branch: `hoops-overhaul-2026-10`. Earlier handoff entries below remain as historical context; current DNA refinement and verified coverage are documented in [DNA_REFINEMENT.md](DNA_REFINEMENT.md).
+
+Current quick-mode refinement: 20 qualified transformations, 43 signature profiles, 23 historical relationships, dependent physical attributes, actual possession mechanics, staged fusion, realistic aging/demand and real 82-0 closing calls are implemented. Final verification: 203 Node tests, 34 event assertions, three Chromium workflows, actual career samples and a full Franchise season/rollover. No outstanding review findings. Follow-up remains statistical calibration across eras, broader rarity telemetry and full extreme-longevity career sampling; see the refinement report for limits. Implementation published as `3bb0c76`, `8a20568` and `aa4cba4`.
 Open `hoops-life/index.html` in a browser; no build step. Real headshots and logos load from the NBA/ESPN CDNs in your browser.
 
 ## Product goal
