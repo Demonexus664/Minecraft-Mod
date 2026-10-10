@@ -127,7 +127,7 @@ test('Legend Gauntlet schedules four honest high-strength NBA opponents',()=>{
   assert.equal(bosses.length,4);
   assert.equal(bosses[0].g,21);
   assert.equal(bosses[3].g,82);
-  assert.deepEqual(bosses.map(b=>b.id),[9,8,7,6]);
+  assert.deepEqual(Array.from(bosses,b=>b.id),[9,8,7,6]);
   assert.ok(bosses.every(b=>schedule[b.g-1].id===b.id));
   assert.deepEqual(teams.map(t=>t.customPlayers[0].ovr),before,'opponents remain unboosted');
   h.newRun({mode:'classic',decades:[2010],playSeason:2025,gauntlet:true});
