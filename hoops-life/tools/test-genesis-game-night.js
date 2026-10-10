@@ -25,14 +25,14 @@ test('every parent pairing is accepted but incompatibility makes a paradox diffi
  assert.equal(strange.family,'Impossible Gravity');
  assert.ok(good.tags.includes('creation')||good.tags.includes('quickRelease'));
 });
-test('failure preserves parents, reports a reason and improves modest stabilization research',()=>{
+test('failure preserves parents and fixes probability after failure',()=>{
  const F=HL.FusionLab,old=F.creations().length;
  const before=F.preview(curr,shaq).chance;
  const out=F.attempt(curr,shaq,{roll:()=>.999});
  assert.equal(out.ok,false);
  assert.ok(out.failureReason&&out.echo);
  assert.equal(F.creations().length,old);
- assert.ok(F.preview(curr,shaq).chance>before);
+ assert.equal(F.preview(curr,shaq).chance,before);
  assert.equal(curr.attrs.three,99);
 });
 test('a successful hybrid has inheritance tradeoffs, and can be a parent again',()=>{
