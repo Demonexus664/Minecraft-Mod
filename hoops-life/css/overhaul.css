@@ -1044,3 +1044,34 @@ html[data-fx-level=off] .ability-replay-row{animation:none!important}
  .draft-dna-counters span{font-size:8px;}
 }
 @media(prefers-reduced-motion:reduce){.draft-workspace-tabs button{transition:none}}
+
+
+/* Skill Draft careers: the important decisions, not a dozen full-page dashboards. */
+.career-compact{position:sticky;top:11px;max-width:330px;}
+.career-compact-card{max-width:260px;margin:auto;}
+.career-compact-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:6px;margin:12px 0;}
+.career-compact-stats>div{display:flex;flex-direction:column;align-items:center;justify-content:center;
+ min-height:57px;padding:7px;background:rgba(80,120,163,.13);
+ border:1px solid var(--rule);border-radius:9px;}
+.career-compact-stats b{font:900 23px var(--display);font-variant-numeric:tabular-nums;color:#e3f1ff;}
+.career-compact-stats span{font:800 9px var(--body);color:var(--text-3);letter-spacing:.1em;}
+.career-compact>details{padding:9px;border:1px solid var(--rule);border-radius:10px;}
+.career-compact>details summary{cursor:pointer;font:800 11px var(--body);}
+.career-compact>details p{font-size:11px;line-height:1.6;color:var(--text-2);}
+.season-compact-head{display:flex;align-items:center;justify-content:space-between;gap:15px;
+ background:linear-gradient(110deg,rgba(62,95,135,.22),rgba(25,38,58,.6));
+ padding:16px;border-radius:12px;}
+.season-compact-head>div{display:grid;gap:3px;}
+.season-compact-head b{font:900 34px var(--display);font-variant-numeric:tabular-nums;}
+.season-compact-head span{font:750 9px var(--body);letter-spacing:.1em;color:var(--text-3);}
+.season-compact-head strong{font:850 19px var(--display);letter-spacing:.04em;
+ text-transform:uppercase;color:#f4dba8;text-align:right;}
+.season-compact-awards{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.season-compact-awards b{font-size:10px;color:var(--text-3);letter-spacing:.12em;margin-right:5px;}
+.season-compact-awards span{border:1px solid rgba(221,190,125,.35);
+ padding:6px 9px;color:#f4dfae;background:rgba(131,104,55,.18);border-radius:6px;
+ font:800 10px var(--body);}
+.season-compact details{border:1px solid var(--rule);padding:10px;border-radius:9px;}
+.season-compact details summary{cursor:pointer;font-weight:800;}
+@media(max-width:1000px){.career-compact{position:static;max-width:100%;}}
