@@ -1450,6 +1450,12 @@ HL.SkillDraft = (function () {
       if (selected && remaining().includes(id)) finishPick(selected, id);
     });
     app.querySelectorAll('[data-wild-cat]').forEach(btn=>btn.onclick=()=>finishPick(st.wildCandidate,btn.dataset.wildCat));
+    app.querySelectorAll('[data-press]').forEach(btn=>btn.onclick=()=>{
+      const c=st?.career;if(!c||c.done||!HL.SkillPress)return;
+      const response=HL.SkillPress.respond(c,btn.dataset.press);
+      if(!response.ok){U.toast(response.reason);return;}
+      FX.sfx.rival?.();render();
+    });
     app.querySelectorAll('[data-role]').forEach(btn=>btn.onclick=()=>{
       const c=st.career;if(!c||c.done||!ROLES[btn.dataset.role])return;
       c.role=btn.dataset.role;FX.sfx.pop(1);render();
