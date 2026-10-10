@@ -37,6 +37,10 @@ jobs:
           node --check js/media/skill-press.js
           node --check js/core/dna-fx.js
           node --check js/league/film-iq.js
+          node --check js/league/fusion-lab.js
+          node --check js/league/ability-replay.js
+          node --check js/modes/game-night.js
+          node --check js/core/fusion-ui.js
       - name: Test draft modes, generated leagues, longevity, gameplay and presentation
         run: |
           node --test \
@@ -45,6 +49,7 @@ jobs:
             tools/test-skill-press.js \
             tools/test-presentation-batch3.js \
             tools/test-film-iq.js \
+            tools/test-genesis-game-night.js \
             tools/test-overhaul-batch2.js \
             tools/test-skilldraft-freechoice.js \
             tools/test-skilldraft-future.js \
