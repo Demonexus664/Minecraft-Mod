@@ -1258,6 +1258,7 @@ HL.SkillDraft = (function () {
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
       ${s.agenda?'<div class="season-goal-report '+(s.agenda.complete?'complete':'')+'"><div><div class="caps">Season contract · '+esc(ROLES[s.role]?.title||'Balanced')+'</div><b>'+esc(s.agenda.title)+'</b><p>'+esc(s.agenda.detail)+'</p></div><strong>'+(s.agenda.complete?'GOAL ACHIEVED':'GOAL MISSED')+'</strong></div>':''}
+      ${s.pressResult?'<div class="press-season-outcome '+(s.pressResult.won?'delivered':'backlash')+'"><span>PUBLIC PROMISE · '+(s.pressResult.won?'DELIVERED':'THE INTERNET KEPT RECEIPTS')+'</span><b>'+esc(s.pressResult.measure)+'</b><small>Fan approval '+(s.pressResult.impact>0?'+':'')+s.pressResult.impact+'. Public perception can influence future offers, not skills.</small></div>':''}
       ${s.rival?'<div class="season-rivalry '+(s.rival.win?'won':'')+'"><div class="caps">SEASON MVP RIVAL · '+
         esc(s.rival.name)+'</div><div class="row wrap"><strong>'+
         (s.rival.win?'RIVAL DEFEATED':'RIVAL WINS THIS ROUND')+'</strong><span class="ml-auto">'+
