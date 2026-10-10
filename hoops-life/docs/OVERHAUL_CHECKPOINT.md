@@ -69,7 +69,7 @@ Keep iterating on both 82-0 and Skill Draft. Focus on actual player decisions, g
 - Aggressive tactical choices add a small, strictly bounded next-season fatigue/injury risk (decays with rest). Choice records and score-driven outcomes are shown on the season report.
 - Major additional CSS visual treatments for game-night broadcasts, live scoreboards, active DNA networks, ability telemetry, hybrid portraits and ancestry gallery, inherited tool meters, failure diagnostics and MyPlayer equipped fusion dossier. Light/Off modes and reduced motion remain supported.
 - Added tests: `tools/test-genesis-game-night.js`, `tools/test-power-network.js`, expanded `tools/test-overhaul-batch2.js` verifying interactive games against real NBA possession simulation. All are in the GitHub Actions regression workflow.
-- Verified earlier hosted run `38088828591`: **70 passed, 0 failed**. Later tests added live Q3 choices; re-check CI for the most recent commit before asserting that those edits are green.
+- Verified hosted run `38089086530` (including live third-quarter choices): **71 passed, 0 failed**. A subsequent docs-only commit preserved this verified code state.
 - **Not yet done:** real browser screenshot QA. Desktop Commander PC remained offline; do not claim screenshots or user-playtested polish.
 ## Next priorities
 1. Use a real browser for screenshot comparisons of 82-0 draft, scout screen, game ticker, film reel and Skill Draft pick/career/result screens. Improve what visibly looks wrong, especially smaller screens and pacing.
