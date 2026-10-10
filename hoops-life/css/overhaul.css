@@ -471,3 +471,27 @@ html[data-fx-level="off"] .btn.go::after{display:none;}
 .film-hero{border-top:1px solid var(--rule);padding-top:9px;
  font:700 11px/1.4 var(--body);color:#f7dcaa;}
 @media(max-width:600px){.film-moments{grid-template-columns:1fr 1fr}.film-moment{padding:12px;min-height:175px}.film-moment h3{font-size:19px}.film-track i{flex-basis:5px;min-width:4px}}
+
+
+/* Courtside is fully fictional and driven by simulation data. */
+.fanfeed{background:radial-gradient(ellipse at 2% 0%,rgba(106,160,233,.11),transparent 60%),var(--surface);}
+.fanfeed-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(255px,1fr));gap:10px;}
+.fan-post{display:flex;gap:10px;align-items:flex-start;min-width:0;
+ background:linear-gradient(140deg,rgba(34,48,68,.62),rgba(13,21,34,.87));
+ border:1px solid rgba(173,201,239,.16);border-radius:13px;padding:15px;}
+.fan-post.hype{border-color:rgba(225,190,105,.35);}
+.fan-post.heat{border-color:rgba(209,106,123,.3);}
+.fan-post-avatar{flex:0 0 38px;width:38px;height:38px;display:grid;place-items:center;
+ border-radius:11px;background:linear-gradient(135deg,#45658b,#1c2e4a);color:#d9eafa;
+ font:850 24px var(--display);box-shadow:inset 0 1px 0 rgba(255,255,255,.16);}
+.fan-post.heat .fan-post-avatar{background:linear-gradient(135deg,#8e445e,#47283e);}
+.fan-post.hype .fan-post-avatar{background:linear-gradient(135deg,#91703f,#4c3d2e);color:#ffe4af;}
+.fan-post-content{min-width:0;flex:1;}
+.fan-post-content b{font:800 16px var(--display);text-transform:uppercase;letter-spacing:.03em;}
+.fan-post-content .t3{font:700 10px var(--body);letter-spacing:.09em;}
+.fan-post-content p{font:450 13px/1.52 var(--body);margin:9px 0 0;color:var(--text-2);}
+.courtside-fold{border:1px solid var(--rule-strong);border-radius:13px;padding:12px 14px;
+ background:rgba(17,29,45,.5);}
+.courtside-fold>summary{font:800 16px var(--display);text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:5px 0;}
+.courtside-fold>.block{margin:13px 0 0;}
+@media(max-width:620px){.fanfeed-list{grid-template-columns:1fr}.fan-post{padding:12px}}
