@@ -128,7 +128,28 @@ HL.World = (function () {
     }
     L.world.watches = L.world.watches.filter(w => !w.resolved || L.season <= w.season + 1).slice(-200);
   }
+  function onLiveGame(L,session,facts) {
+    const oldDay=L.day; L.day=session.day;
+    try {
+      const clubMood=club(L,session.userTeamId);
+      memory(L,clubMood,'live_game',`The team ${facts.won?'won':'lost'} after ${facts.plays.length} called possessions and ${facts.lineups.length} chosen lineups.`,{fans:facts.won?2:-2});
+      const ids=new Set([facts.actorId,...facts.plays.map(e=>e.pid)].filter(id=>id!=null));
+      if(facts.lineups.length) for(const x of session.finalRoster?.[session.userTeamId]||[]){
+        const p=L.players[x.pid],minutes=facts.side.box[x.pid]?.min||0;
+        if(p && x.targetMinutes>=24 && minutes<x.targetMinutes*.4 && !x.out){
+          memory(L,person(L,p.id),'live_bench',`The coach chose a manual rotation; ${p.name} played ${minutes.toFixed(1)} minutes against a normal target of ${x.targetMinutes.toFixed(1)}.`,{trust:-2});
+          morale(p,-1);
+        }
+      }
+      for(const pid of ids){const p=L.players[pid],b=facts.side.box[pid]||{};if(!p)continue;
+        const featured=facts.plays.some(e=>e.pid===pid),ego=p.traits?.ego??50;
+        let trust=featured?1:0;
+        if(facts.talk?.intent==='challenge')trust+=(ego>=75?-1:1);
+        memory(L,person(L,pid),'live_game',`${p.name} played ${(b.min||0).toFixed(1)} minutes and scored ${b.pts||0}; ${featured?'an action was called involving him.':'he experienced the game plan.'}`,{trust});
+      }
+    } finally { L.day=oldDay; }
+  }
   function onInterview(L,p,text,delta) { memory(L,club(L,p.teamId??L.userTeamId),'interview_context',text,{fans:delta.fans||0});memory(L,person(L,p.id),'interview_context',text,{trust:delta.trust||0}); }
   function onPublicPost(L,p,text,delta,tid=p.teamId) { if(!delta.private)memory(L,club(L,tid),'player_post',text,{fans:delta.fans||0});memory(L,person(L,p.id),'player_post',text,{trust:delta.trust||0,private:delta.private===true}); }
-  return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame, onInterview, onPublicPost };
+  return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame, onLiveGame, onInterview, onPublicPost };
 })();

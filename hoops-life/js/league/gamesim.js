@@ -130,6 +130,17 @@ HL.DEFAULT_RULES = () => ({
     return { team, strat, avail, starters, st, onCourt: [], score: 0, quarters: [], teamFouls: 0 };
   }
 
+  HL.GAME_PLAYS = {
+    pickRoll: { label: 'High pick-and-roll', partner: true, desc: 'A handler and roller attack the screen; passing and finishing matter.' },
+    pickPop: { label: 'Pick-and-pop', partner: true, desc: 'The screener fades for a jumper. Drop coverage gives space; switching contests it.' },
+    isolation: { label: 'Isolation', desc: 'Clear a side for your creator; ball handling and the matchup decide the advantage.' },
+    postUp: { label: 'Post-up', desc: 'Find your scorer on the block. Strength and post skill matter against interior defense.' },
+    handoff: { label: 'Dribble handoff', partner: true, desc: 'A teammate hands off to the receiver; timing and passing create space.' },
+    catchShoot: { label: 'Catch-and-shoot', partner: true, desc: 'A passer finds the selected shooter. Denial can disrupt the route.' },
+    cut: { label: 'Backdoor cut', partner: true, desc: 'Send a cutter behind the defense. Denial exposes the back door; a crowded paint makes it harder.' },
+    driveKick: { label: 'Drive-and-kick', partner: true, desc: 'A driver pulls help toward the paint, then looks for the selected receiver.' },
+  };
+
   // ---------- Lineup selection ----------
   function chooseLineup(T, ctx) {
     const { remaining, quarterStart, quarter, diff, clutchTime, garbage, foulOut } = ctx;
@@ -159,6 +170,18 @@ HL.DEFAULT_RULES = () => ({
     }).sort((a, b) => b.score - a.score);
 
     let lineup = scored.slice(0, 5).map(x => x.p);
+    if (T.manualLineup) {
+      const selected = T.manualLineup.map(id => T.avail.find(p => p.id === id)).filter(p => p && !T.st[p.id].out);
+      // A coach may use any positions. Injuries and foul-outs still force replacements.
+      for (const x of scored) if (selected.length < 5 && !selected.includes(x.p)) selected.push(x.p);
+      while (selected.length < 5) {
+        const extra = T.avail.find(p => !selected.includes(p)); if (!extra) break;
+        selected.push(extra);
+      }
+      T.manualLineup = selected.map(p => p.id);
+      T.onCourt = selected.sort((a, b) => POS_IDX[a.pos] - POS_IDX[b.pos]);
+      return;
+    }
     // Keep the floor playable: at least one guard and one big if we have them.
     const rest = scored.slice(5).map(x => x.p);
     const ensure = (test) => {
@@ -233,6 +256,12 @@ HL.DEFAULT_RULES = () => ({
       .map(t => ({ teamId: t.id, from: 'zone', to: 'man', reason: 'illegalDefense' }));
     H.qfg = []; A.qfg = []; H.maxTrail = 0; A.maxTrail = 0;
     const teams = [H, A];
+    const tactical = [];
+    for (const T of teams) {
+      T.timeouts = opts.season != null && opts.season < 2017 ? 6 : 7;
+      T.timeoutsFourth = 0; T.timeoutsLate = 0; T.timeoutOT = 0;
+      T.pendingPlay = null; T.matchup = null; T.huddle = null;
+    }
     for (const T of teams) for (const p of T.starters) T.st[p.id].line.gs = 1;
 
     // Era profile: the season's real league averages shift pace, shooting, turnovers, boards and fouls.
@@ -266,6 +295,7 @@ HL.DEFAULT_RULES = () => ({
       const qStartH = H.score, qStartA = A.score;
       H.qfg.push(0); A.qfg.push(0);
       H.teamFouls = 0; A.teamFouls = 0;
+      if (isOT) for (const T of teams) { T.timeouts = 2; T.timeoutOT = quarter; }
       // A rebound at the horn belongs to the finished period, not its next opening possession.
       H.lastOreb = null; A.lastOreb = null;
       let nextCheck = clock;
@@ -273,7 +303,7 @@ HL.DEFAULT_RULES = () => ({
 
       while (clock > 0) {
         // Substitutions at quarter start and every ~3 minutes of game time.
-        if (clock >= nextCheck - 0.01 || clock === lenSec) {
+        if (clock >= nextCheck - 0.01 || clock === lenSec || teams.some(T => T.manualLineup && T.onCourt.some(p => T.st[p.id].out))) {
           const elapsed = elapsedBefore + (lenSec - clock);
           for (const T of teams) {
             const diff = T.score - (T === H ? A : H).score;
@@ -287,6 +317,10 @@ HL.DEFAULT_RULES = () => ({
               garbage: quarter >= 4 && clock <= 420 && Math.abs(diff) >= 20,
               foulOut: rules.foulOut || 0,
             });
+          }
+          if (quarter === 1 && clock === lenSec) for (const T of teams) if (T.finalizeStarters) {
+            for (const x of Object.values(T.st)) x.line.gs = T.onCourt.includes(x.p) ? 1 : 0;
+            T.finalizeStarters = false;
           }
           nextCheck = clock - R.range(150, 230);
         }
@@ -323,7 +357,22 @@ HL.DEFAULT_RULES = () => ({
         const clutch = (quarter >= 4) && clock <= 300 && Math.abs(H.score - A.score) <= 5;
         const before = offense.score - D.score;
         track.last = null;
-        const result = runPossession(offense, D, rules, transition, clutch, log, before, dur);
+        const play = offense.pendingPlay;
+        offense.pendingPlay = null;
+        let playEvent = null;
+        if (play) {
+          playEvent = tactical.find(e => e.id === play.eventId);
+          const eligible = [play.pid, play.partnerId].filter(id => id != null).every(id => offense.onCourt.some(p => p.id === id && !offense.st[id].out));
+          playEvent.resolved = true; playEvent.cancelled = !eligible;
+          if (!eligible) log(`${HL.GAME_PLAYS[play.play].label} is waved off: a participant has left the floor.`, offense);
+          else log(`${offense.st[play.pid].p.name}: ${HL.GAME_PLAYS[play.play].label.toLowerCase()}${play.partnerId != null ? ' with ' + offense.st[play.partnerId].p.name : ''}.`, offense);
+        }
+        const result = runPossession(offense, D, rules, transition, clutch, log, before, dur, playEvent && !playEvent.cancelled ? play : null, playEvent);
+        if (playEvent && !playEvent.cancelled) {
+          playEvent.points = offense.score - D.score - before;
+          playEvent.offensiveRebound = !!result.keep;
+        }
+        if (offense.huddle?.remaining > 0) offense.huddle.remaining--;
         transition = result.transition;
         const after = offense.score - D.score;
         // Lead changes (the last one decides the game) and the biggest deficit each side faced.
@@ -363,7 +412,7 @@ HL.DEFAULT_RULES = () => ({
       A.quarters.push(A.score - qStartA);
     };
 
-    function runPossession(O, D, rules, transition, clutch, log, lead, secs = 99) {
+    function runPossession(O, D, rules, transition, clutch, log, lead, secs = 99, play = null, playEvent = null) {
       const strat = O.strat, dstrat = D.strat;
       const lineup = O.onCourt, dline = D.onCourt;
       const putbackBy = O.lastOreb; O.lastOreb = null;
@@ -379,11 +428,28 @@ HL.DEFAULT_RULES = () => ({
         // Usage tendency maps back to usage % (usage/3.4 + 10): touches are proportional to it.
         let w = (Math.max(0, p.tend.usage) / 3.4 + 10) * Math.pow(p.ovr / 75, 0.5) * RANK[order.indexOf(p)];
         if (focusStar) w *= Math.pow(p.ovr / 75, 3);
+        if (play) {
+          const recipient = ['pickPop', 'driveKick'].includes(play.play) ? play.partnerId : play.pid;
+          if (p.id === recipient) w *= 3;
+          if (p.id === play.pid && p.id !== recipient) w *= 1.35;
+        }
+        if (O.livePassing?.has(p.id)) w *= HL.clamp(1.25 - p.tend.passFirst / 100, .3, 1.25);
+        if (D.matchup?.pressure === 'deny' && D.matchup.targetId === p.id && dline.some(x => x.id === D.matchup.pid)) w *= .65;
         if (strat.usageLock && strat.usageLock[p.id]) w *= strat.usageLock[p.id];
         return w;
       });
       const idx = lineup.indexOf(initiator);
-      const defender = dline[idx] || dline[0];
+      const assigned = D.matchup && dline.find(p => p.id === D.matchup.pid);
+      const guarding = (p, index) => {
+        if (!assigned || !lineup.some(x => x.id === D.matchup.targetId)) return dline[index] || dline[0];
+        D.matchup.event.active = true;
+        if (p.id === D.matchup.targetId) return assigned;
+        // Swap the original defender so the assigned guard does not cover two players.
+        if (dline[index] === assigned) return dline[lineup.findIndex(x => x.id === D.matchup.targetId)] || dline[0];
+        return dline[index] || dline[0];
+      };
+      const defender = guarding(initiator, idx);
+      if (playEvent && !playEvent.cancelled) playEvent.actualPid = initiator.id;
 
       // The sim has no player coordinates: rule violations are exposure-based, driven by
       // possession duration, pressure, paint usage and IQ. They still have real box-score
@@ -421,6 +487,8 @@ HL.DEFAULT_RULES = () => ({
       let pTO = 0.121 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
       if (dstrat.defense === 'press') pTO += 0.025;
       if (strat.focus === 'motion') pTO += 0.008;
+      if (play && ['pickRoll','handoff','driveKick'].includes(play.play)) pTO += .012 * (100 - initiator.attrs.pass) / 50;
+      if (assigned && D.matchup.targetId === initiator.id && D.matchup.pressure === 'trap') pTO += .018;
       if (transition) pTO += 0.01;
       pTO += E.tov;
       if (R.chance(HL.clamp(pTO, 0.06, 0.25))) {
@@ -463,10 +531,15 @@ HL.DEFAULT_RULES = () => ({
       const shooter = initiator;
       let passer = null;
       const sIdx = lineup.indexOf(shooter);
-      const sDef = dline[sIdx] || defender;
+      const sDef = guarding(shooter, sIdx);
       const helper = dline.slice().sort((a, b) => (b.attrs.intD + b.attrs.block) - (a.attrs.intD + a.attrs.block))[0];
 
       const w = shotWeights(O, shooter, rules, strat, dstrat.defense);
+      if (play) {
+        if (['pickPop','catchShoot','driveKick'].includes(play.play)) { w.three *= 2.4; w.rim *= .55; }
+        if (['pickRoll','postUp','cut'].includes(play.play)) { w.rim *= 2.4; w.three *= .5; }
+        if (play.play === 'isolation') w.mid *= 1.4;
+      }
       let type = R.weighted(['three', 'mid', 'rim'], k => w[k]);
       // Under two seconds there is only time for a catch-and-heave.
       const heave = secs < 2 && !transition;
@@ -478,9 +551,12 @@ HL.DEFAULT_RULES = () => ({
       let pAst = { three: 0.84, rim: 0.56, mid: 0.42 }[type] * HL.clamp(1.35 - usgPct * 0.021, 0.3, 1.2);
       if (strat.focus === 'motion') pAst += 0.08;
       if (focusStar) pAst -= 0.05;
+      if (play && ['catchShoot','cut','pickPop','handoff','driveKick'].includes(play.play)) pAst += .18;
+      if (play?.play === 'isolation') pAst -= .2;
       if (transition) pAst += 0.1;
       if (R.chance(HL.clamp(pAst, 0.05, 0.95))) {
-        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst));
+        const intended = play && ['pickPop','driveKick'].includes(play.play) ? play.pid : play?.partnerId;
+        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst) * (p.id === intended ? 3 : 1));
       }
 
       let makeP, value = 2, blockP = 0, foulP = 0, label;
@@ -490,7 +566,7 @@ HL.DEFAULT_RULES = () => ({
       const teamIQ = lineup.reduce((sum, p) => sum + p.attrs.iq, 0) / lineup.length;
       const contest = (key) => eff(D, sDef, key);
       if (type === 'rim') {
-        const isPost = shooter.tend.post > 25 && R.chance(shooter.tend.post / 100);
+        const isPost = play?.play === 'postUp' && shooter.id === play.pid || shooter.tend.post > 25 && R.chance(shooter.tend.post / 100);
         const finish = isPost
           ? (eff(O, shooter, 'post') * 0.6 + eff(O, shooter, 'close') * 0.4)
           : Math.max(eff(O, shooter, 'layup'), eff(O, shooter, 'dunk') * 0.92 + shooter.attrs.vert * 0.08, eff(O, shooter, 'close') * 0.97);
@@ -517,6 +593,21 @@ HL.DEFAULT_RULES = () => ({
         blockP = 0.008; foulP = 0.02;
         label = deep ? 'deep 4-pointer' : 'three';
       }
+      if (play) {
+        const partner = play.partnerId != null ? O.st[play.partnerId].p : null;
+        if (play.play === 'pickRoll') makeP += ((partner?.attrs.str ?? 50) - 65) * .0006 + (dstrat.defense === 'switch' ? -.008 : .008);
+        if (play.play === 'pickPop' && dstrat.defense === 'drop') makeP += .018;
+        if (play.play === 'cut') makeP += dstrat.defense === 'zone' ? -.015 : D.matchup?.pressure === 'deny' ? .02 : .008;
+        if (partner && ['handoff','catchShoot','driveKick'].includes(play.play)) makeP += (partner.attrs.pass - 65) * .0007;
+        if (play.play === 'isolation') makeP += (shooter.attrs.handle - sDef.attrs.perD) * .0006;
+      }
+      if (assigned && D.matchup.targetId === shooter.id) {
+        const pressure = D.matchup.pressure;
+        if (pressure === 'tight') { makeP += type === 'rim' ? .012 : -.014; foulP *= 1.15; }
+        if (pressure === 'sag') makeP += type === 'rim' ? -.014 : .022;
+        if (pressure === 'trap') { makeP -= .025; if (passer) makeP += .035; }
+      }
+      if (O.huddle?.remaining > 0) makeP += O.huddle.boost;
       makeP -= (teamD - 66) * 0.0052;
       makeP += (teamIQ - 68) * 0.0024;
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
@@ -631,7 +722,7 @@ HL.DEFAULT_RULES = () => ({
       const out = {};
       for (const id in T.st) {
         const l = { ...T.st[id].line, min: Math.round(T.st[id].line.min * 10) / 10 };
-        if (l.min > 0 || l.gs) { l.gp = 1; out[id] = l; }
+        if (T.st[id].played > 0 || l.gs) { l.gp = 1; out[id] = l; }
       }
       return out;
     };
@@ -640,6 +731,7 @@ HL.DEFAULT_RULES = () => ({
       away: { teamId: awayTeam.id, score: A.score, quarters: A.quarters, box: box(A) },
       ot, pbp, injuries,
       events: {
+        ...(tactical.length ? { tactical } : {}),
         violations: track.violations, clockResets: track.clockResets, bonusTrips: track.bonusTrips, strategyAdjustments,
         four: track.four, goAhead: track.goAhead, periods: 4 + ot,
         qfg: { home: H.qfg, away: A.qfg }, trail: { home: H.maxTrail, away: A.maxTrail },
@@ -655,8 +747,75 @@ HL.DEFAULT_RULES = () => ({
     const game = run();
     return {
       step: () => game.next(),
+      command(teamId, kind, values = {}) {
+        const T = teams.find(t => t.team.id === teamId);
+        const fail = reason => ({ ok: false, reason });
+        if (!T || finished || quarter >= 4 && remaining <= 0 && H.score !== A.score) return fail('The game is no longer awaiting a decision.');
+        const schemas = { lineup:['pids'],autoRotation:[],timeout:[],play:['play','pid','partnerId'],matchup:['pid','targetId','pressure'],clearMatchup:[],huddle:['intent','text'] };
+        if (!Object.hasOwn(schemas,kind) || !values || typeof values !== 'object' || Array.isArray(values) || Object.keys(values).some(k => !schemas[kind].includes(k))) return fail('Choose a supported game decision.');
+        const eligible = pid => Number.isInteger(pid) && T.st[pid] && !T.st[pid].out;
+        const opening = T.onCourt.length ? T.onCourt : T.starters;
+        if (kind === 'lineup' && (!Array.isArray(values.pids) || values.pids.length !== 5 || new Set(values.pids).size !== 5 || !values.pids.every(eligible))) return fail('Choose five different available players from your team.');
+        if (kind === 'play') {
+          const spec = Object.hasOwn(HL.GAME_PLAYS,values.play) ? HL.GAME_PLAYS[values.play] : null;
+          if (!spec || !eligible(values.pid) || !opening.some(p => p.id === values.pid) || spec.partner && (!eligible(values.partnerId) || values.partnerId === values.pid || !opening.some(p => p.id === values.partnerId)) || !spec.partner && values.partnerId != null) return fail('Choose a supported play and its available participants on the floor.');
+        }
+        if (kind === 'matchup' && (!eligible(values.pid) || !opening.some(p => p.id === values.pid) || !['tight','sag','deny','trap'].includes(values.pressure) || !teams.find(t => t !== T).avail.some(p => p.id === values.targetId && !teams.find(t => t !== T).st[p.id].out))) return fail('Choose your on-floor defender, an available opponent and a coverage.');
+        if (kind === 'huddle' && (!['encourage','challenge','calm','accountability','reassure','focus'].includes(values.intent) || typeof values.text !== 'string' || !values.text.trim() || values.text.length > 2000)) return fail('Choose a team-talk intent and write up to 2,000 characters.');
+        const modern = opts.season == null || opts.season >= 2017;
+        if (kind === 'timeout' && (quarter === 0 || T.timeouts <= 0 || modern && quarter === 4 && (T.timeoutsFourth >= 4 || remaining <= 180 && T.timeoutsLate >= 2))) return fail(quarter === 0 ? 'Tip off before using a timeout.' : 'No timeout is available under the current period limits.');
+        const event = { id:tactical.length + 1,kind,teamId,period:quarter,clock:clockStr, ...JSON.parse(JSON.stringify(values)) };
+        tactical.push(event);
+        if (!T.onCourt.length) chooseLineup(T,{remaining:regSeconds,quarterStart:true,quarter:1,diff:0,clutchTime:false,garbage:false,foulOut:rules.foulOut||0});
+        if (kind === 'lineup') {
+          T.manualLineup = values.pids.slice(); if (quarter === 0) T.finalizeStarters = true;
+          T.onCourt = values.pids.map(id => T.st[id].p).sort((a,b) => POS_IDX[a.pos] - POS_IDX[b.pos]);
+          if (quarter === 0) for (const x of Object.values(T.st)) x.line.gs = T.onCourt.includes(x.p) ? 1 : 0;
+          event.names = T.onCourt.map(p => p.name); log(`Lineup change: ${event.names.join(', ')}.`,T);
+        }
+        if (kind === 'autoRotation') { T.manualLineup = null; if (quarter === 0) { T.onCourt = []; T.finalizeStarters = true; for (const x of Object.values(T.st)) x.line.gs = T.starters.includes(x.p) ? 1 : 0; } log('The coach returns to the automatic rotation.',T); }
+        if (kind === 'timeout') {
+          T.timeouts--; if (quarter === 4) { T.timeoutsFourth++; if (remaining <= 180) T.timeoutsLate++; }
+          // Both clubs benefit from the real stoppage. Inventory limits prevent unlimited recovery.
+          for (const t of teams) for (const x of Object.values(t.st)) if (!x.out) x.energy = Math.min(1,x.energy + .055);
+          event.score = [H.score,A.score]; log(`${T.team.abbr} call timeout. ${T.timeouts} remaining.`,T);
+        }
+        if (kind === 'play') {
+          if (T.pendingPlay) { const old=tactical.find(e=>e.id===T.pendingPlay.eventId); old.cancelled=true;old.resolved=true;old.reason='Replaced by another call'; }
+          T.pendingPlay = {...values,eventId:event.id}; event.label=HL.GAME_PLAYS[values.play].label;event.name=T.st[values.pid].p.name;event.resolved=false;
+        }
+        if (kind === 'matchup') { T.matchup = {...values,event}; log(`${T.st[values.pid].p.name} takes ${teams.find(t=>t!==T).st[values.targetId].p.name}: ${values.pressure} coverage.`,T); }
+        if (kind === 'clearMatchup') T.matchup = null;
+        if (kind === 'huddle') {
+          const ego=T.onCourt.reduce((n,p)=>n+(p.traits?.ego??50),0)/5,ethic=T.onCourt.reduce((n,p)=>n+(p.traits?.workEthic??50),0)/5;
+          const boost=values.intent==='challenge' ? (ethic-ego)*.0002 : values.intent==='calm' ? .006 : values.intent==='accountability' ? (ethic-50)*.00015 : .005;
+          const usedReplies=new Set(),previousReplies=T.huddle?.responses||[];
+          T.talkSequence=(T.talkSequence||0)+1;
+          const repeated=T.huddle?.text===values.text&&T.huddle?.intent===values.intent;
+          const replies = T.onCourt.map(p => {
+            const x=T.st[p.id],ego=p.traits?.ego??50,driven=p.traits?.workEthic??50;
+            const lines=values.intent==='challenge'&&ego>=75 ? ['Hold everybody to the same standard. I am working out here.','I heard you. Just make sure everybody hears it too.'] : values.intent==='challenge'&&driven>=65 ? ['Fair. I can give you more on that end.','You are right. Next possession, I will set the tone.'] : x.fouls>=4 ? ['I have to stay disciplined. I cannot give away another foul.','I will contest without reaching. I know my foul count.'] : x.energy<.45 ? ['I am feeling it. A short breather would help me execute.','I want to help, but my legs need a moment.'] : values.intent==='calm' ? ['Let us get into our set. No need to force the first look.','I will settle us down. We have time to run the action.'] : values.intent==='accountability' ? ['That last mistake is on me. Let us get the next one right.','We all have a job to do. I know mine.'] : ['I hear you. Keep moving it and I will stay ready.','We are together. Get a stop, then work for a good shot.','Got it. I will talk more on defense.'];
+            const roleLines=isGuard(p)?['I will get us organized before we rush into a shot.','I will keep my head up and find the next pass.','I will make sure we are all hearing the call.']:['I will give the guards a solid screen and roll hard.','I will keep moving after the first action breaks down.','I will keep my body between my man and the basket.'];
+            const additions=values.intent==='challenge'&&ego>=75?['Demand it of us all, not just me.','I am giving you what I have. Let us talk about the execution.','I can take criticism. Make sure it is fair.','I want to win too. Tell me the adjustment.','We need each other out here. Keep the message consistent.']:values.intent==='challenge'?['I can be sharper with my assignment.','Let us get the next stop first.','I know what you need. I will do my part.','We cannot wait for someone else to change it.','I will take that responsibility.']:values.intent==='calm'?['One possession at a time. I understand.','I will trust the first good look instead of chasing a hard one.','Let them pressure us. I will stay patient.','I will make the simple play when it is there.','We have to see the whole floor.']:['I will stay connected to the guy next to me.','No wandering after the first pass. I hear you.','I will be ready when the ball comes back.','Keep talking to me on the next action.','We can clean this up together.'];
+            const specific=values.intent==='challenge'&&ego>=75||x.fouls>=4||x.energy<.45;
+            const stateLines=x.fouls>=4?['I will keep my hands back and move my feet.','I know I am in foul trouble. I have to stay available.','I cannot afford to swipe at another drive.','Tell me if you want a different matchup with these fouls.','I will be careful on the next contest.','I can still defend without reaching.']:x.energy<.45?['My legs are heavy. I need to be honest about that.','I will make the simple play until I catch my breath.','If you give me a short rest, I can bring more energy.','I am trying to stay sharp, but I am tired.','I do not want my fatigue to hurt the group.','Let me get a breather before I lose my assignment.']:additions;
+            const all=[...(repeated?['I heard you the first time. Let me put it into practice.','The message is clear. Let us play the next possession.']:[]),...lines,...stateLines,...(specific?[]:roleLines)];
+            const prior=previousReplies.find(r=>r.pid===p.id)?.text;
+            const choices=all.filter(text=>!usedReplies.has(text)&&text!==prior);
+            const text=choices[(p.id+quarter+Math.floor(remaining)+T.talkSequence)%choices.length];
+            usedReplies.add(text);
+            return {pid:p.id,name:p.name,text,stance:values.intent==='challenge'&&ego>=75?'pushback':x.fouls>=4?'cautious':x.energy<.45?'tired':'engaged'};
+          });
+          T.huddle = {intent:values.intent,text:values.text,boost:HL.clamp(boost,-.012,.012),remaining:6,responses:replies};
+          event.boost=T.huddle.boost; log(`Team talk (${values.intent}): “${values.text}”`,T);
+        }
+        return {ok:true,event};
+      },
       snapshot: () => ({ ...result(), period: quarter, seconds: remaining, clock: clockStr || `${rules.quarterLen}:00`, finished,
         lineups: Object.fromEntries(teams.map(T => [T.team.id, T.onCourt.map(p => ({ pid: p.id, energy: T.st[p.id].energy, fouls: T.st[p.id].fouls }))])),
+        possessionTeamId: offense.team.id,
+        tactics: Object.fromEntries(teams.map(T => [T.team.id,{manual:!!T.manualLineup,timeouts:T.timeouts,timeoutsFourth:T.timeoutsFourth,timeoutsLate:T.timeoutsLate,pendingPlay:T.pendingPlay?{...T.pendingPlay}:null,matchup:T.matchup?{pid:T.matchup.pid,targetId:T.matchup.targetId,pressure:T.matchup.pressure}:null,huddle:T.huddle?{...T.huddle}:null}])),
+        roster: Object.fromEntries(teams.map(T => [T.team.id,T.avail.map(p => ({pid:p.id,energy:T.st[p.id].energy,fouls:T.st[p.id].fouls,targetMinutes:T.st[p.id].target/60,out:T.st[p.id].out}))])),
         out: teams.flatMap(T => T.avail.filter(p => T.st[p.id].out).map(p => p.id)) }),
       control(teamId, values) {
         const T = teams.find(T => T.team.id === teamId); if (!T) return false;
@@ -667,7 +826,9 @@ HL.DEFAULT_RULES = () => ({
       },
       playerControl(pid, values) {
         const T = teams.find(T => T.st[pid]); if (!T) return false;
-        Object.assign(T.st[pid].p.tend, values); return true;
+        Object.assign(T.st[pid].p.tend, values);
+        if ('passFirst' in values) { T.livePassing ||= new Set(); T.livePassing.add(pid); }
+        return true;
       },
     };
   };
