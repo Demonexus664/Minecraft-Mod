@@ -997,7 +997,8 @@ HL.SkillDraft = (function () {
       const award = n => s.awards.find(a => awardName(a) === n);
       const over = n => { const a = award(n); return a && a.over ? `Over ${esc(a.over)}` : ''; };
       const firstAllStar = award('All-Star') && c.awards.filter(a => a.award === 'All-Star').length === 1;
-      const queue = [];      if (s.champion) queue.push(['CHAMPIONS', `${esc(fullName(s.team))} · ${yrLabel(s.yr)}`, 4]);
+      const queue = [];
+      if (s.champion) queue.push(['CHAMPIONS', `${esc(fullName(s.team))} · ${yrLabel(s.yr)}`, 4]);
       if (award('Finals MVP')) queue.push(['FINALS MVP', '', 4]);
       if (award('MVP')) queue.push(['MVP', over('MVP'), 4]);
       if (award('DPOY')) queue.push(['DEFENSIVE PLAYER OF THE YEAR', over('DPOY'), 3]);
