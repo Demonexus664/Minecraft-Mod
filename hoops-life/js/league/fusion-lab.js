@@ -156,7 +156,7 @@ HL.FusionLab=(function(){
 
  function fromDraftCard(card){
   const pid=card?.row?.pid,bio=HL.HISTORY?.players?.[pid];
-  if(!pid||!bio)throw Error('No eligible historical draft card');
+  if(pid==null||!bio)throw Error('No eligible historical draft card');
   const year=+card.season||0,attrs=HL.historicalAttributes(card.row);
   let photo='';
   try{photo=HL.UI?.photo({name:bio[0],real:true,nbaId:bio[1]},null,year)?.src||'';}catch{}
