@@ -632,6 +632,7 @@ HL.SkillDraft = (function () {
     const res = simSeason(L, team, me, missed,c.role);
     const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
     s.agenda=finishAgenda(c,s,L.games);
+    HL.SkillPress?.resolve(c,s);
     if(L.season>HL.LATEST_SEASON){
       s.leagueRecap={
         rookies:Object.values(L.players).filter(p=>p.draft?.year===c.yr&&p.teamId!=null)
