@@ -42,8 +42,7 @@ HL.SkillDraft = (function () {
   function newRun(mode, debut, draftStyle = 'original') {
     cache=null;futureWorld=null;
     HL.DNAFX?.reset();
-    HL.FusionUI?.close();
-    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating',fusionEquipped:null };
+    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -206,7 +205,7 @@ HL.SkillDraft = (function () {
     if (tile) { tile.classList.add('pop'); FX.burst(tile, FX.tierOf(v).colors.concat('#fff'), FX.tierIndex(v) >= 3 ? 30 : 12, 0.6); }
     const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
     const fresh=dna.mutations.find(m=>!oldDna.mutations.some(o=>o.id===m.id));
-    if(fresh) HL.DNAFX.reveal(fresh,{title:'LEGENDARY SKILL FUSION',resultPlayer:{name:st.name,pos:st.pos==='auto'?'':st.pos,number:7,height:dna.build.height,ovr:'DNA',real:false}});
+    if(fresh) HL.DNAFX.reveal(fresh,{title:'LEGENDARY SKILL REACTION',resultPlayer:{name:st.name,pos:st.pos==='auto'?'':st.pos,number:7,height:dna.build.height,ovr:'DNA',real:false}});
     if (!remaining().length && !fresh) setTimeout(() => { const prime = buildPrime(); const ovr = HL.computeOvr(prime.attrs, prime.pos); FX.banner(`${ovr} OVR`, `Your ${prime.pos} is built: ${HL.fmtHeight(prime.height)}, ${prime.weight} lb.`, { tier: ovr >= 95 ? 4 : ovr >= 90 ? 3 : ovr >= 82 ? 2 : 1, kicker: 'Ceiling', ms: 2200 }); }, 350);
   }
 
@@ -243,7 +242,7 @@ HL.SkillDraft = (function () {
     const entries=Object.entries(st.picks).map(([cat,c])=>({pid:c.row.pid,cat,row:c.row,season:c.season}));
     const effective=HL.DNA.reconcileAttributes(attrs,height);
     const base=HL.DNA.applyBuild({ attrs:effective.attrs, draftedAttrs:{...attrs}, constraints:effective.constraints, height, weight, pos, tendencies, longevity, primeLength },HL.DNA.analyze(entries,{build:{attrs:effective.attrs,height,weight}}));
-    return st.fusionEquipped&&HL.FusionLab?HL.FusionLab.project(base,st.fusionEquipped):base;
+    return base;
   }
 
 
@@ -1235,30 +1234,6 @@ HL.SkillDraft = (function () {
   }
 
 
-  function fusionDossier(node,report=null){
-    if(!node)return '';
-    const left={photo:node.images?.[0]||'',name:node.heads?.[0]||'Parent A'};
-    const right={photo:node.images?.[1]||'',name:node.heads?.[1]||'Parent B'};
-    const art=HL.FusionUI?.portrait(left,right,true)||'';
-    const skills=Object.entries(node.mechanics||{}).sort((a,b)=>b[1]-a[1]).slice(0,5);
-    const gain=report?.changes||[];
-    const trade=node.tradeoffs||[];
-    return '<section class="block fusion-dossier"><header><h3>GENESIS HYBRID · EQUIPPED</h3>'+
-      '<span class="ml-auto t3 sm">Generation '+node.depth+'</span></header>'+
-      '<div class="body"><div class="fusion-dossier-layout">'+art+
-      '<div class="fusion-dossier-story"><span class="caps">'+esc(node.family)+'</span>'+
-      '<h3>'+esc(node.name)+'</h3><p>Created from '+esc(node.heads?.join(' × ')||'two players')+
-      '. The fusion inherits actual specialized basketball tools, with its chosen physique and matchup tradeoffs.</p>'+
-      '<div class="fusion-dossier-skill-list">'+skills.map(([k,v])=>
-        '<div><b>'+esc(k.replace(/([A-Z])/g,' $1'))+'</b><span>'+Math.round(v*100)+'% mechanic intensity</span></div>').join('')+'</div>'+
-      '<details><summary>What transferred into MyPlayer?</summary><div class="stack">'+
-      (gain.length?gain.map(x=>'<div class="kv"><span>'+esc(x.key)+'</span><b>'+
-        x.from+' → '+x.to+'</b></div>').join(''):'<p class="t3 sm">The fusion adds tactical mechanics, but none of its listed skills exceeded the player’s original ratings.</p>')+
-      (trade.length?'<div class="caps">Physical inheritance costs</div>'+trade.map(x=>
-        '<div class="kv"><span>'+esc(x.key)+'</span><b>−'+x.lost+' versus the stronger parent</b></div>').join(''):'')+
-      '</div></details></div></div></div></section>';
-  }
-
   function builtView() {
     const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
     return `${HL.DNA.powerMap(dna)}<section class="block"><div class="body stack"><h3>Your player is built</h3>
@@ -1266,8 +1241,7 @@ HL.SkillDraft = (function () {
       <div class="setting"><div class="grow"><b>Draft class</b><div class="d">He enters the real league in this draft and plays every season against the real rosters of that year.</div></div>${debutSelect()}</div>
       <div class="setting"><div class="grow"><b>Choose your position</b><div class="d">Your choice changes OVR weighting, lineup role, matchups and minutes. No height restriction, so unusual builds are allowed.</div></div><select data-position><option value="auto" ${st.pos==='auto'?'selected':''}>Auto: best fit</option>${HL.POSITIONS.map(p=>`<option value="${p}" ${st.pos===p?'selected':''}>${p} · ${p==='PG'?'Point Guard':p==='SG'?'Shooting Guard':p==='SF'?'Small Forward':p==='PF'?'Power Forward':'Center'}</option>`).join('')}</select></div>
       ${(() => {const b=buildPrime(),w=primeWindow({prime:b});return `<section class="block subtle"><div class="body"><div class="cols c2"><div><b>Prime window</b><div class="t2">Age ${w.start}–${w.end} (${w.seasons} seasons) · duration ${b.primeLength}/99</div></div><div><b>Longevity ${b.longevity}/99</b><div class="t2">Controls aging decline and late-career viability; no fixed retirement age</div></div></div><div class="t3 sm" style="margin-top:8px">Position changes how your complete build is evaluated and matched up. Your drafted shot diet and scorer mentality stay active throughout the career.</div></div></section>`;})()}
-      <div class="gf-launch"><div class="grow"><div class="caps">NEW · EXPERIMENTAL PLAYER ENGINEERING</div><h3>Genesis Fusion Laboratory</h3><p>Fuse any pair from the historical archive. Recombine successful fusions with new players or other creations. Even incompatible stars can produce rare paradox outcomes. Odds are shown before every attempt, and the outcome can alter your actual career skills.</p></div><button class="btn go big" data-open-fusion>OPEN FUSION LAB</button></div>
-      ${st.fusionEquipped?fusionDossier(st.fusionEquipped,buildPrime().fusionReport)+'<div class="row"><button class="btn small" data-unequip-fusion>Remove fusion</button></div>':''}
+      <section class="block dna-career-special"><header><h3>SKILL REACTIONS · DUOS, TRIOS & ELITE SKILLS</h3></header><div class="body stack"><p class="t2">The skills you draft form one career player. Elite mechanics and historical duos and trios activate through actual basketball possessions.</p><p class="t3 sm">Player-to-player fusion is exclusive to 82-0 Challenge. Here, your skill sources combine into one career identity.</p></div></section>
       ${HL.DNA.board(buildPrime().dna)}
       ${buildPrime().constraints.length?`<section class="block"><div class="body"><h3>How your tools work together</h3>${buildPrime().constraints.map(x=>`<p class="t2 sm"><b>${esc(x.key)}: ${x.ceiling} drafted → ${x.effective} executable.</b> ${esc(x.reason)}</p>`).join('')}</div></section>`:''}
       ${buildDetail(buildPrime())}
@@ -1442,7 +1416,6 @@ HL.SkillDraft = (function () {
     const cur = Object.fromEntries(CATS.filter(x => x[2].length&&!x[0].startsWith('tend')).map(([id, label, keys]) => [id, [label, avgOf(c.me.attrs, keys), avgOf(c.prime.attrs, keys)]]));
     const habits=CATS.filter(x=>x[0].startsWith('tend')).map(([id,label,keys])=>`<details><summary>${esc(label)}</summary>${keys.map(k=>`<div class="kv"><span>${esc(k)}</span><b>${c.me.tend[k]??'—'}/100</b></div>`).join('')}</details>`).join('');
     return `<div style="max-width:340px">${card}</div>
-      ${c.prime.fusion?fusionDossier(c.prime.fusion,c.prime.fusionReport):''}
       <section class="block"><header><h3>Trophy case</h3></header><div class="body">${cab.length ? cab.map(([k, n]) => `<div class="kv"><span>${esc(k)}</span><b>${n}</b></div>`).join('') : '<div class="t3 sm">Empty, for now.</div>'}</div></section>
       ${hi.length ? `<section class="block"><header><h3>Career highs</h3></header><div class="body">${hi.map(([k, h]) => `<div class="kv"><span>${k}</span><b>${h.v} <span class="t3 xs">vs ${esc(h.opp)}, ${yrLabel(h.yr)}${h.playoffs ? ' (playoffs)' : ''}</span></b></div>`).join('')}</div></section>` : ''}
       <section class="block"><header><h3>Ratings</h3><span class="ml-auto t3 sm">Now · ceiling</span></header><div class="body">${Object.values(cur).map(([label, now, top]) => `<div class="meter"><span class="lbl">${esc(label)}</span><span class="val">${now} <span class="t3 xs">/ ${top}</span></span><div class="track"><i class="${now >= 80 ? 'hi' : now < 55 ? 'lo' : 'mid'}" style="width:${now}%"></i></div></div>`).join('')}</div></section>
@@ -1594,10 +1567,6 @@ HL.SkillDraft = (function () {
     const position = app.querySelector('[data-position]'); if (position) position.onchange = () => { st.pos=position.value; render(); };
     const db = app.querySelector('[data-debut]'); if (db) db.onchange = () => { st.debut = +db.value; };
     const c = st.career;
-    app.querySelector('[data-open-fusion]')?.addEventListener('click',()=>HL.FusionUI?.open(node=>{
-      if(st&&!st.career){st.fusionEquipped=node;render();FX.sfx.achievement?.();}
-    }));
-    app.querySelector('[data-unequip-fusion]')?.addEventListener('click',()=>{st.fusionEquipped=null;render();});
     app.querySelectorAll('[data-begin]').forEach(b => b.onclick = async () => {
       const run=st;
       const proceeded=await busy(`The ${st.debut} draft`, 'Loading the real league…', async () => {
