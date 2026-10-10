@@ -892,7 +892,7 @@ HL.SkillDraft = (function () {
       if (tens >= 3) counts.td++; else if (tens >= 2) counts.dd++;
     };
     let w = 0, l = 0, gi = 0;
-    const nightEvents=[];
+    const nightEvents=[],abilityCounts={};
     for (const gm of L.schedule) {
       if (gm.home !== team.id && gm.away !== team.id) continue;
       me.injury = gi++ >= missed ? null : { name: 'Injured', games: 1 };
