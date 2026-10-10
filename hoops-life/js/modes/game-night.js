@@ -34,9 +34,27 @@ HL.GameNights=(function(){
   if(record){record.id=id;record.title=p.title;record.wear=p.wear;}
   return p;
  }
+ function scenario(context){
+  const {game,total,record,opp}=context,played=record.w+record.l;
+  const percentage=played?record.w/played:.5;
+  const elite=(opp?.players||[]).filter(p=>p.ovr>=88).length;
+  if(game===1)return {title:'THE FIRST NIGHT',sub:'The debut sets the tone',
+    story:'The cameras are following every warmup. A new face is walking onto an NBA court for the first time.'};
+  if(game<=21&&percentage<.48)return {title:'THE LOCKER ROOM IS RESTLESS',sub:'Change the early narrative',
+    story:'The standings are uncomfortable. The coach needs a decision before another tough stretch.'};
+  if(game<=21)return {title:'THE LEAGUE HAS NOTICED',sub:'Protect the early momentum',
+    story:'The record is building expectations. Opponents have begun scouting your favorite possessions.'};
+  if(game<=41)return {title:'MIDSEASON ADJUSTMENT',sub:elite?'This opponent has multiple superstar threats':'The second half begins now',
+    story:elite?'Their leading options are difficult to guard. Your staff has one chance to change the matchup plan.':
+      'The race is tightening. Choose the identity that takes you toward the postseason.'};
+  return {title:percentage>=.6?'CHAMPIONSHIP EXPECTATIONS':'THE PLAYOFF PUSH',
+    sub:'Every late-season possession has consequences',
+    story:percentage>=.6?'The city expects a deep run. The next tactical choice will reveal whether you are really ready.':
+      'The margin for error is getting smaller. The approach you choose could determine the playoff picture.'};
+ }
  function prompt(context){
   if(typeof document==='undefined'||!document.body)return Promise.resolve('trust');
-  const {game,total,opp,team,record,player,year,era}=context;
+  const {game,total,opp,team,record,player,year}=context,beat=scenario(context);
   const ref=document.createElement('div');
   ref.className='game-night-overlay';ref.setAttribute('role','dialog');
   ref.setAttribute('aria-modal','true');ref.setAttribute('aria-label','Basketball game-night decision');
@@ -49,7 +67,8 @@ HL.GameNights=(function(){
    '<div class="game-night-number">'+esc(player?.number||'00')+'</div><div class="game-night-captain">'+
    esc(player?.name||'Your player')+'</div></div><div class="game-night-story">'+
    '<div class="caps">'+(year>=2010?'BROADCAST · LIVE PRE-GAME':'COURTSIDE REPORT · GAME NIGHT')+'</div>'+
-   '<h2>YOU CONTROL THE NEXT CHAPTER.</h2>'+
+   '<h2>'+esc(beat.title)+'</h2>'+
+   '<p class="game-night-dek">'+esc(beat.sub)+'</p><p>'+esc(beat.story)+'</p>'+
    '<p>The '+esc(team?.name||'team')+' are '+record.w+'-'+record.l+
    '. Tonight: '+esc(opp?.city||'')+' '+esc(opp?.name||'the visitors')+'.</p>'+
    '<div class="game-night-opposition"><b>SCOUTING TAPE</b><span>'+
@@ -92,5 +111,5 @@ HL.GameNights=(function(){
     ' · Team '+d.record+'</p><small>Chosen adjustments applied to real possessions, not player OVR.</small></div>').join('')+
    '</div></div></section>';
  }
- return {PLANS,apply,prompt,recap};
+ return {PLANS,apply,prompt,recap,scenario};
 })();
