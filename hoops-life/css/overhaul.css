@@ -408,3 +408,33 @@ button:focus-visible,input:focus-visible,select:focus-visible,.gcard:focus-visib
 .season-rivalry strong {font:850 24px var(--display);text-transform:uppercase;letter-spacing:.03em;}
 .season-rivalry span {font-weight:750;font-variant-numeric:tabular-nums;color:var(--text-2);}
 .season-rivalry p {margin:10px 0 0;}
+
+
+/* Presentation settings persist across 82-0 and Skill Draft. */
+.fx-selector {
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  font:800 10px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--text-3);
+}
+.fx-selector select {
+  background:#1b2636;color:var(--text);border:1px solid rgba(167,202,248,.27);
+  border-radius:8px;padding:7px 8px;max-width:112px;font:700 11px var(--body);
+}
+.fx-selector select:focus-visible{outline:2px solid #8cc8ff;outline-offset:2px;}
+html[data-fx-level="lite"] .gc-shine,
+html[data-fx-level="off"] .gc-shine,
+html[data-fx-level="off"] .gcard.t-legend::after,
+html[data-fx-level="off"] .gcard.t-diamond::after {display:none!important;}
+html[data-fx-level="lite"] .machine,
+html[data-fx-level="off"] .machine{box-shadow:0 8px 23px rgba(0,0,0,.2);}
+html[data-fx-level="off"] .reel.landed,
+html[data-fx-level="off"] .hand .gcard.up,
+html[data-fx-level="off"] .page,
+html[data-fx-level="off"] .tile.pop {animation:none!important;}
+html[data-fx-level="off"] .gcard.up:hover{transform:none!important;}
+html[data-fx-level="off"] .btn.spin::after,
+html[data-fx-level="off"] .btn.go::after{display:none;}
+@media(max-width:570px){
+  .simbar{flex-wrap:wrap;justify-content:flex-end;row-gap:5px;}
+  .fx-selector{font-size:9px;gap:4px;}
+  .fx-selector select{max-width:94px;padding:5px;}
+}
