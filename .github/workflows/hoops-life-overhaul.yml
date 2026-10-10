@@ -36,6 +36,7 @@ jobs:
           node --check js/media/fanfeed.js
           node --check js/media/skill-press.js
           node --check js/core/dna-fx.js
+          node --check js/league/film-iq.js
       - name: Test draft modes, generated leagues, longevity, gameplay and presentation
         run: |
           node --test \
@@ -43,6 +44,7 @@ jobs:
             tools/test-fanfeed.js \
             tools/test-skill-press.js \
             tools/test-presentation-batch3.js \
+            tools/test-film-iq.js \
             tools/test-overhaul-batch2.js \
             tools/test-skilldraft-freechoice.js \
             tools/test-skilldraft-future.js \
