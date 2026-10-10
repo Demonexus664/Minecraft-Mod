@@ -487,7 +487,7 @@ HL.Challenge = (function () {
     }
     st.result = {w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,best,losses:log,lines,players,firstLoss,gameLog,
       absences,injuriesLog,specialEncounter:null,dna:st.dna,specialDraft:st.special?.label||null,
-      closeGames,closeWins,marqueeLog,schemeCounts,schemeRecords,coach:st.coach,coachLog:st.coachLog,bosses:st.bosses,gauntlet:st.gauntlet,
+      closeGames,closeWins,marqueeLog,schemeCounts,schemeRecords,abilityCounts,coach:st.coach,coachLog:st.coachLog,bosses:st.bosses,gauntlet:st.gauntlet,
       mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
