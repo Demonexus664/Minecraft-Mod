@@ -1,0 +1,280 @@
+/* HOOPS LIFE / ARENA EDITION
+   Real product presentation pass. Layered broadcast lighting, card material,
+   contrast, accessible motion and consistent feedback across both draft modes.
+   Effects are pure CSS so slower devices can disable animation independently. */
+
+:root {
+  --bg:#080b12;
+  --surface:#101621;
+  --surface-2:#151c29;
+  --surface-3:#1b2532;
+  --rule:rgba(166,187,219,.14);
+  --rule-strong:rgba(191,212,247,.24);
+  --text:#f4f7ff;
+  --text-2:#b0bfd2;
+  --text-3:#7e92aa;
+  --r:12px;
+  --arena-glow:rgba(62,143,233,.13);
+  --arena-edge:rgba(255,255,255,.09);
+  --gold:#f8d990;
+}
+html { scroll-behavior:smooth; }
+body {
+  background:
+    radial-gradient(ellipse 100% 60% at 50% -10%,rgba(61,110,196,.16),transparent 68%),
+    radial-gradient(ellipse 45% 70% at 95% 30%,rgba(20,64,103,.1),transparent 65%),
+    linear-gradient(150deg,#090d15,#080b10 55%,#0a101b);
+  background-attachment:fixed;
+  min-height:100vh;
+}
+body::before {
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  opacity:.14;
+  background-image:repeating-linear-gradient(90deg,transparent 0,transparent 59px,rgba(189,216,255,.08) 60px),
+                   repeating-linear-gradient(0deg,transparent 0,transparent 59px,rgba(189,216,255,.07) 60px);
+  mask-image:linear-gradient(to bottom,#000,transparent 92%);
+}
+#app { position:relative; isolation:isolate; }
+.frame { min-height:100vh; }
+.masthead {
+  position:relative;
+  background:linear-gradient(145deg,rgba(16,23,37,.96),rgba(12,18,29,.95));
+  border-bottom:1px solid rgba(197,215,255,.12);
+  box-shadow:0 10px 40px rgba(0,0,0,.24),inset 0 1px 0 rgba(255,255,255,.08);
+  backdrop-filter:blur(18px);
+}
+.masthead::after {
+  content:"";position:absolute;bottom:-1px;left:14%;right:14%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--team),transparent);
+  box-shadow:0 0 24px var(--team);opacity:.45;pointer-events:none;
+}
+.wordmark { letter-spacing:-.04em; text-shadow:0 2px 16px rgba(0,0,0,.35); }
+.page { animation:hl-page-in .35s cubic-bezier(.16,1,.3,1) both; }
+.page-title h2 {letter-spacing:.015em;}
+.block {
+  border:1px solid var(--arena-edge);
+  background:linear-gradient(155deg,rgba(27,37,54,.84),rgba(13,19,30,.95));
+  box-shadow:0 12px 34px rgba(0,0,0,.15),inset 0 1px 0 rgba(255,255,255,.04);
+  border-radius:16px;
+  overflow:hidden;
+}
+.block>header {
+  border-bottom:1px solid rgba(184,207,255,.11);
+  background:linear-gradient(90deg,rgba(120,166,245,.08),transparent);
+}
+.block>header h3 {letter-spacing:.055em;}
+.block .body {position:relative;}
+button:focus-visible,input:focus-visible,select:focus-visible,.gcard:focus-visible {
+  outline:2px solid #8cc8ff;outline-offset:3px;
+}
+.btn,.btn.spin,.btn.go {
+  position:relative;border-radius:10px;letter-spacing:.025em;
+  transition:transform .17s cubic-bezier(.2,.8,.2,1),border-color .2s ease,box-shadow .22s ease,filter .22s ease;
+  transform:translateZ(0);
+}
+.btn:not(:disabled):hover,.btn.go:not(:disabled):hover {
+  transform:translateY(-2px);
+  box-shadow:0 6px 19px rgba(0,0,0,.25),inset 0 1px 0 rgba(255,255,255,.12);
+  filter:brightness(1.1);
+}
+.btn:not(:disabled):active {transform:translateY(1px) scale(.985);transition-duration:70ms;}
+.btn.spin,.btn.go {
+  background:linear-gradient(125deg,var(--team),color-mix(in srgb,var(--team) 60%,#fff));
+  border-color:color-mix(in srgb,var(--team) 70%,white);
+  color:var(--team-ink);
+  box-shadow:0 3px 22px color-mix(in srgb,var(--team) 28%,transparent),inset 0 1px 0 rgba(255,255,255,.25);
+}
+.btn.spin::after,.btn.go::after {
+  content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(100deg,transparent 28%,rgba(255,255,255,.19) 50%,transparent 72%);
+  background-size:260% 100%;background-position:110% 0;
+  transition:background-position .6s;
+}
+.btn.spin:hover::after,.btn.go:hover::after{background-position:-25% 0;}
+.seg,.gameplan-option,.training-choice {transition:background .18s,border-color .18s,transform .18s;}
+.seg button.on {box-shadow:inset 0 -2px 0 var(--team);}
+
+/* Arena-like stage, with the reels as the hero. */
+.machine {
+  position:relative;isolation:isolate;
+  background:
+    radial-gradient(ellipse 70% 42% at 50% 8%,rgba(109,174,255,.16),transparent),
+    linear-gradient(145deg,#18263b 0%,#101a2a 40%,#080e18 100%);
+  border:1px solid rgba(134,178,235,.25);
+  box-shadow:0 24px 68px rgba(0,0,0,.39),inset 0 1px 0 rgba(202,229,255,.14),0 0 38px rgba(47,114,187,.07);
+  border-radius:20px;overflow:hidden;
+}
+.machine::before {
+  content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background:
+    linear-gradient(110deg,transparent 15%,rgba(109,171,242,.045) 48%,transparent 83%),
+    repeating-linear-gradient(0deg,transparent 0 39px,rgba(174,211,255,.018) 40px 41px);
+}
+.machine::after {
+  content:"";position:absolute;top:0;left:12%;right:12%;height:2px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(153,206,255,.72),transparent);
+  box-shadow:0 0 27px rgba(137,206,255,.45);
+}
+.machine .lights {filter:drop-shadow(0 0 8px rgba(255,233,156,.4));}
+.reels {gap:14px;perspective:850px;}
+.reel {
+  position:relative;overflow:hidden;border-radius:14px;
+  border:1px solid rgba(205,227,255,.2);
+  background:linear-gradient(150deg,rgba(9,17,30,.94),rgba(28,39,57,.87));
+  box-shadow:0 16px 27px rgba(0,0,0,.25),inset 0 0 20px rgba(121,173,244,.055);
+}
+.reel::before,.reel::after{
+  content:"";position:absolute;left:0;right:0;height:27%;z-index:2;pointer-events:none;
+}
+.reel::before{top:0;background:linear-gradient(#070b12,transparent);}
+.reel::after{bottom:0;background:linear-gradient(transparent,#070b12);}
+.reel-label{font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:#8ba9cc;}
+.reel-win {filter:drop-shadow(0 1px 4px rgba(0,0,0,.4));}
+.reel.landed {animation:hl-reel-lock .43s cubic-bezier(.2,1,.3,1) both;border-color:rgba(250,221,156,.55);}
+.reel.landed .reel-item{filter:drop-shadow(0 4px 12px rgba(255,209,133,.14));}
+.result {
+  position:relative;
+  color:#f9e8b8;text-shadow:0 2px 15px rgba(243,205,115,.23);
+  letter-spacing:.035em;
+}
+
+/* Collectible cards are now layered physical surfaces: foil, reflection and
+   movement are tied to hover and rarity, not constant distracting loops. */
+.gcard {
+  position:relative;isolation:isolate;transform-style:preserve-3d;
+  border-radius:16px;
+  box-shadow:0 8px 25px rgba(0,0,0,.35),0 2px 0 rgba(255,255,255,.13);
+  transition:transform .23s cubic-bezier(.2,.8,.2,1),box-shadow .24s,border-color .2s;
+  will-change:transform;
+}
+.gcard.up:hover {
+  transform:perspective(850px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)) translateY(-5px) scale(1.025);
+  box-shadow:0 23px 46px rgba(0,0,0,.51),0 0 24px color-mix(in srgb,var(--c) 19%,transparent);
+  z-index:5;
+}
+.gcard:active {filter:brightness(1.06);}
+.gc-front {background:linear-gradient(155deg,rgba(255,255,255,.1),transparent 28%,rgba(0,0,0,.15) 65%);}
+.gc-shine {
+  pointer-events:none;opacity:.65!important;mix-blend-mode:screen;
+  background:radial-gradient(circle at var(--mx,42%) var(--my,22%),rgba(255,255,255,.48),transparent 44%)!important;
+  transition:opacity .16s;
+}
+.gcard:hover .gc-shine{opacity:.92!important;}
+.gcard.t-legend,.gcard.t-diamond{box-shadow:0 9px 28px rgba(0,0,0,.38),0 0 0 1px rgba(197,231,255,.18);}
+.gcard.t-legend::after,.gcard.t-diamond::after {
+  content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(125deg,transparent 5%,rgba(255,255,255,.16) 42%,transparent 51%);
+  background-size:235% 100%;background-position:120% 0;
+  transition:background-position .65s;
+}
+.gcard.t-legend:hover::after,.gcard.t-diamond:hover::after{background-position:-20% 0;}
+.dna-card-shell:has(.gcard.t-legend){filter:drop-shadow(0 4px 12px rgba(251,201,97,.1));}
+.hand {align-items:stretch;}
+.hand .gcard.up {animation:hl-card-enter .34s cubic-bezier(.16,1,.3,1) both;}
+.hand .gcard.up:nth-child(2){animation-delay:.055s;}
+.hand .gcard.up:nth-child(3){animation-delay:.11s;}
+.hand .gcard.up:nth-child(4){animation-delay:.165s;}
+.hand .gcard.up:nth-child(5){animation-delay:.22s;}
+.tile.pop {animation:hl-tile-lock .44s cubic-bezier(.16,1,.3,1);}
+.dna-choice,.gameplan-option {
+  transition:transform .18s,box-shadow .18s,border-color .18s,background .18s;
+}
+.dna-choice:not(:disabled):hover,.gameplan-option:hover{transform:translateY(-3px);border-color:rgba(159,202,255,.5);box-shadow:0 11px 25px rgba(0,0,0,.22);}
+.gameplan-option.active {box-shadow:0 0 0 1px var(--team),0 0 22px color-mix(in srgb,var(--team) 16%,transparent);}
+.court {
+  position:relative;
+  background:
+   radial-gradient(ellipse at 50% 35%,rgba(255,221,154,.07),transparent 55%),
+   repeating-linear-gradient(90deg,rgba(216,177,114,.03) 0 42px,rgba(0,0,0,.027) 43px 45px),
+   linear-gradient(165deg,#372924,#1c2028 60%,#131a25);
+  border:1px solid rgba(215,178,120,.35);
+  box-shadow:inset 0 0 65px rgba(0,0,0,.55),0 12px 35px rgba(0,0,0,.3);
+}
+.court::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(140deg,rgba(255,234,191,.1),transparent 45%,rgba(118,190,255,.05));
+}
+.slot-wrap .slot {transition:transform .18s,background .18s,border-color .18s;}
+.slot-wrap:hover .slot{transform:scale(1.04);border-color:rgba(249,220,154,.8);}
+.bench {background:linear-gradient(110deg,rgba(28,39,55,.8),rgba(10,17,29,.9));border-radius:12px;}
+.ticker .rec {
+  font-variant-numeric:tabular-nums;
+  letter-spacing:-.075em;
+  text-shadow:0 6px 24px rgba(0,0,0,.4),0 0 32px rgba(235,245,255,.1);
+}
+.ticker .dots i {transition:background .13s,box-shadow .16s,transform .18s;}
+.ticker .dots i.w {box-shadow:0 0 7px rgba(98,246,158,.45);transform:scaleY(1.07);}
+.ticker .dots i.l {box-shadow:0 0 7px rgba(254,120,122,.45);transform:scaleY(1.07);}
+.teamband {background:linear-gradient(135deg,rgba(45,66,94,.55),rgba(16,23,36,.96));border-radius:16px;border:1px solid var(--arena-edge);}
+.dossier-honor {background:linear-gradient(155deg,rgba(36,46,65,.9),rgba(17,23,34,.94));}
+.tbl-wrap {scrollbar-color:rgba(132,172,224,.38) rgba(11,18,28,.65);}
+.tbl tbody tr:hover{background:rgba(140,179,246,.07);}
+.offer:hover{border-color:rgba(144,205,253,.4);}
+.fx-banner .fxb-title{text-shadow:0 5px 25px rgba(0,0,0,.42),0 0 30px rgba(255,214,130,.18);}
+
+/* Offseason programs and progressive legacy achievements. */
+.training-lab {background:radial-gradient(ellipse at 85% 0%,rgba(99,168,239,.13),transparent 55%),var(--surface);}
+.training-grid {display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px;}
+.training-choice {
+  cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:7px;min-height:146px;
+  color:var(--text);padding:14px;background:linear-gradient(150deg,rgba(41,54,73,.62),rgba(13,20,33,.93));
+  border:1px solid rgba(185,209,248,.17);border-radius:12px;
+}
+.training-choice>span {font:700 10px var(--body);letter-spacing:.16em;color:#8197b5;}
+.training-choice>b {font:800 19px/1.04 var(--display);text-transform:uppercase;}
+.training-choice>small {color:var(--text-2);line-height:1.42;flex:1;}
+.training-choice>em {font:600 11px var(--body);color:var(--text-3);font-style:normal;}
+.training-choice:hover {transform:translateY(-3px);border-color:rgba(176,208,255,.45);box-shadow:0 12px 26px rgba(0,0,0,.23);}
+.training-choice.active {border-color:var(--team);background:linear-gradient(145deg,color-mix(in srgb,var(--team) 22%,#182034),#101b2b);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--team) 60%,white);}
+.training-choice.active>span{color:#f9df9f;}
+.legacy-quest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;}
+.legacy-quest {min-width:0;padding:15px;border:1px solid var(--rule);border-radius:12px;background:rgba(11,18,29,.65);}
+.legacy-quest b {font:800 18px var(--display);text-transform:uppercase;}
+.legacy-quest span {font:800 11px var(--body);letter-spacing:.07em;color:var(--text-3);}
+.legacy-quest p {margin:8px 0;color:var(--text-2);min-height:2.5em;font-size:12px;}
+.legacy-quest>small{font:700 12px var(--body);color:var(--text-3);}
+.legacy-quest.complete{border-color:rgba(222,183,91,.5);background:linear-gradient(135deg,rgba(115,87,26,.2),rgba(15,22,32,.75));}
+.legacy-quest.complete span{color:#ffe3a1;}
+.quest-track{height:5px;border-radius:5px;overflow:hidden;background:rgba(151,179,220,.16);margin:11px 0 7px;}
+.quest-track>i {display:block;height:100%;background:linear-gradient(90deg,#568dda,var(--team),#f0d28f);border-radius:inherit;box-shadow:0 0 13px rgba(248,210,143,.35);transition:width .35s ease;}
+.coach-break {
+  position:fixed;inset:0;z-index:100000;display:grid;place-items:center;padding:16px;
+  background:rgba(2,6,13,.87);backdrop-filter:blur(14px);
+  animation:hl-page-in .22s ease both;
+}
+.coach-panel{width:min(920px,100%);max-height:min(92vh,850px);overflow:auto;padding:6px;border-radius:20px;
+ background:linear-gradient(140deg,rgba(93,154,231,.37),rgba(201,163,83,.21),rgba(50,101,150,.25));
+ box-shadow:0 30px 110px rgba(0,0,0,.63);}
+.coach-panel-inner{padding:clamp(20px,4vw,36px);background:linear-gradient(145deg,#18253a,#0c1523);border-radius:16px;}
+.coach-broadcast{padding:16px 25px;font:800 13px var(--display);letter-spacing:.22em;color:#ffdc98;text-transform:uppercase;}
+.coach-report h2{font-size:clamp(30px,5vw,54px);margin:8px 0 12px;}
+.coach-report p{color:var(--text-2);line-height:1.6;}
+.coach-choices{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:15px 0;}
+.coach-option{padding:15px;border-radius:12px;border:1px solid var(--rule-strong);background:rgba(31,45,64,.6);text-align:left;cursor:pointer;color:var(--text);}
+.coach-option:hover,.coach-option.on{border-color:#ebc783;background:rgba(178,130,61,.13);}
+.coach-option strong{display:block;font:800 20px var(--display);text-transform:uppercase;}
+.coach-option small{display:block;color:var(--text-2);margin:10px 0 14px;line-height:1.4;}
+.coach-option span{font:700 11px var(--body);color:#f3d494;}
+
+@keyframes hl-page-in {from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hl-reel-lock{0%{transform:scale(.975)}58%{transform:scale(1.035)}100%{transform:scale(1)}}
+@keyframes hl-card-enter{from{opacity:.55;transform:translateY(11px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes hl-tile-lock{0%{transform:scale(.9);filter:brightness(1.4)}70%{transform:scale(1.09)}100%{transform:scale(1)}}
+@media(max-width:800px){
+  .reels{gap:6px}.reel{border-radius:9px}.reel-label{letter-spacing:.08em;font-size:10px}
+  .machine{border-radius:13px}
+  .legacy-quest-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .training-grid,.legacy-quest-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .training-choice{min-height:145px;padding:10px}
+  .training-choice>b{font-size:16px}
+  .legacy-quest{padding:11px}.legacy-quest b{font-size:15px}
+  .gcard.up:hover{transform:translateY(-3px) scale(1.015)}
+  .coach-choices{grid-template-columns:1fr 1fr}.coach-option{padding:12px}
+}
+@media(prefers-reduced-motion:reduce) {
+  html{scroll-behavior:auto!important}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;}
+  .gcard.up:hover{transform:none}.btn:hover,.training-choice:hover{transform:none}
+}
