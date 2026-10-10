@@ -160,6 +160,93 @@ HL.FusionUI=(function(){
    };
   });
  }
+
+ function openDraft(cards,spent,used,onSuccess){
+  close();root=document.createElement('div');root.className='gf-overlay gf-draft-only';
+  root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');
+  root.setAttribute('aria-label','82-0 drafted player fusion');
+  document.body.appendChild(root);
+  root.onclick=e=>{if(e.target===root)close();};
+  let first=null,second=null,frameChoice='blend',outcome=null,playedSound=false;
+  const key=(a,b)=>[a.id,b.id].sort().join('|');
+  function paint(){
+   if(!root)return;
+   const x=first==null?null:cards[first]?.node,y=second==null?null:cards[second]?.node;
+   const seen=x&&y?spent[key(x,y)]:false;
+   const eligibility=i=>cards[i]&&!used[cards[i].node.id];
+   const picker=(side,chosen,other)=>{
+    return '<div class="gf-draft-source"><div class="caps">PARENT '+(side===0?'ONE':'TWO')+
+     '</div><b>'+E(chosen==null?'CHOOSE A DRAFTED PLAYER':cards[chosen].node.name)+'</b>'+
+     '<div class="gf-draft-picks">'+cards.map(({slot,node},i)=>
+       '<button type="button" data-gf-pick="'+side+':'+i+'" '+
+       (!eligibility(i)||i===other||outcome?'disabled':'')+
+       ' class="'+(chosen===i?'selected':'')+'">'+E(node.name)+
+       '<small>'+E(slot)+' · '+node.ovr+' OVR'+(used[node.id]?' · ATTEMPT USED':'')+
+       '</small></button>').join('')+'</div></div>';
+   };
+   const p=x&&y?F().preview(x,y):null;
+   root.innerHTML='<div class="gf-workbench gf-draft-workbench"><div class="gf-top"><div>'+
+    '<span>82-0 · DRAFTING WORKSPACE</span><h2>GENESIS · ONE SHOT</h2></div>'+
+    '<button class="btn" data-gf-close>BACK TO DRAFT</button></div>'+
+    '<p class="gf-explainer">Only players you rolled for this team. Each parent has ONE attempt, successful or not. Matching positions do not guarantee success.</p>'+
+    '<div class="gf-draft-selection">'+picker(0,first,second)+picker(1,second,first)+'</div>'+
+    (p?portrait(x,y)+
+      '<div class="gf-odds"><div class="gf-chance"><span>TRUE SUCCESS ODDS</span>'+
+      '<strong>'+p.display+'</strong><div class="gf-probability"><i style="width:'+p.chance+
+      '%"></i></div></div><div class="gf-meters"><div><b>'+p.affinity+
+      '</b><span>Compatibility</span></div><div><b>'+p.tension+
+      '</b><span>Instability</span></div><div><b>'+p.power+
+      '</b><span>Ceiling</span></div></div><p>'+E(p.family)+
+      '. Success combines both roster cards into one. Failure preserves both players.</p></div>':
+      '<p class="t2">Select two cards to scout the odds.</p>')+
+    '<div class="gf-controls"><label>BODY FRAME <select data-gf-frame>'+
+    [['blend','Blend'],['left','Parent One'],['right','Parent Two']].map(([id,label])=>
+     '<option value="'+id+'" '+(frameChoice===id?'selected':'')+'>'+label+'</option>').join('')+
+    '</select></label><button class="btn go big" data-gf-roll '+
+    (!p||seen||outcome?'disabled':'')+'>TRY FUSION · ONE ATTEMPT</button></div>'+
+    (seen?'<div class="gf-feedback">Pair already attempted.</div>':'')+
+    '<div data-gf-outcome></div></div>';
+   root.querySelector('[data-gf-close]').onclick=close;
+   root.querySelector('[data-gf-frame]').onchange=e=>{frameChoice=e.target.value;};
+   root.querySelectorAll('[data-gf-pick]').forEach(btn=>btn.onclick=()=>{
+    if(outcome)return;
+    const [side,i]=btn.dataset.gfPick.split(':').map(Number);
+    if(!eligibility(i)||i===(side===0?second:first))return;
+    if(side===0)first=i;else second=i;
+    paint();
+   });
+   root.querySelector('[data-gf-roll]').onclick=()=>{
+    if(!p||seen||outcome||used[x.id]||used[y.id])return;
+    try{
+     outcome=F().attempt(x,y,{spent,frame:frameChoice});
+     used[x.id]=true;used[y.id]=true;paint();
+    }catch(e){const area=root?.querySelector('[data-gf-outcome]');
+     if(area)area.textContent=String(e.message||e);}
+   };
+   if(outcome){
+    const area=root.querySelector('[data-gf-outcome]');
+    area.innerHTML='<div class="gf-result '+(outcome.ok?'success':'failure')+'">'+
+     '<div class="gf-reveal-flags">'+(outcome.ok?'FUSION STABILIZED':'FAILED · BOTH ATTEMPTS CONSUMED')+'</div>'+
+     (outcome.ok?'<h2>'+E(outcome.node.name)+'</h2>'+
+       '<p>'+outcome.node.ovr+' OVR · '+E(outcome.node.family)+
+       ' · generation '+outcome.node.depth+'</p>'+
+       '<div class="gf-ability-list">'+Object.entries(outcome.node.mechanics||{}).slice(0,6).map(([id,n])=>
+       '<div><strong>'+E(id)+'</strong><span>'+
+       E(HL.DNA.MECHANIC_TEXT?.[id]||'Specialized possession skill')+
+       '</span><b>'+Math.round(n*100)+'%</b></div>').join('')+'</div>'+
+       '<button class="btn go big" data-gf-finish>PUT HYBRID ON ROSTER</button>':
+       '<h2>NO HYBRID</h2><p>'+E(outcome.failureReason)+
+       '</p><p>Both source cards remain on your team but cannot try fusion again this run.</p>'+
+       '<button class="btn" data-gf-end>RETURN TO DRAFT</button>')+'</div>';
+    area.querySelector('[data-gf-finish]')?.addEventListener('click',()=>{
+     onSuccess?.(outcome.node);close();
+    });
+    area.querySelector('[data-gf-end]')?.addEventListener('click',close);
+    if(!playedSound){HL.FX?.sfx?.fusion?.(outcome.ok?'shooting':'defense',outcome.ok?'result':'climax');playedSound=true;}
+   }
+  }
+  paint();root.querySelector('[data-gf-close]')?.focus();
+ }
  function open(callback){
   close();onEquip=callback;
   root=document.createElement('div');root.className='gf-overlay';
@@ -170,5 +257,5 @@ HL.FusionUI=(function(){
  }
  function close(){root?.remove();root=null;}
  function reset(){close();a=b=previous=onEquip=null;frame='blend';F().reset();}
- return {open,close,reset,portrait,profile,odds};
+ return {open,openDraft,close,reset,portrait,profile,odds};
 })();
