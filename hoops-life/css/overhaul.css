@@ -911,3 +911,22 @@ html[data-fx-level=off] .power-map-node{animation:none!important}
  .ability-replay-row>strong{font-size:19px}}
 @media(prefers-reduced-motion:reduce){.ability-replay-row{animation:none!important}}
 html[data-fx-level=off] .ability-replay-row{animation:none!important}
+
+
+/* Equipped multi-parent genes remain visually recognizable during MyCareer. */
+.fusion-dossier{background:radial-gradient(ellipse at 85% 0%,#ac67f827,transparent 65%),
+ linear-gradient(145deg,#20273c,#0d1624);}
+.fusion-dossier-layout{display:grid;grid-template-columns:minmax(100px,.55fr) 1fr;gap:17px;align-items:start;}
+.fusion-dossier .gf-portrait.mini{width:min(100%,175px);margin:0 auto;}
+.fusion-dossier-story{min-width:0;}
+.fusion-dossier-story>h3{font:900 25px/1 var(--display);margin:7px 0;color:#fff;text-transform:uppercase;}
+.fusion-dossier-story>p{font:450 12px/1.55 var(--body);color:#b8c8dc;}
+.fusion-dossier-skill-list{display:grid;gap:5px;margin:15px 0;}
+.fusion-dossier-skill-list>div{display:flex;flex-wrap:wrap;gap:5px;justify-content:space-between;
+ border-bottom:1px solid #ffffff1e;padding:6px 0;font:700 11px var(--body);}
+.fusion-dossier-skill-list b{text-transform:capitalize;color:#d6e7ff;}
+.fusion-dossier-skill-list span{color:#f4dbaa;}
+.fusion-dossier details{margin-top:12px;padding:8px 10px;border:1px solid #cfb9fc4a;border-radius:8px;}
+.fusion-dossier summary{font:800 11px var(--body);color:#d2baff;cursor:pointer;}
+@media(max-width:600px){.fusion-dossier-layout{grid-template-columns:1fr}
+ .fusion-dossier-story>h3{font-size:22px}}
