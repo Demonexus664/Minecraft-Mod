@@ -38,6 +38,49 @@ HL.FX = (function () {
       o.start(); o.stop(ctx.currentTime + dur + 0.02);
     } catch (e) { /* audio unavailable */ }
   }
+
+  // A short filtered noise transient adds actual texture to impacts, whistles
+  // and ball swishes. Nodes are disconnected automatically after playback.
+  function noise(dur=.16,vol=.023,cutoff=1800) {
+    if(!soundOn())return;
+    try{
+      const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
+      ctx=ctx||new Audio();
+      if(ctx.state==='suspended')ctx.resume().catch(()=>{});
+      const length=Math.max(1,Math.round(ctx.sampleRate*dur));
+      const buffer=ctx.createBuffer(1,length,ctx.sampleRate),data=buffer.getChannelData(0);
+      for(let i=0;i<length;i++)data[i]=(Math.random()*2-1)*(1-i/length);
+      const src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain();
+      filter.type='lowpass';filter.frequency.value=cutoff;src.buffer=buffer;
+      gain.gain.setValueAtTime(vol,ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.0001,ctx.currentTime+dur);
+      src.connect(filter);filter.connect(gain);gain.connect(ctx.destination);
+      src.onended=()=>{try{src.disconnect();filter.disconnect();gain.disconnect();}catch{}};
+      src.start();src.stop(ctx.currentTime+dur+.02);
+    }catch{}
+  }
+  const schedules={
+    shooting:[[180,0,'sine'],[660,115,'triangle'],[988,250,'sine'],[1320,380,'sine']],
+    interior:[[80,0,'triangle'],[117,140,'sawtooth'],[78,270,'sine'],[59,420,'triangle']],
+    defense:[[240,0,'sawtooth'],[182,115,'sawtooth'],[121,245,'triangle'],[94,410,'sine']],
+    flight:[[210,0,'sine'],[315,125,'triangle'],[570,255,'sine'],[960,380,'sine']]
+  };
+  function fusionSound(family='shooting',stage='interact') {
+    if(!soundOn())return;
+    const melody=schedules[family]||schedules.shooting;
+    if(stage==='interact'){
+      noise(.21,.013,family==='defense'?600:2200);
+      tone(melody[0][0],.25,melody[0][2],.044,120);
+    }else if(stage==='climax'){
+      const base=family==='interior'?72:family==='defense'?94:family==='flight'?150:126;
+      tone(base,.52,'sawtooth',.049,-55);noise(.31,.038,800);
+      melody.slice(1,3).forEach(([f,ms,type])=>setTimeout(()=>tone(f,.19,type,.033,140),ms/2));
+    }else if(stage==='result'){
+      noise(.12,.013,4800);
+      melody.forEach(([f,ms,type],i)=>setTimeout(()=>tone(f,i===3?.52:.22,type,.034,75),ms));
+    }
+  }
+
   const sfx = {
     tick: () => tone(1400, 0.025, 'square', 0.015),
     land: () => { tone(220, 0.12, 'triangle', 0.08, -80); },
@@ -54,6 +97,12 @@ HL.FX = (function () {
     rival: () => {tone(144,.28,'sawtooth',.046,-22);setTimeout(()=>tone(286,.12,'triangle',.028,340),160);},
     achievement: () => [523,659,784,988,1175].forEach((f,i)=>
       setTimeout(()=>tone(f,i===4?.44:.10,'triangle',.03),i*94)),
+    fusion: fusionSound,
+    arena: (moment='win')=>{
+      if(moment==='clutch'){noise(.19,.017,3600);tone(195,.17,'triangle',.035,100);}
+      else if(moment==='loss'){noise(.34,.025,460);tone(110,.28,'sawtooth',.036,-45);}
+      else {noise(.31,.024,2400);[196,294,392].forEach((f,i)=>setTimeout(()=>tone(f,.2,'triangle',.028),i*85));}
+    },
   };
 
   // ---------- rarity tiers ----------
