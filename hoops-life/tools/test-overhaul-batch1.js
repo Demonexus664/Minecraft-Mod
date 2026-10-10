@@ -18,7 +18,7 @@ const challengeReturn='return { open: () => { st = null; render(); }';
 assert.ok(fullSkill.includes(skillReturn));
 assert.ok(full82.includes(challengeReturn));
 vm.runInContext(full82.replace(challengeReturn,
-  'return { __overhaul:{newRun,missionStatus,COACHES,CHALLENGES,gauntletSchedule,state:()=>st}, open: () => { st = null; render(); }'),
+  'return { __overhaul:{newRun,missionStatus,COACHES,CHALLENGES,gauntletSchedule,seasonMoments,filmReel,state:()=>st}, open: () => { st = null; render(); }'),
   ctx,{filename:'challenge820.js'});
 vm.runInContext(fullSkill.replace(skillReturn,
   'return { __overhaul:{TRAINING,trainSummer,trainingView,milestoneView,ratingsAt,ROLES,AGENDAS,customizeRole,finishAgenda,rolePanel}, open: () => { st = null; cache = null; render(); }'),
@@ -193,4 +193,28 @@ test('Visual effects intensity persists between screens and can disable motion',
   fx.setFxLevel('off');
   assert.equal(fx.fxLevel(),'off');
   assert.equal(root.attrs['data-fx-level'],'off');
+});
+
+test('82-0 season film highlights are built from earned results and real box scores',()=>{
+ const h=HL.Challenge.__overhaul;
+ const log=[
+  {g:1,opp:'Warriors',win:true,for:137,against:92,hero:{name:'Star A',pts:32,reb:8,ast:5}},
+  {g:2,opp:'Knicks',win:true,for:101,against:100,hero:{name:'Star B',pts:44,reb:4,ast:10}},
+  {g:3,opp:'Celtics',win:false,for:96,against:117,hero:{name:'Star C',pts:49,reb:7,ast:3}},
+  {g:4,opp:'Rockets',win:true,for:128,against:116,hero:{name:'Star D',pts:56,reb:11,ast:2}},
+  {g:5,opp:'Lakers',win:true,for:119,against:112,boss:true,hero:{name:'Star E',pts:31,reb:6,ast:8}},
+ ];
+ const events=Array.from(h.seasonMoments(log));
+ assert.equal(events.length,5);
+ assert.equal(events[0].title,'Statement Win');
+ assert.equal(events[1].title,'Narrow Escape');
+ assert.equal(events[2].title,'Player Takeover');
+ assert.equal(events[3].title,'The Toughest Night');
+ assert.equal(events[4].title,'Boss Defeated');
+ assert.equal(events[2].hero.name,'Star D');
+ const html=h.filmReel(log);
+ assert.match(html,/SEASON FILM REEL/);
+ assert.match(html,/56 PTS/);
+ assert.match(html,/GAMES 1-5/);
+ assert.match(html,/class="won boss"/);
 });
