@@ -164,6 +164,42 @@ HL.Challenge = (function () {
     return Math.max(25,rating(c)-pen);
   };
 
+
+  // A run has an independent, optional objective plus an adaptive coach.
+  // Both affect actual possessions or measurable season results, never free OVR.
+  const CHALLENGES={
+    perfect:{title:'The Impossible',detail:'Complete the schedule undefeated.',test:r=>r.l===0},
+    lock:{title:'Defensive Dynasty',detail:'Win at a 60-win pace while allowing fewer than 105 points per game (100 before 2015).',
+      test:r=>r.w/r.games>=60/82&&r.pa<(r.season>=2015?105:100)},
+    fireworks:{title:'Offensive Supernova',detail:'Win at a 65-win pace and score 120 PPG (110 before 2015).',
+      test:r=>r.w/r.games>=65/82&&r.pf>=(r.season>=2015?120:110)},
+    clutch:{title:'Closeout Artists',detail:'Win at a 60-win pace and 70% of close games, with at least three games decided by five or fewer.',
+      test:r=>r.w/r.games>=60/82&&r.closeGames>=3&&r.closeWins/r.closeGames>=.7}
+  };
+  const COACHES={
+    steady:{title:'Trust the System',description:'Keep your chosen game plan all season.',adjust:base=>({...base})},
+    scout:{title:'Opponent Scout',description:'Change defensive schemes based on the strengths of the opposing stars.',
+      adjust:(base,players)=>{
+        const top=players.slice().sort((a,b)=>b.ovr-a.ovr).slice(0,6);
+        const shooters=top.filter(p=>(p.attrs?.three||0)>=82).length;
+        const bigs=top.filter(p=>(p.attrs?.post||0)>=83||(p.attrs?.dunk||0)>=92).length;
+        return {...base,defense:shooters>=3?'switch':bigs>=2?'drop':'press',crash:bigs>=2?Math.max(67,base.crash):base.crash};
+      }},
+    momentum:{title:'Momentum Coach',description:'Attack faster after losses, slow down and protect the paint after win streaks.',
+      adjust:(base,players,ctx)=>{
+        if(ctx.lastLoss)return {...base,pace:Math.min(95,base.pace+20),focus:'star',defense:'press'};
+        if(ctx.streak>=3)return {...base,pace:Math.max(25,base.pace-12),defense:'drop',crash:Math.max(62,base.crash)};
+        return {...base};
+      }}
+  };
+  const missionStatus=(r,id)=>{const m=CHALLENGES[id]||CHALLENGES.perfect;return {id,title:m.title,detail:m.detail,completed:!!m.test(r)};};
+  function marqueeOpponents(teams){
+    return teams.map(t=>{
+      const five=(t.customPlayers||HL.League.teamPlayers(t.id)).slice().sort((a,b)=>b.ovr-a.ovr).slice(0,5);
+      return {team:t,power:five.reduce((n,p)=>n+p.ovr,0)/Math.max(1,five.length)};
+    }).sort((a,b)=>b.power-a.power).slice(0,4).map(x=>x.team);
+  }
+
   // ---------- run ----------
   function seedFor(s) { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return Math.abs(h) % 2147483647; }
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -171,7 +207,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -226,7 +262,12 @@ HL.Challenge = (function () {
     if(unlocked)HL.DNAFX.reveal(unlocked,{title:'LEGENDARY TEAM FUSION'});
     if (pen >= 10) U.toast(`<b>${esc(HL.HISTORY.players[c.row.pid][0])}</b> at ${slot}: −${pen} out of position.`);
   }
-  function swap(a, b) { if (['season', 'result', 'playoffs'].includes(st.phase)) return; const t = st.lineup[a]; st.lineup[a] = st.lineup[b]; st.lineup[b] = t; FX.sfx.flip(); render(); }
+  function swap(a,b){
+    if(['season','result','playoffs'].includes(st.phase)||!SLOTS.includes(a)||!SLOTS.includes(b))return;
+    const t=st.lineup[a];st.lineup[a]=st.lineup[b];st.lineup[b]=t;
+    st.dna=HL.DNA.analyze(SLOTS.filter(k=>st.lineup[k]).map(k=>({pid:st.lineup[k].row.pid,cat:k,row:st.lineup[k].row,season:st.lineup[k].season})),{mode:'team'});
+    FX.sfx.flip();render();
+  }
 
   // ---------- the season, played live ----------
   async function playSeason() {
@@ -288,6 +329,10 @@ HL.Challenge = (function () {
     const opps = L.teams;
     // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
+    const marqueeIds=new Set(marqueeOpponents(opps).map(t=>t.id));
+    const marqueeLog=[],schemeCounts={};
+    const baseStrategy={...dream.strategy},coaching=COACHES[st.coach]||COACHES.steady;
+    let closeGames=0,closeWins=0;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
@@ -301,7 +346,12 @@ HL.Challenge = (function () {
     const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
       const opp = schedule[g];
-      const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: opp.customPlayers || HL.League.teamPlayers(opp.id) };
+      const oppPlayers=opp.customPlayers||HL.League.teamPlayers(opp.id);
+      const oppObj={id:opp.id,abbr:opp.abbr,strategy:opp.strategy,players:oppPlayers};
+      const adapted=coaching.adjust(baseStrategy,oppPlayers,{streak,lastLoss:g>0&&!gameLog[g-1].win});
+      Object.assign(dream.strategy,adapted);
+      const signature=adapted.defense+' · '+adapted.focus+' · '+adapted.pace;
+      schemeCounts[signature]=(schemeCounts[signature]||0)+1;
       for (const p of players) {
         if(p.injury?.games>0) { absences[p.id]++; }
         else p.injury=null;
@@ -324,6 +374,8 @@ HL.Challenge = (function () {
       if (won) { w++; streak++; best = Math.max(best, streak); } else { l++; streak = 0; }
       pf += mine.score; pa += theirs.score;
       gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
+      if(Math.abs(mine.score-theirs.score)<=5){closeGames++;if(won)closeWins++;}
+      if(marqueeIds.has(opp.id))marqueeLog.push({g:g+1,opp:opp.name,won,for:mine.score,against:theirs.score});
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
       if (!won) { log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 }); if (!firstLoss) firstLoss = { g: g + 1, opp }; }
       // Live ticker.
@@ -350,7 +402,10 @@ HL.Challenge = (function () {
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
       if(st!==run)return;
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss, gameLog,absences,injuriesLog,specialEncounter:null, dna:st.dna, specialDraft:st.special?.label||null };
+    st.result = {w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,best,losses:log,lines,players,firstLoss,gameLog,
+      absences,injuriesLog,specialEncounter:null,dna:st.dna,specialDraft:st.special?.label||null,
+      closeGames,closeWins,marqueeLog,schemeCounts,coach:st.coach,
+      mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
     st.result.unlocked = achievements();
