@@ -77,6 +77,9 @@ HL.Challenge = (function () {
       return Math.round(category[2].reduce((n,k)=>n+(t[k]??50),0)/category[2].length);
     }
     const a = HL.historicalAttributes ? HL.historicalAttributes(c.row) : HL.History.unpack(c.row.attrs, HL.HISTORY.attrs);
+    // Elevation is a physical matchup tool, not a measure of shooting technique.
+    // A short, quick-release shooter must not lose a mechanics grade to height.
+    if (category[0] === 'jumper') return Math.round(a.releaseSpeed * .6 + a.shotArc * .4);
     return Math.round(category[2].reduce((n, k) => n + a[k], 0) / category[2].length);
   }
   const skillCache = new Map();
