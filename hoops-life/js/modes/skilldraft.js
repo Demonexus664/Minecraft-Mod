@@ -42,6 +42,7 @@ HL.SkillDraft = (function () {
   function newRun(mode, debut, draftStyle = 'original') {
     cache=null;futureWorld=null;
     HL.DNAFX?.reset();
+    HL.FusionUI?.reset();
     st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
