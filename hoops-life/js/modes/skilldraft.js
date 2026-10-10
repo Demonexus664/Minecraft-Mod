@@ -40,6 +40,7 @@ HL.SkillDraft = (function () {
   // Debut: a real draft year. Random debuts leave room for a full career inside the real data.
   const randomDebut = () => R.int(1956, HL.LATEST_SEASON - 14);
   function newRun(mode, debut, draftStyle = 'original') {
+    cache=null;futureWorld=null;
     HL.DNAFX?.reset();
     st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating' };
   }
@@ -244,9 +245,9 @@ HL.SkillDraft = (function () {
   }
 
   // ---------- career engine ----------
-  // Every season is played in that year's real league (real rosters, schedule length and playoff
-  // format). Seasons past the latest data replay the latest league. The career is a sequence of
-  // seasons and offseason decisions, so it can be played one season at a time or simmed to the end.
+  // Historical seasons use their actual rosters. Once recorded history ends,
+  // advance one persistent league through generated drafts, player development,
+  // retirement and free agency; never replay the final historical roster.
   const ME_ID = 999999;
   const LIN = () => C().LINEAGE;
   const fr = t => LIN()[t.bref] || t.bref;
@@ -271,17 +272,64 @@ HL.SkillDraft = (function () {
     tot.stl += l.stl; tot.blk += l.blk; tot.tov += l.tov; tot.fgm += l.fgm; tot.fga += l.fga; tot.tpm += l.tpm; tot.tpa += l.tpa; tot.ftm += l.ftm; tot.fta += l.fta;
   }
 
-  // One league per season, reused while the career is on that season.
-  let cache = null;
+  // One league per historical season. Post-data careers retain a genuinely
+  // evolving world with rookies, transfers, retirements and developing peers.
+  let cache = null, futureWorld = null;
+  function projectFutureSeason(L) {
+    // The short-form career sim does not play all other teams' 1,230 games.
+    // Estimate their records from CURRENT rosters, rather than 2025's standings.
+    const strength = L.teams.map(team => {
+      const roster = HL.League.teamPlayers(team.id).sort((a,b)=>b.ovr-a.ovr).slice(0,9);
+      const top = roster.slice(0,5).reduce((n,p)=>n+p.ovr,0)/Math.max(1,Math.min(5,roster.length));
+      const depth = roster.slice(5).reduce((n,p)=>n+p.ovr,0)/Math.max(1,roster.slice(5).length);
+      return {team, strength: top*.83+depth*.17 + R.normal(0,2.8)};
+    });
+    const avg = strength.reduce((n,x)=>n+x.strength,0)/Math.max(1,strength.length);
+    for (const {team,strength:power} of strength) {
+      const wins=Math.round(HL.clamp(L.games*.5+(power-avg)*2.5+R.normal(0,5),10,L.games-10));
+      team.real={...team.real,w:wins,l:L.games-wins,playoffs:false};
+      team.w=wins;team.l=L.games-wins;
+    }
+    for(const conf of new Set(L.teams.map(t=>t.conf))) {
+      const members=L.teams.filter(t=>t.conf===conf).sort((a,b)=>b.real.w-a.real.w);
+      members.slice(0,Math.min(8,members.length)).forEach(t=>{t.real.playoffs=true;});
+    }
+  }
   async function leagueFor(yr,c=null) {
     if(c?.cancelled)return null;
-    if (cache && cache.yr === yr) { HL.League.set(cache.L); return cache.L; }
-    const key = String(Math.min(yr, HL.LATEST_SEASON));
-    await HL.History.load(key);
-    if(c?.cancelled)return null;
-    const L = HL.League.createFromSeason({ seasonKey: key, seed: R.int(1, 1e9) });
-    cache = { yr, L };
-    return L;
+    if(cache && cache.yr===yr){HL.League.set(cache.L);return cache.L;}
+    if(yr<=HL.LATEST_SEASON) {
+      const key=String(yr);
+      await HL.History.load(key);
+      if(c?.cancelled)return null;
+      const L=HL.League.createFromSeason({seasonKey:key,seed:R.int(1,1e9)});
+      cache={yr,L};
+      return L;
+    }
+    if(!futureWorld){
+      const latest=HL.LATEST_SEASON;
+      if(cache?.yr===latest)futureWorld=cache.L;
+      else {
+        await HL.History.load(String(latest));
+        if(c?.cancelled)return null;
+        futureWorld=HL.League.createFromSeason({seasonKey:String(latest),seed:R.int(1,1e9)});
+      }
+    }
+    while(futureWorld.season<yr){
+      if(c?.cancelled)return null;
+      HL.League.set(futureWorld);
+      futureWorld.settings.history='generated';
+      // Feed the league's existing offseason engine plausible previous records.
+      for(const t of futureWorld.teams){t.w=t.real.w;t.l=t.real.l;}
+      futureWorld.phase='offseason';
+      const next=HL.League.advanceToNextSeason();
+      if(next?.ok===false)throw new Error(next.reason||'League offseason could not advance');
+      if(futureWorld.season<=HL.LATEST_SEASON)throw new Error('Future league failed to advance');
+      projectFutureSeason(futureWorld);
+    }
+    cache={yr,L:futureWorld};
+    HL.League.set(futureWorld);
+    return futureWorld;
   }
   const realWp = t => t.real.w / Math.max(1, t.real.w + t.real.l);
   const byRecord = L => L.teams.slice().sort((a, b) => realWp(a) - realWp(b));
@@ -293,14 +341,19 @@ HL.SkillDraft = (function () {
     // Exceptional builds are intentionally capable of superhuman primes.
     // Ordinary 55-80 ratings still produce normal multi-year peaks.
     const p=c.prime.primeLength;
-    const seasons=extraordinaryLongevity(c)?32:HL.clamp(Math.round(3+9*(p-40)/59),3,12);
+    const seasons=extraordinaryLongevity(c)?14:HL.clamp(Math.round(3+9*(p-40)/59),3,12);
     const start=Math.max(23,28-Math.floor((seasons-1)/2));
     return {start,end:start+seasons-1,seasons};
   }
-  // No forced retirement age: a viable player may keep playing for decades.
-  // The age at which opportunities dry up is determined by his remaining skills
-  // and contract market, not a secret maximum career length.
-  function careerLimit() { return Infinity; }
+  // Real NBA careers ordinarily occupy one to two decades, with exceptionally
+  // durable stars occasionally reaching their early 40s. Even 99s have a limit.
+  function careerLimit(c) {
+    if(!c?.prime)return 20;
+    const p=c.prime, a=p.attrs||{};
+    return Math.round(HL.clamp(
+      12 + (p.longevity-55)*.17 + ((a.dur||65)-65)*.06 +
+        (extraordinaryLongevity(c)?3:0),8,extraordinaryLongevity(c)?25:21));
+  }
   function extraordinaryLongevity(c) {
     const p=c.prime,a=p.attrs;
     return p.longevity>=98&&p.primeLength>=98&&a.dur>=94&&a.stam>=96&&a.iq>=92&&Math.max(a.three||0,a.mid||0,a.pass||0,a.post||0)>=95;
@@ -312,7 +365,8 @@ HL.SkillDraft = (function () {
     const execution=ovr-Math.max(0,55-mobility)*.48-Math.max(0,48-defense)*.2;
     const recent=(c.seasons||[]).filter(s=>!s.minors).slice(-3);
     const missed=recent.reduce((n,s)=>n+(s.injury?.games||0),0)/Math.max(1,recent.length);
-    const value=execution-Math.max(0,missed-25)*.09;
+    const ageTax=Math.max(0,c.age-36)*(c.age>=40?1.3:.35);
+    const value=execution-Math.max(0,missed-25)*.09-ageTax;
     return {eligible:value>=62,score:value,mobility,reason:value>=62?'NBA-level effectiveness and availability':'Declining mobility, effectiveness or availability no longer supports an NBA role'};
   }
   function shouldPauseAuto(c) {
@@ -328,14 +382,14 @@ HL.SkillDraft = (function () {
     // attrition curve eventually outpaces even max longevity and stamina.
     // Retirement is still player-controlled; declining contract value, not a
     // hard scripted retirement date, closes the NBA market.
-    const exceptional=extraordinaryLongevity(c),late=Math.max(0,age-(exceptional?60:36));
-    const decline=Math.max(0,age-w.end)*(exceptional?.68:1.3+(99-c.prime.longevity)*.035)+late*late*(exceptional?.13:.065);
+    const exceptional=extraordinaryLongevity(c),late=Math.max(0,age-(exceptional?37:33));
+    const decline=Math.max(0,age-w.end)*(exceptional?1.2:1.65+(99-c.prime.longevity)*.018)+late*late*(exceptional?.22:.18);
     const wear=(c.seasons||[]).reduce((n,s)=>n+(s.injury?.lasting?Math.min(60,s.injury.games||0)/30:0),0);
     for(const k of HL.ATTR_KEYS) {
       const goal=Number.isFinite(c.prime.attrs[k]) ? c.prime.attrs[k] : 65;
       const physical=['speed','vert','burst','accel','agility','stam','transition'].includes(k);
       const skillFade=['iq','ft','pass','vision','passingAccuracy','shotArc','shotSelection'].includes(k)?.38:1;
-      const earlyPhysical=physical?Math.max(0,age-(exceptional?49:30))*(exceptional?.18:.32+(99-c.prime.longevity)*.012):0;
+      const earlyPhysical=physical?Math.max(0,age-(exceptional?30:28))*(exceptional?.35:.46+(99-c.prime.longevity)*.01):0;
       const fade=decline*(physical?1.45:skillFade)+earlyPhysical+(physical?wear*1.6:wear*.2);
       const gap=physical?5:13;
       out[k]=Math.round(HL.clamp(goal-gap*(1-buildUp)-fade,25,Math.max(99,goal)));
@@ -443,6 +497,11 @@ HL.SkillDraft = (function () {
   async function offseason(c) {
     const from = c.me.ovr;
     c.age++; c.yr++;
+    if(c.seasons.filter(s=>!s.minors).length>=careerLimit(c) || c.age>= (extraordinaryLongevity(c)?45:43)) {
+      const played=c.seasons.filter(s=>!s.minors).length;
+      end(c, 'Retired after '+played+' NBA seasons at age '+c.age+'.');
+      return;
+    }
     const L = await leagueFor(c.yr,c);if(!L)return;
     setAge(c, c.age);
     const ovr = c.me.ovr;
