@@ -1075,3 +1075,18 @@ html[data-fx-level=off] .ability-replay-row{animation:none!important}
 .season-compact details{border:1px solid var(--rule);padding:10px;border-radius:9px;}
 .season-compact details summary{cursor:pointer;font-weight:800;}
 @media(max-width:1000px){.career-compact{position:static;max-width:100%;}}
+
+
+/* Draft-specific information is visible on the five cards, not hidden at the page bottom. */
+.draft-fit-chip{max-width:195px;padding:7px 9px;border-radius:7px;
+ border:1px solid rgba(163,217,245,.35);background:rgba(28,54,77,.89);
+ color:#cfe9fe;font:800 9px/1.4 var(--body);text-align:center;
+ letter-spacing:.025em;overflow-wrap:break-word;}
+.genesis-lineup-card.gcard{display:flex;flex-direction:column;justify-content:center;
+ gap:7px;cursor:grab;min-width:0;max-width:100%;padding:7px!important;
+ border:1px solid rgba(240,192,115,.55);background:linear-gradient(135deg,#253049,#111928);}
+.genesis-lineup-card .gf-portrait{width:100%;min-height:75px;max-height:108px;overflow:hidden;}
+.genesis-lineup-card .gf-image-label{display:none;}
+.genesis-lineup-meta{display:grid;gap:4px;text-align:center;}
+.genesis-lineup-meta b{font:850 15px/1 var(--display);overflow-wrap:anywhere;}
+.genesis-lineup-meta span{font:800 9px var(--body);color:#f0d2a0;}
