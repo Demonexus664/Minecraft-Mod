@@ -245,6 +245,58 @@ HL.SkillDraft = (function () {
   }
 
 
+
+  // An on-court identity changes usage, shot selection and defensive behavior
+  // during possessions. Ratings are never padded to imitate the choice.
+  const ROLES={
+    balanced:{title:'Two-Way Balance',detail:'Keep your natural shot diet, play through your teammates.',t:{},focus:'balanced',usage:1,injury:0},
+    scorer:{title:'First Option',detail:'More isolations and shot attempts; fewer passes and extra fatigue risk.',t:{usage:14,shotHunt:16,iso:13,passFirst:-13,moveBall:-10},focus:'star',usage:1.16,injury:.025},
+    facilitator:{title:'Floor General',detail:'More touches, ball movement and assists; fewer forced jumpers.',t:{usage:7,passFirst:20,moveBall:18,riskyPass:-5,shotHunt:-13},focus:'motion',usage:1.08,injury:.005},
+    finisher:{title:'Rim Attacker',detail:'More drives and drawn fouls; fewer perimeter attempts.',t:{usage:9,drive:19,drawFoul:14,three:-12,mid:-7},focus:'inside',usage:1.1,injury:.018},
+    stopper:{title:'Defensive Specialist',detail:'More help and closeouts, less gambling and lower offensive usage.',t:{usage:-9,contest:16,effort:16,gamble:-10,shotHunt:-12},focus:'balanced',usage:.94,injury:.008}
+  };
+  const AGENDAS={
+    points:{title:'Scoring Crown',detail:'Average at least 30 PPG across half the schedule.',test:(s,n)=>s.g>=n*.5&&s.ppg>=30},
+    assists:{title:'Floor General',detail:'Average at least 10 APG across half the schedule.',test:(s,n)=>s.g>=n*.5&&s.apg>=10},
+    rebounds:{title:'Own the Glass',detail:'Average at least 12 RPG across half the schedule.',test:(s,n)=>s.g>=n*.5&&s.rpg>=12},
+    winning:{title:'Contender',detail:'Win at a 55-win pace and make the playoffs.',test:(s,n)=>s.w/Math.max(1,s.w+s.l)>=55/82&&s.made},
+    legacy:{title:'Championship Chase',detail:'Win a championship and play 45% of the season.',test:(s,n)=>s.champion&&s.g>=n*.45}
+  };
+  function customizeRole(me,id) {
+    const role=ROLES[id]||ROLES.balanced;
+    const base=HL.completeTendencies(me);
+    const tend={...base};
+    for(const [key,delta]of Object.entries(role.t))tend[key]=HL.clamp((base[key]??50)+delta,0,100);
+    me.tend=HL.completeTendencies({...me,tend});
+    return role;
+  }
+  function finishAgenda(c,s,n) {
+    const id=AGENDAS[c.agenda]?c.agenda:'winning',def=AGENDAS[id];
+    const complete=!s.minors&&!!def.test(s,n);
+    const out={year:c.yr,id,title:def.title,detail:def.detail,complete};
+    c.agendaHistory ||= [];
+    c.agendaHistory.push(out);
+    if(complete){c.agendaVictories=(c.agendaVictories||0)+1;c.trainingReward=(c.trainingReward||0)+.2;}
+    return out;
+  }
+  function rolePanel(c) {
+    const roles=Object.entries(ROLES).map(([id,r])=>
+      '<button class="role-card '+(c.role===id?'active':'')+'" data-role="'+id+'">'+
+      '<small>'+(c.role===id?'ACTIVE STYLE':'PLAY STYLE')+'</small><b>'+esc(r.title)+'</b>'+
+      '<span>'+esc(r.detail)+'</span></button>').join('');
+    const objectives=Object.entries(AGENDAS).map(([id,a])=>
+      '<option value="'+id+'" '+(c.agenda===id?'selected':'')+'>'+esc(a.title)+'</option>').join('');
+    const prev=c.agendaHistory?.at(-1);
+    return '<section class="block role-studio"><header><h3>SEASON GAMEPLAN STUDIO</h3><span class="ml-auto t3 sm">Real on-court decisions</span></header>'+
+      '<div class="body stack"><p class="t2 sm">Your role changes shot selection, touches, passing, defense and fatigue. It does not grant fake ratings. Choose before the season.</p>'+
+      '<div class="role-grid">'+roles+'</div><div class="season-agenda"><div class="grow"><b>Season contract</b>'+
+      '<p class="t3 sm">Take on a tough statistical or championship goal. Success earns a small extra training session at the next offseason, with diminishing returns.</p></div>'+
+      '<select data-agenda aria-label="Season objective">'+objectives+'</select></div>'+
+      (prev?'<div class="role-last '+(prev.complete?'complete':'')+'">Previous challenge · '+
+        esc(prev.title)+' · <b>'+(prev.complete?'ACHIEVED':'MISSED')+'</b> · '+yrLabel(prev.year)+'</div>':'')+
+      '<div class="caps">Completed contracts: '+(c.agendaVictories||0)+'</div></div></section>';
+  }
+
   // Offseason training is a real, modest attribute investment, not a free OVR
   // multiplier. It persists across seasons while age, health and DNA still rule.
   const TRAINING={
@@ -260,7 +312,9 @@ HL.SkillDraft = (function () {
     const id=TRAINING[c.trainingFocus]?c.trainingFocus:'balanced';
     const t=TRAINING[id],old=c.training[id]||0;
     // One training camp per offseason, diminishing returns across the career.
-    const gain=HL.clamp(t.rate*(1-old/9),.15,t.rate);
+    const bonus=Math.min(.3,c.trainingReward||0);
+    const gain=HL.clamp(t.rate*(1-old/9)+bonus,.15,t.rate+.3);
+    c.trainingReward=0;
     c.training[id]=Math.round((old+gain)*100)/100;
     c.trainingHistory ||= [];
     c.trainingHistory.push({year:c.yr,program:id,gain:+gain.toFixed(2)});
@@ -492,7 +546,7 @@ HL.SkillDraft = (function () {
       seasons: [], awards: [], rings: 0, teams: [], pick: null, altered: [], earnings: 0, log: [], lastRecords: {},
       totals: blankTotals(), ptotals: blankTotals(), highs: {}, tradeRequests: 0,
       pending: null, done: false, end: null, legacy: null, dna: prime.dna, story: [], pendingStory:null, franchiseLoyalty:0,
-       trainingFocus:'balanced',training:{},trainingHistory:[],
+       trainingFocus:'balanced',training:{},trainingHistory:[],role:'balanced',agenda:'winning',agendaVictories:0,agendaHistory:[],trainingReward:0,
     };
   }
 
@@ -545,14 +599,15 @@ HL.SkillDraft = (function () {
     let missed = 0, injury = null;
     const eliteCondition = Math.max(0, (Math.min(me.attrs.stam || 65, me.attrs.dur || 65) - 70) / 29);
     const ageRisk = Math.max(0, c.age - 32) * 0.012 * (1 - 0.7 * eliteCondition);
-    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk, 0.01, 0.75))) {
+    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk + (ROLES[c.role]?.injury||0), 0.01, 0.75))) {
       const inj = HL.rollInjury(1.2);
       missed = Math.min(L.games, inj.games);
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
       if (missed > 0) injury = { name: inj.name, games: missed, lasting: !!inj.lasting };
     }
-    const res = simSeason(L, team, me, missed);
-    const s = { age: c.age, yr: c.yr, key: String(L.season), team: metaOf(team), ovr: me.ovr, salary: c.contract ? c.contract.amount : 0, injury, ...res };
+    const res = simSeason(L, team, me, missed,c.role);
+    const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
+    s.agenda=finishAgenda(c,s,L.games);
     if(L.season>HL.LATEST_SEASON){
       s.leagueRecap={
         rookies:Object.values(L.players).filter(p=>p.draft?.year===c.yr&&p.teamId!=null)
@@ -769,13 +824,14 @@ HL.SkillDraft = (function () {
   }
 
   // ---------- one season: real schedule, awards voted against the real field, playoff path ----------
-  function simSeason(L, team, me, missed) {
+  function simSeason(L, team, me, missed, role='balanced') {
     const roster = HL.League.teamPlayers(team.id).sort((a, b) => b.ovr - a.ovr).slice(0, 14);
     const historical=L.season<=HL.LATEST_SEASON;
     const realRows=historical?HL.History.seasonRows(String(L.season)):[];
     const stars=realRows.filter(r=>r.g>=L.games/2).sort((a,b)=>b.ovr-a.ovr).slice(0,10);
     const starMin=historical?Math.min(44,stars.reduce((n,r)=>n+r.mpg,0)/Math.max(1,stars.length)):36;
     me.teamId = team.id;
+    const selectedRole=customizeRole(me,role);
     // The coach slots him by where he ranks on the roster; the real players' minutes shrink to make room.
     const rankOnTeam = roster.filter(p => p.ovr > me.ovr).length;
     const byRank = [36, 34, 32, 30, 28, 25, 22, 19, 15, 12, 8];
@@ -785,7 +841,10 @@ HL.SkillDraft = (function () {
     if (othersMin > room) for (const p of roster) if (p.realMpg) p.realMpg *= room / othersMin;
     me.minutesLock = true;
     me.stats = {}; me.injury = null;
-    const tObj = { id: team.id, abbr: team.abbr, strategy: HL.DEFAULT_STRATEGY(), players: [me, ...roster] };
+    const strategy=HL.DEFAULT_STRATEGY();
+    strategy.focus=selectedRole.focus;
+    strategy.usageLock={[me.id]:selectedRole.usage};
+    const tObj={id:team.id,abbr:team.abbr,strategy,players:[me,...roster]};
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     const objOf = t => ({ id: t.id, abbr: t.abbr, strategy: t.strategy, players: HL.League.teamPlayers(t.id) });
     const line = HL.blankStatLine(), pline = HL.blankStatLine();
@@ -1122,6 +1181,7 @@ HL.SkillDraft = (function () {
       out.push(`<section class="block"><div class="body row wrap" style="gap:10px"><div class="grow"><h3>${yrLabel(c.yr)}</h3><div class="t2 sm">${c.minors ? 'A season in the minor leagues.' : `With the ${esc(fullName(c.teamMeta))}.`}</div></div><button class="btn go big" data-play>Play the season</button><button class="btn" data-simrest>Sim next 10 seasons</button></div></section>`);
     }
     const last = c.seasons[c.seasons.length - 1];
+    out.push(rolePanel(c));
     if(c.pendingStory){const e=c.pendingStory;out.unshift(`<section class="block dna-story-choice"><div class="body stack"><span class="dna-section-label">A CAREER TURNING POINT</span><h2>${esc(e.title)}</h2><p>${esc(e.subtitle)}</p><div class="row wrap"><button class="btn go" data-story-choice="a">${esc(e.a)}</button><button class="btn" data-story-choice="b">${esc(e.b)}</button></div></div></section>`);}
     if (last) out.push(seasonReport(last));
     out.push(trainingView(c));
@@ -1156,6 +1216,7 @@ HL.SkillDraft = (function () {
     const extras = [cnt.g40 ? plural(cnt.g40, '40-point game') : '', cnt.g50 ? plural(cnt.g50, '50-point game') : '', cnt.td ? plural(cnt.td, 'triple-double') : '', cnt.dd ? plural(cnt.dd, 'double-double') : ''].filter(Boolean);
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
+      ${s.agenda?'<div class="season-goal-report '+(s.agenda.complete?'complete':'')+'"><div><div class="caps">Season contract · '+esc(ROLES[s.role]?.title||'Balanced')+'</div><b>'+esc(s.agenda.title)+'</b><p>'+esc(s.agenda.detail)+'</p></div><strong>'+(s.agenda.complete?'GOAL ACHIEVED':'GOAL MISSED')+'</strong></div>':''}
       ${s.leagueRecap ? `<details open><summary>League evolution · new rookies, rising players & scoring rivals</summary>
         <div class="cols c2" style="gap:12px">
         <div class="stack"><div class="caps">New rookie class</div>${s.leagueRecap.rookies.map(p=>`<div class="kv"><span>${esc(p.name)} · ${esc(p.team)}</span><b>${p.ovr} OVR</b></div>`).join('')||'<div class="t3">No rookies in this class</div>'}</div>
@@ -1341,6 +1402,12 @@ HL.SkillDraft = (function () {
       if (selected && remaining().includes(id)) finishPick(selected, id);
     });
     app.querySelectorAll('[data-wild-cat]').forEach(btn=>btn.onclick=()=>finishPick(st.wildCandidate,btn.dataset.wildCat));
+    app.querySelectorAll('[data-role]').forEach(btn=>btn.onclick=()=>{
+      const c=st.career;if(!c||c.done||!ROLES[btn.dataset.role])return;
+      c.role=btn.dataset.role;FX.sfx.pop(1);render();
+    });
+    const agendaSelect=app.querySelector('[data-agenda]');
+    if(agendaSelect)agendaSelect.onchange=()=>{if(st.career&&!st.career.done)st.career.agenda=agendaSelect.value;render();};
     app.querySelectorAll('[data-training]').forEach(btn=>btn.onclick=()=>{
       const c=st.career;if(!c||c.done||!TRAINING[btn.dataset.training])return;
       c.trainingFocus=btn.dataset.training;FX.sfx.pop(1);render();
