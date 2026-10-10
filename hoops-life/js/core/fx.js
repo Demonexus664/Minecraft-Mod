@@ -6,6 +6,16 @@ window.HL = window.HL || {};
 HL.FX = (function () {
   const reduced = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const wait = ms => new Promise(r => setTimeout(r, reduced() ? Math.min(ms, 60) : ms));
+  const levels=['full','lite','off'];
+  function fxLevel(){
+    try {const val=localStorage.getItem('hl-fx-level');return levels.includes(val)?val:'full';}
+    catch{return 'full';}
+  }
+  function setFxLevel(level){
+    if(!levels.includes(level))return;
+    try{localStorage.setItem('hl-fx-level',level);}catch{}
+    document.documentElement.setAttribute('data-fx-level',level);
+  }
 
   // ---------- sound (WebAudio blips, no files) ----------
   let ctx = null;
@@ -59,7 +69,8 @@ HL.FX = (function () {
 
   // ---------- particles ----------
   function burst(el, colors = ['#ffd84f', '#fff'], n = 28, spread = 1) {
-    if (!el || reduced()) return;
+    if (!el || reduced()||fxLevel()==='off') return;
+    n=fxLevel()==='lite'?Math.min(15,Math.ceil(n*.45)):n;
     const r = el.getBoundingClientRect();
     const layer = document.createElement('div');
     layer.className = 'fx-layer';
@@ -76,13 +87,13 @@ HL.FX = (function () {
     setTimeout(() => layer.remove(), 1100);
   }
   function shake(el = document.querySelector('.page'), strength = 1) {
-    if (!el || reduced()) return;
+    if (!el || reduced()||fxLevel()!=='full') return;
     el.style.setProperty('--shake', strength * 6 + 'px');
     el.classList.remove('fx-shake'); void el.offsetWidth; el.classList.add('fx-shake');
     setTimeout(() => el.classList.remove('fx-shake'), 400);
   }
   function flash(color = '#fff') {
-    if (reduced()) return;
+    if (reduced()||fxLevel()!=='full') return;
     const f = document.createElement('div');
     f.className = 'fx-flash'; f.style.background = color;
     document.body.appendChild(f);
@@ -165,9 +176,20 @@ HL.FX = (function () {
     });
   }
 
-  function soundToggle() { return `<button class="btn small quiet" data-sound title="Sound">${soundOn() ? 'Sound on' : 'Sound off'}</button>`; }
+  function soundToggle() {
+    return '<button class="btn small quiet" data-sound title="Toggle sound" aria-pressed="'+
+      (soundOn()?'true':'false')+'">'+(soundOn()?'Sound on':'Sound off')+'</button>'+
+      '<label class="fx-selector">FX <select data-fx-level aria-label="Visual effects intensity">'+
+      levels.map(id=>'<option value="'+id+'" '+(fxLevel()===id?'selected':'')+'>'+
+        (id==='full'?'Cinematic':id==='lite'?'Light':'Off')+'</option>').join('')+
+      '</select></label>';
+  }
   const boundRoots=new WeakSet();
   function bindSound(root) {
+    if(document.documentElement.getAttribute('data-fx-level')!==fxLevel())
+      document.documentElement.setAttribute('data-fx-level',fxLevel());
+    const effect=root.querySelector('[data-fx-level]');
+    if(effect)effect.onchange=()=>setFxLevel(effect.value);
     const b=root.querySelector('[data-sound]');
     if(b)b.onclick=()=>{
       setSound(!soundOn());
@@ -186,7 +208,7 @@ HL.FX = (function () {
     }
   }
 
-  return { sfx, TIERS, tierOf, tierIndex, burst, shake, flash, countUp, reels, flipIn, tilt, banner, wait, soundToggle, bindSound, reduced };
+  return { sfx, TIERS, tierOf, tierIndex, burst, shake, flash, countUp, reels, flipIn, tilt, banner, wait, soundToggle, bindSound, reduced,fxLevel,setFxLevel };
 })();
 
 // Game cards (collectible style) for real player-seasons.
