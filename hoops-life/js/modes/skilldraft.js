@@ -42,7 +42,7 @@ HL.SkillDraft = (function () {
   function newRun(mode, debut, draftStyle = 'original') {
     cache=null;futureWorld=null;
     HL.DNAFX?.reset();
-    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating', buildView:'skills', skillFilter:'all' };
+    st = { mode, draftStyle, debut: debut || randomDebut(), picks: {}, team: null, decade: null, cat: null, hand: [], phase: 'spin', skips: { team: 2, era: 2, stat: 2, all: 2 }, career: null, name: 'Your Player', pos: 'auto', selected: null, skillChoices: null, rosterQuery: '', rosterPage: 0, rosterSort: 'rating', buildView:'skills', skillFilter:'all',freeGroup:'basketball' };
   }
   const remaining = () => CATS.filter(c => !st.picks[c[0]]).map(c => c[0]);
   const decades = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
@@ -201,7 +201,7 @@ HL.SkillDraft = (function () {
     st.hand = []; st.cat = null;st.wildCandidate=null;st.selected=null;st.skillChoices=null;
     st.phase = remaining().length ? 'spin' : 'built';
     render();
-    const tile = document.querySelector(`.tile[data-cat="${id}"]`);
+    const tile = document.querySelector(`.draft-skill-cell[data-cat="${id}"]`);
     if (tile) { tile.classList.add('pop'); FX.burst(tile, FX.tierOf(v).colors.concat('#fff'), FX.tierIndex(v) >= 3 ? 30 : 12, 0.6); }
     const dna=HL.DNA.analyze(Object.entries(st.picks).map(([cat,pk])=>({pid:pk.row.pid,cat,row:pk.row,season:pk.season})));
     const fresh=dna.mutations.find(m=>!oldDna.mutations.some(o=>o.id===m.id));
@@ -1213,11 +1213,11 @@ HL.SkillDraft = (function () {
       const cells=CATS.filter(([id])=>filter==='all'||(filter==='picked'?!!st.picks[id]:!st.picks[id]))
         .map(([id,label])=>{
           const pk=st.picks[id];
-          if(!pk)return '<article class="draft-skill-cell empty '+(st.cat===id?'next':'')+
+          if(!pk)return '<article data-cat="'+id+'" class="draft-skill-cell empty '+(st.cat===id?'next':'')+
             '"><span>'+esc(label)+'</span><strong>—</strong><small>'+
             (st.cat===id?'DRAFTING NOW':'Unfilled')+'</small></article>';
           const bio=HL.HISTORY.players[pk.row.pid],score=skillValue(pk,catOf(id));
-          return '<article class="draft-skill-cell filled"><span>'+esc(label)+'</span>'+
+          return '<article data-cat="'+id+'" class="draft-skill-cell filled"><span>'+esc(label)+'</span>'+
             '<strong>'+(hide?'?':id==='body'?HL.fmtHeight(bio[3]):score)+'</strong>'+
             '<small>'+esc(bio[0])+' · '+yrLabel(pk.season)+'</small></article>';
         }).join('');
@@ -1521,6 +1521,9 @@ HL.SkillDraft = (function () {
     });
     const rosterBack = app.querySelector('[data-back-roster]');
     if (rosterBack) rosterBack.onclick = () => { st.phase = 'hand'; st.selected = null; st.skillChoices = null; render(); };
+    app.querySelectorAll('[data-free-group]').forEach(btn=>btn.onclick=()=>{
+      if(st.phase!=='choose-skill')return;st.freeGroup=btn.dataset.freeGroup;render();
+    });
     app.querySelectorAll('[data-free-cat]').forEach(btn => btn.onclick = () => {
       if (st.phase !== 'choose-skill') return;
       const id = btn.dataset.freeCat, selected = st.skillChoices && st.skillChoices[id];
@@ -1671,22 +1674,35 @@ HL.SkillDraft = (function () {
     const bio = HL.HISTORY.players[selected.row.pid];
     const picks = Object.entries(st.picks).map(([cat, c]) =>
       ({ pid:c.row.pid, cat, row:c.row, season:c.season }));
-    const groups = [
-      ['Basketball skills', CATS.filter(c => !c[0].startsWith('tend') && !['longevity','primeLength'].includes(c[0]))],
-      ['Playing tendencies', CATS.filter(c => c[0].startsWith('tend'))],
-      ['Career traits', CATS.filter(c => ['longevity','primeLength'].includes(c[0]))]
+    const groups=[
+      ['basketball','SKILLS',CATS.filter(c=>!c[0].startsWith('tend')&&!['longevity','primeLength'].includes(c[0]))],
+      ['tendencies','PLAYSTYLE',CATS.filter(c=>c[0].startsWith('tend'))],
+      ['traits','CAREER TRAITS',CATS.filter(c=>['longevity','primeLength'].includes(c[0]))]
     ];
-    const options = groups.map(([heading, cats]) => {
+    const active=groups.some(([id,,cats])=>id===st.freeGroup&&cats.some(c=>st.skillChoices[c[0]]))?
+      st.freeGroup:groups.find(([, ,cats])=>cats.some(c=>st.skillChoices[c[0]]))?.[0]||'basketball';
+    const tabs='<nav class="draft-workspace-tabs" aria-label="Available skill categories">'+
+      groups.map(([id,label,cats])=>'<button data-free-group="'+id+'" class="'+(active===id?'on':'')+
+        '" aria-pressed="'+(active===id)+'"><span>'+label+'</span><b>'+
+        cats.filter(c=>st.skillChoices[c[0]]).length+'</b></button>').join('')+'</nav>';
+    const options = groups.filter(([id])=>id===active).map(([id,heading,cats]) => {
       const available = cats.filter(c => st.skillChoices[c[0]]);
       if (!available.length) return '';
       return '<div class="stack" style="gap:8px"><h3>' + heading + '</h3><div class="dna-choice-grid">' +
         available.map(cat => {
           const option = st.skillChoices[cat[0]];
           const v = skillValue(option, cat);
-          const fusion = HL.DNA.preview(picks, { pid:option.row.pid, cat:cat[0], row:option.row, season:option.season });
+          const entry={pid:option.row.pid,cat:cat[0],row:option.row,season:option.season};
+          const reaction=HL.DNA.preview(picks,entry);
+          const previous=HL.DNA.analyze(picks),next=HL.DNA.analyze([...picks,entry]);
+          const gainedPairs=Math.max(0,(next.pairs?.length||0)-(previous.pairs?.length||0));
+          const gainedTrios=Math.max(0,(next.trios?.length||0)-(previous.trios?.length||0));
+          const hints=[gainedPairs?gainedPairs+' DUO'+(gainedPairs>1?'S':''):'',
+            gainedTrios?gainedTrios+' TRIO'+(gainedTrios>1?'S':''):'',
+            reaction?'RARE REACTION':''].filter(Boolean).join(' · ');
           return '<button class="dna-choice" data-free-cat="' + cat[0] + '">' +
             '<span class="stack" style="gap:4px;text-align:left"><b>' + esc(cat[1]) + '</b>' +
-            '<span class="t3 sm">' + yrLabel(option.season) + (fusion ? ' · ✦ Fusion possibility' : '') + '</span></span>' +
+            '<span class="t3 sm">' + yrLabel(option.season) + (hints?' · '+esc(hints):'') + '</span></span>' +
             '<strong>' + (hide ? '?' : cat[0] === 'body' ? HL.fmtHeight(bio[3]) : v) + '</strong></button>';
         }).join('') + '</div></div>';
     }).join('');
@@ -1697,7 +1713,7 @@ HL.SkillDraft = (function () {
         stat:[['PTS',selected.row.pts],['REB',selected.row.trb],['AST',selected.row.ast]], hidden:hide }) +
       '<div class="grow"><p class="t2">Which skill do you want to inherit? All unfilled categories are available. The year beside each choice is this player’s best season for that specific skill.</p>' +
       '<button class="btn" data-back-roster>Back to full roster</button></div></div>' +
-      options + '</div></section>';
+      tabs + options + '</div></section>';
   }
 
   function draftView(hide, reveal) {
