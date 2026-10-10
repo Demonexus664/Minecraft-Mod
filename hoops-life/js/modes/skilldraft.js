@@ -331,6 +331,8 @@ HL.SkillDraft = (function () {
         ({name:p.name,ovr:p.ovr,change:p.ovr-previousRatings.get(p.id)}))
         .sort((a,b)=>b.change-a.change);
       projectFutureSeason(futureWorld);
+      futureWorld._careerAwardField=null;
+      futureWorld._careerAwardYear=null;
     }
     cache={yr,L:futureWorld};
     HL.League.set(futureWorld);
@@ -657,7 +659,7 @@ HL.SkillDraft = (function () {
   // The generated league's award field is sampled from real possessions in
   // CURRENT rosters: new rookies, improving players and aging stars.
   function generatedAwardField(L) {
-    if(L._careerAwardField)return L._careerAwardField;
+    if(L._careerAwardYear===L.season && L._careerAwardField)return L._careerAwardField;
     const totals=new Map(), sampled={};
     for(const t of L.teams)sampled[t.id]=0;
     const rules={...L.rules,profile:L.profile};
@@ -691,6 +693,7 @@ HL.SkillDraft = (function () {
         def:defValue(p.attrs,g,L.games)*(mpg<18?.7:1)});
     }
     L._careerAwardField=field;
+    L._careerAwardYear=L.season;
     return field;
   }
 
