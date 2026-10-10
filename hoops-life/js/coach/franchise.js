@@ -11,9 +11,9 @@ HL.Franchise = (function () {
   // ---------------- navigation map ----------------
   const SECTIONS = [
     ['home', 'Home', [['overview', 'Overview'], ['news', 'News'], ['mediaday', 'Media Day']]],
-    ['team', 'Team', [['roster', 'Roster'], ['rotation', 'Rotation & Game Plan'], ['schedule', 'Schedule'], ['stats', 'Player Stats']]],
+    ['team', 'Team', [['roster', 'Roster'], ['rotation', 'Rotation & Game Plan'], ['people', 'People & Relationships'], ['schedule', 'Schedule'], ['stats', 'Player Stats']]],
     ['league', 'League', [['standings', 'Standings'], ['leaders', 'Leaders'], ['playoffs', 'Playoffs'], ['players', 'Players'], ['history', 'History']]],
-    ['office', 'Front Office', [['trades', 'Trades', 1], ['freeagency', 'Free Agency', 1], ['draft', 'Draft', 1], ['finances', 'Finances', 1], ['staff', 'Staff', 1]]],
+    ['office', 'Front Office', [['trades', 'Trades'], ['freeagency', 'Free Agency'], ['draft', 'Draft', 1], ['finances', 'Finances'], ['staff', 'Staff', 1]]],
     ['league-office', 'League Office', [['rules', 'Rulebook'], ['settings', 'Settings']]],
   ];
   const go = (sec, pg, state = {}) => { section = sec; page = pg; pageState = state; render(); window.scrollTo(0, 0); };
@@ -238,6 +238,10 @@ HL.Franchise = (function () {
     const Lg = L();
     try {
       if (n.type === 'media' && n.visual) return `<div style="max-width:${n.visual.kind === 'short' ? 280 : n.visual.kind === 'thumb' ? 520 : 340}px">${mediaVisual(n)}</div>`;
+      if (n.type === 'transaction' && n.transaction && n.transaction.kind !== 'waiver') {
+        const tx = n.transaction, p = Lg.players[tx.playerIds[0]];
+        return HL.GFX.moveCard(p, tx.otherTeamId != null ? Lg.teams[tx.otherTeamId] : null, Lg.teams[tx.teamId], tx.kind === 'trade' ? 'Trade agreed' : tx.kind === 'extension' ? 'Extended' : 'Signed');
+      }
       if (n.type === 'champion' && n.teamIds) {
         const t = Lg.teams[n.teamIds[0]];
         return HL.GFX.championPoster(t, topStars(t.id), n.season + 1, { sub: n.body || '' });
@@ -335,7 +339,7 @@ HL.Franchise = (function () {
       <div class="en"><span>${k(Math.round(r.reposts * 0.6))} replies</span><span>${k(r.reposts)} reposts</span><span>${k(r.likes)} likes</span></div></div></div>`;
   }
   function kicker(n) {
-    const types = { media: 'Media day', game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
+    const types = { people: 'People & relationships', media: 'Media day', game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
     const events = { 'game.buzzer_beater': 'Buzzer-beater', 'game.game_winner': 'Game-winner', 'game.comeback': 'Comeback', 'record.single_game': 'Record book', 'record.single_game_tie': 'Record book', 'record.minutes_sixth_overtime': 'Record book', 'court.four_point_play': 'Four-point play', 'court.five_point_play': 'Five-point play', 'court.charge_triple': 'Defense', 'court.no_field_goals_quarter': 'Defense' };
     const label = n.type === 'event' ? (events[n.key] || 'Rare feat') : (types[n.type] || n.type);
     return `${label} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
@@ -635,6 +639,7 @@ HL.Franchise = (function () {
       const r = L().rules;
       const tog = (k, label, desc) => `<div class="setting"><div class="grow"><b>${label}</b><div class="d">${desc}</div></div><label class="switch"><input type="checkbox" data-rule="${k}" ${r[k] ? 'checked' : ''}><span></span></label></div>`;
       const num = (k, label, desc, min, max, step = 1) => `<div class="setting"><div class="grow"><b>${label}</b><div class="d">${desc}</div></div><input type="number" min="${min}" max="${max}" step="${step}" value="${r[k]}" data-rule-num="${k}" style="width:84px"></div>`;
+      const select = (k, label, desc, choices) => `<div class="setting"><div class="grow"><b>${label}</b><div class="d">${desc}</div></div><select data-rule-select="${k}" aria-label="${label}">${choices.map(([v, text]) => `<option value="${v}" ${r[k] === v ? 'selected' : ''}>${text}</option>`).join('')}</select></div>`;
       return `<div class="page-title"><h2>Rulebook</h2><span class="t2">Every change affects the sim, and the league reacts. Changing rules mid-season is more controversial.</span></div>
       <div class="cols c2">
         <section class="block"><header><h3>Court & scoring</h3></header><div class="body">
@@ -646,12 +651,20 @@ HL.Franchise = (function () {
           ${num('quarterLen', 'Quarter length', 'Minutes. NBA 12, FIBA 10.', 4, 20)}
           ${num('otLen', 'Overtime length', 'Minutes. NBA 5.', 1, 12)}
           ${num('shotClock', 'Shot clock', 'Seconds. Shorter means faster pace.', 10, 35)}
+          ${num('shotClockReset', 'Offensive-rebound reset', 'Seconds to attack after a rebound. Never longer than the full shot clock. NBA: 14 since 2018.', 1, 35)}
+          ${select('backcourtSeconds', 'Backcourt time limit', 'Advance the ball before the limit or lose possession. Pressure defense raises the risk.', [[8, '8 seconds'], [10, '10 seconds'], [0, 'Disabled']])}
+        </div></section>
+        <section class="block"><header><h3>Lane & defensive coverage</h3></header><div class="body">
+          ${tog('offensiveThreeSeconds', 'Offensive three seconds', 'Staying in the paint costs a turnover. Post-heavy attacks face more risk.')}
+          ${tog('defensiveThreeSeconds', 'Defensive three seconds', 'A lane violation awards one technical free throw; the offense keeps the ball. No personal foul.')}
+          ${tog('illegalDefense', 'Illegal defense / zone ban', 'Teams use man coverage instead of zone defense. Historical default before 2001.')}
         </div></section>
         <section class="block"><header><h3>Contact & fouls</h3></header><div class="body">
           ${tog('handCheck', 'Hand-checking', '1990s-style perimeter defense.')}
-          ${tog('tackling', 'Tackling', 'Injuries skyrocket. The players\' union will not be happy.')}
+          ${tog('tackling', 'Full-contact defense', 'Experimental heavy contact: harder rim finishes and higher injury risk. Ordinary fouls still apply.')}
           ${tog('noFouls', 'No fouls called', 'No free throws. Anything goes.')}
           ${num('foulOut', 'Foul-out limit', 'Personal fouls before disqualification. 0 = never.', 0, 12)}
+          ${num('bonusFouls', 'Team-foul bonus', 'Team foul that starts two free throws for non-shooting fouls. NBA: fifth, fourth in OT. 0 = no bonus.', 0, 12)}
         </div></section>
         <section class="block"><header><h3>Health</h3></header><div class="body">
           ${num('injuryMult', 'Injury frequency', '1 = realistic, 0 = none.', 0, 5, 0.1)}
@@ -680,12 +693,16 @@ HL.Franchise = (function () {
       return `<div class="page-title"><h2>${titles[page] || 'Coming soon'}</h2></div><section class="block"><div class="empty">This front-office tool is coming in the next milestone. Until then the league handles it automatically each offseason (draft, re-signings and free agency).</div></section>`;
     },
   };
-  for (const k of ['trades', 'freeagency', 'draft', 'finances', 'staff']) PAGES[k] = PAGES.soon;
+  for (const k of ['trades', 'freeagency', 'finances']) PAGES[k] = () => HL.FrontOfficeUI.render(page, pageState);
+  for (const k of ['draft', 'staff']) PAGES[k] = PAGES.soon;
+  PAGES.people = HL.PeopleUI.render;
 
   function renderPage() {
     const el = document.getElementById('page');
     el.innerHTML = (PAGES[page] || PAGES.soon)();
     bindCommon(el);
+    if (['trades', 'freeagency', 'finances'].includes(page)) HL.FrontOfficeUI.bind(page, el, pageState, save => { renderPage(); if (save) autosave(); });
+    if (page === 'people') HL.PeopleUI.bind(el, () => { renderPage(); autosave(); });
     if (BIND[page]) BIND[page](el);
   }
 
@@ -726,12 +743,15 @@ HL.Franchise = (function () {
     },
     rules(el) {
       const r = L().rules;
-      el.querySelectorAll('[data-rule]').forEach(cb => cb.onchange = () => { r[cb.dataset.rule] = cb.checked; ruleChanged(cb.dataset.rule, cb.checked, !cb.checked); });
+      const change = (key, value) => { const old = r[key]; if (old === value) return; r[key] = value; ruleChanged(key, value, old); };
+      el.querySelectorAll('[data-rule]').forEach(cb => cb.onchange = () => change(cb.dataset.rule, cb.checked));
+      el.querySelectorAll('[data-rule-select]').forEach(inp => inp.onchange = () => change(inp.dataset.ruleSelect, +inp.value));
       el.querySelectorAll('[data-rule-num]').forEach(inp => inp.onchange = () => {
+        if (!inp.value.trim() || !Number.isFinite(+inp.value)) { inp.value = r[inp.dataset.ruleNum]; return; }
         const v = Math.max(+inp.min, Math.min(+inp.max, +inp.value));
-        const old = r[inp.dataset.ruleNum];
-        r[inp.dataset.ruleNum] = v;
-        if (old !== v) ruleChanged(inp.dataset.ruleNum, v, old);
+        const rounded = Math.round(v / +inp.step) * +inp.step;
+        inp.value = +rounded.toFixed(6);
+        change(inp.dataset.ruleNum, +inp.value);
       });
     },
     settings(el) {

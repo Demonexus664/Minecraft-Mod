@@ -297,7 +297,7 @@ HL.Challenge = (function () {
     if (st.phase === 'result') main = resultView();
     else if (st.phase === 'season') main = tickerView();
     else main = machineView(revealHand);
-    U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar">
+    U.app().innerHTML = `<div class="frame challenge-frame"><div class="masthead"><div class="bar">
         <div class="wordmark" data-home>Hoops<i>Life</i></div>
         <div class="mainnav"><button class="on">82-0 Challenge${st.daily ? ' · Daily' : ''}</button></div>
         <div class="simbar"><span class="t2 sm">${st.mode === 'hoopiq' ? 'HoopIQ' : 'Classic'} · ${yrLabel(st.playSeason)} · Pick ${Math.min(filled() + 1, SLOTS.length)}/${SLOTS.length}</span>${FX.soundToggle()}<button class="btn small" data-new>New run</button></div>
@@ -430,7 +430,7 @@ HL.Challenge = (function () {
     for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
     const dailyDone = bestRuns().find(r => r.daily === today());
     const draw = () => {
-      U.app().innerHTML = `<div class="frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">82-0 Challenge</button></div><div class="simbar">${FX.soundToggle()}</div></div></div>
+      U.app().innerHTML = `<div class="frame challenge-frame"><div class="masthead"><div class="bar"><div class="wordmark" data-home>Hoops<i>Life</i></div><div class="mainnav"><button class="on">82-0 Challenge</button></div><div class="simbar">${FX.soundToggle()}</div></div></div>
       <div class="page" style="max-width:980px">
         <section class="machine" style="text-align:center"><div class="lights">${'<i></i>'.repeat(14)}</div>
           <div class="fxb-kicker" style="margin-top:14px">Spin · Draft · Go undefeated</div>

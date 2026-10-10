@@ -20,6 +20,12 @@ HL.DEFAULT_RULES = () => ({
   threeValue: 3,
   fourPoint: false,     // a deep "4-point" zone
   shotClock: 24,
+  shotClockReset: 14,   // after an offensive rebound; capped at the full shot clock
+  backcourtSeconds: 8, // 0 disables the backcourt time limit
+  offensiveThreeSeconds: true,
+  defensiveThreeSeconds: true,
+  illegalDefense: false, // zone defenses must use man coverage
+  bonusFouls: 5,        // this team foul starts the penalty; 0 disables it
   foulOut: 6,
   handCheck: false,     // hand-checking allowed (pre-2004 style)
   tackling: false,      // the chaos rule
@@ -94,6 +100,7 @@ HL.DEFAULT_RULES = () => ({
 
   function prepTeam(team, rules) {
     const strat = Object.assign(HL.DEFAULT_STRATEGY(), team.strategy || {});
+    if (rules.illegalDefense && strat.defense === 'zone') strat.defense = 'man';
     let avail = team.players.filter(p => !p.injury || p.injury.games <= 0);
     if (avail.length < 5) {
       // Not enough healthy bodies: the least-injured players play hurt.
@@ -178,7 +185,10 @@ HL.DEFAULT_RULES = () => ({
   const caution = (T, p) => { const f = T.st[p.id].fouls; return f >= 5 ? 0.35 : f >= 4 ? 0.6 : 1; };
   const eff = (T, p, key) => {
     const e = T.st[p.id].energy;
-    return p.attrs[key] * (0.86 + 0.14 * Math.min(1, e + 0.15));
+    // Relationships can affect focus; keep the influence modest and preserve the
+    // calibrated baseline (70 morale), including older players without this field.
+    const focus = HL.clamp(1 + ((p.morale ?? 70) - 70) * 0.0005, 0.97, 1.015);
+    return p.attrs[key] * (0.86 + 0.14 * Math.min(1, e + 0.15)) * focus;
   };
   // How dangerous a scorer is (used for the on-floor pecking order).
   const offRating = (p) => {
@@ -210,12 +220,16 @@ HL.DEFAULT_RULES = () => ({
 
   // ---------- Main ----------
   HL.simGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
+    rules = Object.assign(HL.DEFAULT_RULES(), rules);
     const H = prepTeam(homeTeam, rules), A = prepTeam(awayTeam, rules);
     H.home = true;
     const pbp = opts.pbp ? [] : null;
     const injuries = [];
     // Facts for the event log (records, game-winners, four-point plays...), kept for every game.
-    const track = { four: [], goAhead: null, last: null };
+    const track = { four: [], goAhead: null, last: null, violations: [], clockResets: [], bonusTrips: [] };
+    const strategyAdjustments = [homeTeam, awayTeam]
+      .filter(t => rules.illegalDefense && t.strategy && t.strategy.defense === 'zone')
+      .map(t => ({ teamId: t.id, from: 'zone', to: 'man', reason: 'illegalDefense' }));
     H.qfg = []; A.qfg = []; H.maxTrail = 0; A.maxTrail = 0;
     const teams = [H, A];
     for (const T of teams) for (const p of T.starters) T.st[p.id].line.gs = 1;
@@ -250,6 +264,8 @@ HL.DEFAULT_RULES = () => ({
       const qStartH = H.score, qStartA = A.score;
       H.qfg.push(0); A.qfg.push(0);
       H.teamFouls = 0; A.teamFouls = 0;
+      // A rebound at the horn belongs to the finished period, not its next opening possession.
+      H.lastOreb = null; A.lastOreb = null;
       let nextCheck = clock;
       const elapsedBefore = Math.min(regSeconds, (quarter - 1) * rules.quarterLen * 60);
 
@@ -274,10 +290,13 @@ HL.DEFAULT_RULES = () => ({
         }
 
         const D = offense === H ? A : H;
-        let dur = transition ? R.range(4, 9) : HL.clamp(R.normal(avgPossSec, 4.5), 5, rules.shotClock);
+        const reboundReset = offense.lastOreb != null;
+        const possessionClock = reboundReset ? Math.min(rules.shotClock, rules.shotClockReset) : rules.shotClock;
+        let dur = transition ? R.range(4, 9) : HL.clamp(R.normal(avgPossSec, 4.5), Math.min(5, possessionClock), possessionClock);
         const lastShot = dur >= clock;
         dur = Math.min(dur, clock);
         clock -= dur;
+        if (reboundReset) track.clockResets.push({ teamId: offense.team.id, period: quarter, seconds: possessionClock, duration: dur });
         // Last possession of a period: teams play for one shot but often get it off with a few seconds
         // left, which leaves the other side a rushed try or a heave.
         if (lastShot && dur >= 4 && R.chance(0.55)) clock = Math.min(R.range(0.4, 4.5), dur - 1);
@@ -314,7 +333,7 @@ HL.DEFAULT_RULES = () => ({
         for (const T of teams) {
           for (const p of T.onCourt) {
             const s = T.st[p.id];
-            let risk = 1.15e-5 * dur * (rules.injuryMult || 1);
+            let risk = 1.15e-5 * dur * (rules.injuryMult ?? 1);
             risk *= 1 + (60 - p.attrs.dur) / 60;
             risk *= 1 + Math.max(0, 0.5 - s.energy) * 1.5;
             risk *= 1 + Math.max(0, p.age - 31) * 0.08;
@@ -362,10 +381,40 @@ HL.DEFAULT_RULES = () => ({
       const idx = lineup.indexOf(initiator);
       const defender = dline[idx] || dline[0];
 
+      // The sim has no player coordinates: rule violations are exposure-based, driven by
+      // possession duration, pressure, paint usage and IQ. They still have real box-score
+      // consequences and retain their type and participants in the game result.
+      const violation = (type, T, p, facts) => track.violations.push({ type, side: T === H ? 'home' : 'away', pid: p.id, teamId: T.team.id, period: quarter, clock: clockStr, ...facts });
+      const backcourtRisk = !transition && putbackBy == null && rules.backcourtSeconds > 0 && secs >= rules.backcourtSeconds
+        ? 0.002 * HL.clamp((11 - rules.backcourtSeconds) / 3, 0, 3) * (dstrat.defense === 'press' ? 3 : 1) : 0;
+      if (backcourtRisk > 0 && R.chance(backcourtRisk)) {
+        O.st[initiator.id].line.tov++;
+        violation('backcourt', O, initiator, { turnover: true, seconds: rules.backcourtSeconds });
+        log(`${initiator.name}: ${rules.backcourtSeconds}-second backcourt violation.`, O);
+        return { keep: false, transition: false };
+      }
+      const paintPlayers = lineup.filter(isBig);
+      if (rules.offensiveThreeSeconds && secs >= 3 && paintPlayers.length && R.chance(0.002 * (strat.focus === 'inside' ? 1.5 : 1))) {
+        const p = pickBy(paintPlayers, p => (20 + p.tend.post) * (120 - p.attrs.iq));
+        O.st[p.id].line.tov++;
+        violation('offensiveThreeSeconds', O, p, { turnover: true });
+        log(`Offensive three-second violation on ${p.name}.`, O);
+        return { keep: false, transition: false };
+      }
+      if (!rules.noFouls && rules.defensiveThreeSeconds && secs >= 3 && R.chance(0.0015 * (dstrat.defense === 'zone' ? 2 : 1))) {
+        const p = pickBy(dline, p => (isBig(p) ? 3 : 1) * (120 - p.attrs.iq));
+        const shooter = lineup.slice().sort((a, b) => b.attrs.ft - a.attrs.ft)[0];
+        log(`Defensive three-second violation on ${p.name}. One technical free throw; offense keeps possession.`, D);
+        const made = shootFTs(O, shooter, 1, rules, log);
+        if (made) track.last = { pid: shooter.id, label: 'technical free throw', value: made, putback: false, assist: null };
+        violation('defensiveThreeSeconds', D, p, { freeThrows: 1, made, shooterId: shooter.id, retainedPossession: true, personalFoul: false });
+      }
+
       // Turnovers
       const toSkill = (eff(O, initiator, 'handle') + eff(O, initiator, 'pass') + eff(O, initiator, 'iq')) / 3;
       const dSteal = dline.reduce((s, p) => s + p.attrs.steal * (0.7 + p.tend.gamble / 166), 0) / 5;
-      let pTO = 0.125 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
+      // Lane/backcourt violations account for part of the previously generic turnover budget.
+      let pTO = 0.121 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
       if (dstrat.defense === 'press') pTO += 0.025;
       if (strat.focus === 'motion') pTO += 0.008;
       if (transition) pTO += 0.01;
@@ -396,7 +445,9 @@ HL.DEFAULT_RULES = () => ({
       if (!rules.noFouls && R.chance(E.common)) {
         const fouler = pickBy(dline, p => Math.pow(p.tend.foulAggr / 50, 1.6) * caution(D, p));
         foul(D, fouler, rules, log);
-        if (D.teamFouls > 4) {
+        const threshold = quarter > 4 ? Math.min(rules.bonusFouls, 4) : rules.bonusFouls;
+        if (threshold > 0 && D.teamFouls >= threshold) {
+          track.bonusTrips.push({ teamId: O.team.id, pid: initiator.id, period: quarter, teamFouls: D.teamFouls, threshold, freeThrows: 2 });
           const ft = shootFTs(O, initiator, 2, rules, log);
           if (ft) track.last = { pid: initiator.id, label: 'free throws', value: ft, putback: false, assist: null };
           return { keep: false, transition: false };
@@ -588,6 +639,7 @@ HL.DEFAULT_RULES = () => ({
       away: { teamId: awayTeam.id, score: A.score, quarters: A.quarters, box: box(A) },
       ot, pbp, injuries,
       events: {
+        violations: track.violations, clockResets: track.clockResets, bonusTrips: track.bonusTrips, strategyAdjustments,
         four: track.four, goAhead: track.goAhead, periods: 4 + ot,
         qfg: { home: H.qfg, away: A.qfg }, trail: { home: H.maxTrail, away: A.maxTrail },
         charges: Object.assign({}, ...[H, A].map(T => Object.fromEntries(Object.entries(T.st).filter(([, x]) => x.charges).map(([id, x]) => [id, x.charges])))),

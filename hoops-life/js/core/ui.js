@@ -54,55 +54,38 @@ HL.UI = (function () {
 
   function logo(team, size = 40) {
     if (!team) return '';
-    const src = asset('logo.' + (team.bref || team.abbr)) || asset('logo.' + team.abbr) || HL.teamLogoUrl(team);
+    const src = asset('logo.' + (team.bref || team.abbr)) || asset('logo.' + team.abbr) || window.HL_PHOTOS?.['logo.' + (team.bref || team.abbr)]?.src || window.HL_PHOTOS?.['logo.' + team.abbr]?.src || HL.teamLogoUrl(team);
     const img = src ? `<img src="${src}" alt="${esc(team.name)}" loading="lazy" onload="this.parentNode.classList.add('loaded')" onerror="this.remove()">` : '';
     return `<span class="logo" style="width:${size}px;height:${size}px;font-size:${size}px;--c:${teamAccent(team).c}"><b>${esc(team.abbr)}</b>${img}</span>`;
   }
 
   function hashStr(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
 
-  // Layered SVG portrait for generated people (and fallback when a real headshot can't load).
-  // p.look (hair style, beard, headband) overrides the defaults; opts.expression changes eyes and mouth.
-  function svgFace(p, color, opts = {}) {
-    const h = hashStr(p.name || 'x');
-    const look = p.look || {};
-    const skins = ['#f1c7a5', '#e0ac85', '#c68a62', '#a86b45', '#8a5433', '#6b3f25', '#4f2e1b'];
-    const hairs = ['#141414', '#2b1b10', '#4a2f1b', '#6b4423', '#a07040', '#d9b26f', '#8a8a8a'];
-    const skin = skins[h % skins.length], hair = hairs[look.hairColor != null ? look.hairColor : (h >> 3) % hairs.length];
-    const style = look.hair != null ? look.hair : (h >> 6) % 5, beard = look.beard != null ? look.beard : (h >> 9) % 3 === 0;
-    const ex = opts.expression || 'neutral';
-    const mouth = { smiling: '<path d="M43 54 Q50 60 57 54" stroke="#5a3322" stroke-width="1.8" fill="none" stroke-linecap="round"/>', laughing: '<path d="M43 53 Q50 63 57 53 Z" fill="#5a3322"/>', serious: '<path d="M45 56 L55 56" stroke="#5a3322" stroke-width="1.6" stroke-linecap="round"/>', tired: '<path d="M45 57 Q50 55.5 55 57" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>', squinting: '<path d="M46 56 Q50 57 54 56" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>' }[ex] || '<path d="M45 55 Q50 57.5 55 55" stroke="#5a3322" stroke-width="1.5" fill="none" stroke-linecap="round"/>';
-    const eyes = ex === 'squinting' || ex === 'laughing' ? '<path d="M40.5 45 h5 M54.5 45 h5" stroke="#161616" stroke-width="1.6" stroke-linecap="round"/>'
-      : ex === 'tired' ? '<circle cx="43" cy="45.5" r="1.5" fill="#161616"/><circle cx="57" cy="45.5" r="1.5" fill="#161616"/><path d="M40 43.5 h6 M54 43.5 h6" stroke="' + skin + '" stroke-width="2.4"/><path d="M40.5 48.5 q2.5 1.2 5 0 M54.5 48.5 q2.5 1.2 5 0" stroke="#00000055" stroke-width="1" fill="none"/>'
-      : '<circle cx="43" cy="45" r="1.7" fill="#161616"/><circle cx="57" cy="45" r="1.7" fill="#161616"/>';
-    const band = look.headband ? `<rect x="31" y="31" width="38" height="5" rx="2" fill="${look.headband === true ? '#ffffff' : look.headband}"/>` : '';
-    const hairPath = [
-      `<path d="M31 41 Q50 17 69 41 Q69 29 50 25 Q31 29 31 41Z" fill="${hair}"/>`,
-      `<ellipse cx="50" cy="32" rx="21" ry="12" fill="${hair}"/>`,
-      `<path d="M29 43 Q31 15 50 17 Q69 15 71 43 Q65 29 50 29 Q35 29 29 43Z" fill="${hair}"/>`,
-      `<g fill="${hair}">${Array.from({ length: 9 }, (_, i) => `<circle cx="${32 + i * 4.5}" cy="${27 + Math.abs(4 - i)}" r="5"/>`).join('')}</g>`,
-      '',
-    ][style];
-    return `<svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg">
-      <rect width="100" height="100" fill="${color || '#2a2d33'}" opacity=".35"/>
-      <path d="M12 100 Q15 73 50 70 Q85 73 88 100Z" fill="${color || '#3a3f48'}"/>
-      <rect x="43" y="56" width="14" height="16" rx="5" fill="${skin}"/>
-      <ellipse cx="50" cy="44" rx="18" ry="21" fill="${skin}"/>
-      ${hairPath}
-      ${beard ? `<path d="M34 50 Q36 66 50 67 Q64 66 66 50 Q60 60 50 60 Q40 60 34 50Z" fill="${hair}"/>` : ''}
-      ${band}${eyes}${mouth}
-    </svg>`;
+  const slugOf = s => (s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const initials = p => (p.name || '?').trim().split(/\s+/).map(x => x[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  // A photographed uniform is never relabeled as a different team's real uniform.
+  function photo(p, team, season) {
+    const slug = slugOf(p.name), club = slugOf(team?.bref || team?.abbr);
+    const fallback = HL.headshotUrl(p);
+    const resolve = key => {
+      const custom = asset(key); if (custom) return { src: custom, label: 'Team photo' };
+      const bundled = window.HL_PHOTOS?.[key];
+      return bundled && (p.number == null || bundled.number == null || String(p.number) === String(bundled.number)) ? { src: bundled.src, label: bundled.kind === 'concept' ? 'Concept portrait' : 'Team photo' } : null;
+    };
+    const selected = club && ((season != null && resolve(`real.${slug}.${club}.${season}`)) || resolve(`real.${slug}.${club}`));
+    const exact = selected?.src;
+    const src = exact || (p.real && (asset('real.' + slug) || window.HL_PHOTOS?.['real.' + slug]?.src)) || asset('player.' + p.id) || fallback;
+    return { src, fallback, exact: !!exact, label: selected?.label || 'Archive photo' };
   }
-
+  function photoImage(p, source) {
+    if (!source.src) return '';
+    return `<img src="${esc(source.src)}" alt="${esc(p.name)}" loading="lazy" data-fallback="${esc(source.fallback && source.fallback !== source.src ? source.fallback : '')}" onload="this.parentNode.classList.add('ok')" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';const note=this.parentNode.parentNode.querySelector('.gfx-photo-credit');if(note)note.textContent='Archive photo'}else{this.remove()}">`;
+  }
   function face(p, size = 40, team) {
     const L = HL.League.get();
-    const t = team || (p.teamId != null && L ? L.teams[p.teamId] : null);
+    const t = team || (p.teamId != null && L ? L.teams.find(x => x.id === p.teamId) : null);
     const color = t ? teamAccent(t).c : '#3a3f48';
-    // Your own images win: assets/manifest.js can map "real.<name-slug>" (e.g. real.michael-jordan) for real players.
-    const slug = (p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
-    const img = src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : '';
-    return `<span class="face" style="width:${size}px;height:${size}px;--fc:${color}">${svgFace(p, color)}${img}</span>`;
+    return `<span class="face" style="width:${size}px;height:${size}px;--fc:${color}"><span class="face-initials" aria-label="${esc(p.name)}">${esc(initials(p))}</span>${photoImage(p, photo(p, t, L?.season))}</span>`;
   }
 
   function rtClass(v) { return v >= 95 ? 'r-99' : v >= 90 ? 'r-90' : v >= 85 ? 'r-85' : v >= 80 ? 'r-80' : v >= 75 ? 'r-75' : v >= 70 ? 'r-70' : 'r-lo'; }
@@ -178,5 +161,5 @@ HL.UI = (function () {
     else document.documentElement.setAttribute('data-era', era);
   }
 
-  return { app, esc, icon, teamAccent, applyTeamTheme, logo, face, svgFace, rating, rtClass, money, pct, fx, ordinal, sheet, closeSheet, toast, runWithProgress, seg, asset, setEra };
+  return { app, esc, icon, teamAccent, applyTeamTheme, logo, face, photo, photoImage, initials, rating, rtClass, money, pct, fx, ordinal, sheet, closeSheet, toast, runWithProgress, seg, asset, setEra };
 })();

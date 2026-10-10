@@ -1,7 +1,4 @@
-// Composable graphics: every image is assembled at runtime from layered pieces
-// (team-color backgrounds, light rays, logos, player cutouts re-dressed in their CURRENT
-// team's jersey, props and broadcast typography). Nothing is pre-made, so a Finals poster
-// of your 1991 Bulls vs your custom super-team is drawn exactly for that matchup.
+// Real headshots plus reusable team-specific photographic jerseys; matching full photos can override compositing.
 window.HL = window.HL || {};
 
 HL.GFX = (function () {
@@ -25,48 +22,22 @@ HL.GFX = (function () {
     return { c: a.c, c2: a.c2, ink: a.ink };
   }
 
-  // ---------- jersey (drawn over the bottom of the cutout, so old uniforms never show) ----------
-  function jersey(team, number, opts = {}) {
-    const { c, c2 } = teamColors(team);
-    const era = opts.era || 'modern';
-    // Jersey wordmarks as teams actually wear them.
-    const WORD = { Timberwolves: 'WOLVES', 'Trail Blazers': 'BLAZERS', Cavaliers: 'CAVS', Mavericks: 'MAVS', SuperSonics: 'SONICS', Grizzlies: 'GRIZZLIES', Pelicans: 'PELICANS', Clippers: 'CLIPPERS' };
-    const word = opts.word != null ? String(opts.word).toUpperCase() : team ? (WORD[team.name] || (team.name.length > 10 ? team.city : team.name)).toUpperCase() : '';
-    const trim = c2.toLowerCase() === c.toLowerCase() ? '#ffffff' : c2;
-    const gid = id('j');
-    // Retro eras get thicker trim and tighter lettering.
-    const trimW = era === '70s' || era === '80s' ? 9 : 6;
-    // Wide shoulders (edge to edge) so the photo's own shirt never shows; the torso and lettering stay centered.
-    return `<svg class="gfx-jersey" viewBox="0 0 360 110" preserveAspectRatio="xMidYMax meet" aria-hidden="true">
-      <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${c}" stop-opacity="1"/><stop offset="1" stop-color="${c}" stop-opacity=".92"/></linearGradient>
-        <linearGradient id="${gid}s" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset=".22" stop-color="#000" stop-opacity=".12"/><stop offset=".4" stop-color="#000" stop-opacity="0"/><stop offset=".6" stop-color="#000" stop-opacity="0"/><stop offset=".78" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity=".45"/></linearGradient></defs>
-      <path d="M0 110 L0 36 Q12 18 92 12 L150 3 Q180 40 210 3 L268 12 Q348 18 360 36 L360 110 Z" fill="url(#${gid})"/>
-      <path d="M0 110 L0 36 Q12 18 92 12 L150 3 Q180 40 210 3 L268 12 Q348 18 360 36 L360 110 Z" fill="url(#${gid}s)"/>
-      <path d="M150 3 Q180 40 210 3" fill="none" stroke="${trim}" stroke-width="${trimW}" stroke-linecap="round"/>
-      <path d="M118 9 Q108 60 96 110 M242 9 Q252 60 264 110" fill="none" stroke="${trim}" stroke-width="${trimW - 1}" opacity=".95"/>
-      ${word ? `<text x="180" y="62" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word.length > 7 ? 15 : 18}" letter-spacing="1" fill="${trim}">${esc(word)}</text>` : ''}
-      <text x="180" y="${word ? 100 : 92}" text-anchor="middle" font-family="var(--display)" font-weight="800" font-size="${word ? 36 : 44}" fill="#fff" stroke="${trim}" stroke-width="2" paint-order="stroke">${number}</text>
-    </svg>`;
+  // Keep the legacy card API while replacing the drawn uniform with typography.
+  function jersey(team, number) { return `<div class="gfx-identity-number">${esc(number)}</div>`; }
+  function uniform(team, number) {
+    const key = (team.bref || team.abbr).toLowerCase();
+    const src = U.asset('jersey.' + key) || window.HL_UNIFORMS?.[key]?.src || window.HL_UNIFORMS?.[team.abbr.toLowerCase()]?.src;
+    if (!src) return '';
+    const { c2 } = teamColors(team);
+    return `<div class="gfx-uniform" style="--trim:${c2}"><img src="${esc(src)}" alt="" onload="this.parentNode.classList.add('ready')" onerror="const note=this.parentNode.parentNode.querySelector('.gfx-photo-credit');if(note)note.textContent='Archive photo';this.parentNode.remove()"><div class="gfx-uniform-print"><b class="gfx-uniform-number">${esc(number)}</b></div></div>`;
   }
-
-  // ---------- figure: background-less cutout (head from real headshot or SVG face) + jersey ----------
   function figure(p, team, opts = {}) {
     const { c } = teamColors(team);
-    const asset = U.asset;
-    const slug = (p.name || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
-    return `<div class="gfx-figure" style="--c:${c}">
-      <div class="gfx-head">${U.svgFace(p, 'transparent')}${src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : ''}</div>
-      ${jersey(team, HL.jerseyNumber(p), opts)}
-    </div>`;
+    const source = U.photo(p, team, opts.season ?? HL.League.get()?.season);
+    const garment = source.src && !source.exact && team ? uniform(team, HL.jerseyNumber(p)) : '';
+    return `<div class="gfx-figure" style="--c:${c}"><div class="gfx-head"><div class="gfx-placeholder"><b>${esc(U.initials(p))}</b><span>Photo unavailable</span></div>${U.photoImage(p, source)}</div>${garment}${source.src ? `<span class="gfx-photo-credit">${esc(garment ? 'Composite portrait' : source.label)}</span>` : ''}</div>`;
   }
-
-  // ---------- backgrounds ----------
-  function rays(color, opacity = 0.18) {
-    const n = 14, g = id('r');
-    return `<svg class="gfx-rays" viewBox="-100 -100 200 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><radialGradient id="${g}"><stop offset="0" stop-color="${color}" stop-opacity="${opacity}"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></radialGradient></defs>
-      ${Array.from({ length: n }, (_, i) => { const a = (i / n) * Math.PI * 2, b = a + Math.PI / n / 1.6; return `<path d="M0 0 L${Math.cos(a) * 200} ${Math.sin(a) * 200} L${Math.cos(b) * 200} ${Math.sin(b) * 200} Z" fill="url(#${g})"/>`; }).join('')}</svg>`;
-  }
+  function rays() { return '<div class="gfx-light" aria-hidden="true"></div>'; }
   function stripes(c2) {
     return `<div class="gfx-stripes" style="--s:${c2}"></div>`;
   }
@@ -81,11 +52,7 @@ HL.GFX = (function () {
     return `<div class="gfx-confetti">${out}</div>`;
   }
   function trophy(kind = 'champ') {
-    // Generic trophies drawn in SVG (no real trophy likeness).
-    if (kind === 'mvp') return `<svg class="gfx-trophy" viewBox="0 0 60 100" aria-hidden="true"><defs><linearGradient id="tm" x1="0" x2="1"><stop offset="0" stop-color="#8a6a1f"/><stop offset=".5" stop-color="#f3d27a"/><stop offset="1" stop-color="#8a6a1f"/></linearGradient></defs>
-      <rect x="14" y="84" width="32" height="12" rx="2" fill="#2b2b2b"/><rect x="22" y="62" width="16" height="24" fill="url(#tm)"/><circle cx="30" cy="40" r="20" fill="url(#tm)"/><path d="M22 34 a9 9 0 0 1 16 0" stroke="#7a5a16" stroke-width="2" fill="none"/></svg>`;
-    return `<svg class="gfx-trophy" viewBox="0 0 60 120" aria-hidden="true"><defs><linearGradient id="tc" x1="0" x2="1"><stop offset="0" stop-color="#8a6a1f"/><stop offset=".5" stop-color="#f6dc8c"/><stop offset="1" stop-color="#8a6a1f"/></linearGradient></defs>
-      <rect x="12" y="104" width="36" height="12" rx="2" fill="url(#tc)"/><path d="M24 104 L26 58 L34 58 L36 104 Z" fill="url(#tc)"/><path d="M14 10 L46 10 L42 50 Q30 62 18 50 Z" fill="url(#tc)"/><circle cx="30" cy="22" r="11" fill="#c8732a" stroke="#7a3f12" stroke-width="1.5"/><path d="M19 22 h22 M30 11 v22" stroke="#7a3f12" stroke-width="1.2"/></svg>`;
+    return `<div class="gfx-award-seal" aria-hidden="true"><span>${kind === 'mvp' ? 'MVP' : 'CHAMPIONS'}</span><b>${kind === 'mvp' ? '01' : '★'}</b></div>`;
   }
 
   // ---------- compositions ----------
@@ -97,7 +64,7 @@ HL.GFX = (function () {
       <div class="gfx-bg"></div>${rays('#ffffff', 0.12)}${stripes(c2)}
       ${team ? `<div class="gfx-logo">${U.logo(team, 44)}</div>` : ''}
       <div class="gfx-ovr">${U.rating(p.ovr)}</div>
-      <div class="gfx-stage">${figure(p, team, { era })}</div>
+      <div class="gfx-stage">${figure(p, team, { era, season: opts.season })}</div>
       <div class="gfx-nameplate"><div class="gfx-pos">${esc(p.pos)} · #${HL.jerseyNumber(p)}</div><div class="gfx-name">${esc(p.name)}</div>${opts.sub ? `<div class="gfx-sub">${esc(opts.sub)}</div>` : ''}</div>
     </div>`;
   }
@@ -151,7 +118,7 @@ HL.GFX = (function () {
     </div>`;
   }
 
-  // A created player's card: his jersey (name and number) in team colors, no face.
+  // A created player's identity card: name and number, without a fabricated portrait.
   function jerseyCard(p, team, opts = {}) {
     const { c, c2 } = teamColors(team);
     const last = (p.name || '').split(' ').slice(-1)[0];
@@ -159,29 +126,23 @@ HL.GFX = (function () {
       <div class="gfx-bg"></div>${rays('#ffffff', 0.12)}${stripes(c2)}
       ${team ? `<div class="gfx-logo">${U.logo(team, 44)}</div>` : ''}
       <div class="gfx-ovr">${U.rating(p.ovr)}</div>
-      <div class="gfx-jbig">${jersey(team, HL.jerseyNumber(p), { word: last.length > 9 ? last.slice(0, 9) : last })}</div>
+      <div class="gfx-jbig"><div class="gfx-identity-label">${esc(last)}</div>${jersey(team, HL.jerseyNumber(p))}</div>
       <div class="gfx-nameplate"><div class="gfx-pos">${esc(p.pos)} · #${HL.jerseyNumber(p)}${p.height ? ' · ' + HL.fmtHeight(p.height) : ''}</div><div class="gfx-name">${esc(p.name)}</div>${opts.sub ? `<div class="gfx-sub">${esc(opts.sub)}</div>` : ''}</div>
     </div>`;
   }
 
   // ---------- media day & social (composed from the stored media-day pieces) ----------
-  // A media-day portrait: backdrop, figure in the stored jersey and number, expression, framing and lighting.
+  // Media graphic using an archive portrait; stored pose/expression are story context, not edits to the photograph.
   function portrait(p, comp, opts = {}) {
     const team = comp ? { name: comp.jersey.team, city: comp.jersey.city, abbr: comp.jersey.abbr, color: comp.jersey.color, color2: comp.jersey.color2 } : null;
     const { c, c2 } = teamColors(team);
-    const look = Object.assign({}, p, comp && comp.look && Object.keys(comp.look).length ? { look: comp.look } : {}, comp ? { number: comp.number } : {});
     const light = { 'harsh flash': 'brightness(1.25) contrast(1.2) saturate(.8)', moody: 'brightness(.72) contrast(1.15)', backlit: 'brightness(.8) contrast(1.1)', studio: 'none' }[comp && comp.lighting] || 'none';
     const frame = { 'low angle': 'scale(1.06) translateY(4%)', 'high angle': 'scale(.92) translateY(8%)', 'tight crop': 'scale(1.35) translateY(14%)', 'straight on': 'none' }[comp && comp.angle] || 'none';
-    const ball = comp && /ball/.test(comp.pose) ? `<div class="gfx-ball ${comp.pose.includes('overhead') ? 'up' : comp.pose.includes('spinning') ? 'spin' : ''}"></div>` : '';
     const back = comp && comp.backdrop === 'step-and-repeat' ? `<div class="gfx-repeat">${Array.from({ length: 24 }, () => `<span>${esc(team ? team.abbr : '')}</span>`).join('')}</div>` : '';
-    const face = U.svgFace(look, 'transparent', { expression: comp && comp.expression });
-    const asset = U.asset;
-    const slug = (p.name || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const src = (p.real && asset('real.' + slug)) || asset('player.' + p.id) || HL.headshotUrl(p);
     return `<div class="gfx gfx-portrait ${comp ? 'bd-' + comp.backdrop.replace(/[^a-z]/g, '') : ''} ${opts.cls || ''}" style="--c:${c};--c2:${c2}">
       <div class="gfx-bg"></div>${back}
-      <div class="gfx-stage" style="transform:${frame};filter:${light}"><div class="gfx-figure"><div class="gfx-head">${face}${src ? `<img src="${src}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="this.remove()">` : ''}</div>${jersey(team, comp ? comp.number : HL.jerseyNumber(p), {})}</div>${ball}</div>
-      ${opts.plate === false ? '' : `<div class="gfx-nameplate"><div class="gfx-pos">${esc(team ? team.name : '')} · Media day${comp ? ' ' + comp.season : ''}</div><div class="gfx-name">${esc(p.name)}</div>${comp ? `<div class="gfx-sub">${esc(comp.pose)} · ${esc(comp.expression)}</div>` : ''}</div>`}
+      <div class="gfx-stage" style="transform:${frame};filter:${light}">${figure(p, team, { season: comp?.season })}</div>
+      ${opts.plate === false ? '' : `<div class="gfx-nameplate"><div class="gfx-pos">${esc(team ? team.name : '')} · Media day${comp ? ' ' + comp.season : ''}</div><div class="gfx-name">${esc(p.name)}</div>${comp ? '<div class="gfx-sub">Media day coverage · Archive portrait</div>' : ''}</div>`}
     </div>`;
   }
   const k = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'K' : String(n);
@@ -200,7 +161,7 @@ HL.GFX = (function () {
     return `<div class="gfx-thumb">
       ${portrait(p, comp, { plate: false })}
       <div class="th-title">${esc(v.title || 'WASHED?')}</div>
-      <svg class="th-arrow" viewBox="0 0 100 60"><path d="M4 30 H70 M50 8 L78 30 L50 52" fill="none" stroke="#ff2b2b" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="th-arrow" aria-hidden="true">➜</span>
       <div class="th-ring"></div>
       <div class="th-meta">${esc(v.platform || 'StreamTube')} · ${esc(channel || 'Hoop Talk')} · ${k(v.counts.likes * 6)} views</div>
     </div>`;

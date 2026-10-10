@@ -63,6 +63,10 @@ HL.eraRules = function (season) {
   r.threePoint = season >= 1979;
   r.handCheck = season < 2004;
   r.shotClock = season >= 1954 ? 24 : 35;
+  r.shotClockReset = season >= 2018 ? 14 : r.shotClock;
+  r.backcourtSeconds = season >= 2001 ? 8 : 10;
+  r.defensiveThreeSeconds = season >= 2001;
+  r.illegalDefense = season < 2001;
   return r;
 };
 // Average NBA salary by season (approx., $M) -> money scale relative to 2025-26.
@@ -97,7 +101,13 @@ HL.League = {};
   let L = null; // active league
 
   HL.League.get = () => L;
-  HL.League.set = (league) => { L = league; if (league) HL.setNextPlayerId(league.nextPid || 1); };
+  HL.League.set = (league) => {
+    L = league;
+    if (league) {
+      league.rules = Object.assign(HL.eraRules(league.season), league.rules || {});
+      HL.setNextPlayerId(league.nextPid || 1);
+    }
+  };
 
   const blankRecord = () => ({ w: 0, l: 0, homeW: 0, homeL: 0, awayW: 0, awayL: 0, confW: 0, confL: 0, streak: 0, last10: [], pf: 0, pa: 0 });
 
@@ -306,6 +316,7 @@ HL.League = {};
     }
     if (!covered) HL.News && HL.News.game && HL.News.game(L, g, res, playoffs);
     HL.MediaDay && HL.MediaDay.afterGame(L, res);
+    HL.World && HL.World.afterGame(L, g, res);
   }
 
   function healPlayer(p) {
@@ -599,6 +610,7 @@ HL.League = {};
     if (real) applyFranchiseChanges(HL.HISTORY_SEASONS[String(next)], next);
     runDraft(season, next, real);
     progressAndRetire(season, next, real);
+    if (HL.FrontOffice) HL.FrontOffice.rollover(L, season, next);
     contractsAndFreeAgency(season, next);
     for (const t of L.teams) Object.assign(t, blankRecord());
     L.season = next;
@@ -617,6 +629,8 @@ HL.League = {};
   function pickCustomRules(rules, season) {
     const base = HL.eraRules(season), out = {};
     for (const k in rules) if (rules[k] !== base[k]) out[k] = rules[k];
+    // An explicit choice must survive an era change even if it matched the old default.
+    for (const change of L.ruleHistory || []) if (change.key in rules) out[change.key] = rules[change.key];
     return out;
   }
 
@@ -767,7 +781,8 @@ HL.League = {};
         p.teamId = t.id;
         setContract(p, next);
       }
-      const r = roster().sort((a, b) => a.ovr - b.ovr);
+      // Preserve negotiated roster moves ahead of automatic depth signings and draft additions.
+      const r = roster().sort((a, b) => !!a.userRosterMove - !!b.userRosterMove || a.ovr - b.ovr);
       while (r.length > 15) { const cut = r.shift(); cut.teamId = null; }
     }
     L.newTeams = [];

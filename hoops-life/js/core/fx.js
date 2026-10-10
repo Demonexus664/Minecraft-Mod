@@ -167,7 +167,7 @@ HL.Cards = (function () {
     const tier = HL.FX.tierOf(o.rating);
     const ti = HL.FX.TIERS.indexOf(tier);
     const p = { name: o.name, nbaId: o.nbaId, real: true, id: o.pid || o.name };
-    const fig = HL.GFX.figure(p, o.team, {});
+    const fig = HL.GFX.figure(p, o.team, { season: o.season });
     return `<div class="gcard t-${tier.key} ${o.down ? 'down' : 'up'} ${o.cls || ''}" data-tier="${ti}" ${o.attrs || ''} style="--c:${o.team ? U.teamAccent(o.team).c : '#444'}">
       <div class="gc-inner">
         <div class="gc-back"><div class="gc-back-mark">HL</div></div>
