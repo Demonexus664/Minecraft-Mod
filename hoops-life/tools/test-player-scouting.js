@@ -60,3 +60,30 @@ test('unknown, tiny-sample and unlabelled rows cannot receive a famous prime by 
   assert.equal(HL.historicalScouting({...r,seasonStart:undefined}).length,0);
   assert.equal(HL.historicalScouting({...r,seasonStart:2008}).length,0);
 });
+
+
+test('second individual audit restores overlooked pre-modern and ABA basketball skills', () => {
+  for (const [name, year, skill, minimum] of [
+    ['Maurice Stokes', 1956, 'vision', 96],
+    ['Dave DeBusschere', 1968, 'perD', 99],
+    ['Jerry Sloan', 1968, 'perD', 98],
+    ['Pete Maravich', 1975, 'handle', 100],
+    ['Earl Monroe', 1968, 'shotCreation', 99],
+    ['James Worthy', 1987, 'transition', 99],
+    ['Joe Dumars', 1987, 'perD', 99],
+    ['Dražen Petrović', 1992, 'releaseSpeed', 98],
+    ['Mitch Richmond', 1996, 'mid', 96],
+    ['Ralph Sampson', 1984, 'contestD', 97],
+  ]) assert.ok(attrs(name, year)[skill] >= minimum, name + ' ' + year + ': ' + skill);
+});
+
+test('new hand-scored seasons retain missing three-point lines and injury boundaries', () => {
+  const pistol=row('Pete Maravich',1975);
+  assert.equal(attrs('Pete Maravich',1975).three,HL.History.unpack(pistol.attrs,HL.HISTORY.attrs).three);
+  const early=attrs('Ralph Sampson',1984),later=attrs('Ralph Sampson',1987);
+  assert.ok(early.contestD > later.contestD, 'Sampson must not inherit healthy peak coverage after injury');
+  assert.equal(HL.historicalScouting(row('Ralph Sampson',1987)).length,0);
+  assert.ok(attrs('Maurice Stokes',1956).three<65);
+  assert.ok(attrs('Joe Dumars',1987).three<65, 'early Dumars cannot inherit late-career shooting');
+  assert.ok(attrs('Joe Dumars',1996).three>=94, 'later Dumars develops his outside shot');
+});
