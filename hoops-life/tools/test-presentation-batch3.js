@@ -60,15 +60,13 @@ test('visual designs have mechanical specificity, mobile layout and motion escap
  assert.match(index,/css\/overhaul\.css/);
 });
 
-test('career season shows press receipts as story outcomes, not fabricated boosts',()=>{
- const mode=read('js/modes/skilldraft.js'),press=read('js/media/skill-press.js');
- assert.match(mode,/HL\.SkillPress\?\.resolve\(c,s\)/);
- assert.match(mode,/HL\.SkillPress\?\.market\(c\)/);
- assert.match(mode,/data-press/);
- assert.match(mode,/PUBLIC PROMISE/);
+test('career interface no longer shows bloat; drafting uses separate abilities tab',()=>{
+ const mode=read('js/modes/skilldraft.js');
+ assert.match(mode,/data-build-view/);
+ assert.match(mode,/data-skill-filter/);
+ assert.match(mode,/ABILITIES & COMBOS/);
+ assert.doesNotMatch(mode,/out\.push\(rolePanel\(c\)\)/);
+ assert.doesNotMatch(mode,/HL\.SkillPress\?\.resolve\(c,s\)/);
  assert.match(mode,/originalMinutes/);
  assert.match(mode,/p\.realMpg=minutes/);
- assert.match(mode,/_skillRoleBaseline/);
- assert.match(press,/pledge/);
- assert.match(press,/next season|Future contract-market/);
 });
