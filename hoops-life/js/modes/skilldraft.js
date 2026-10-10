@@ -572,7 +572,7 @@ HL.SkillDraft = (function () {
       noise: Object.fromEntries(HL.ATTR_KEYS.map(k => [k, R.normal(0, 1.6)])),
       debut: st.debut, age: 19, yr: st.debut, franchise: null, teamMeta: null, contract: null, minors: false,
       seasons: [], awards: [], rings: 0, teams: [], pick: null, altered: [], earnings: 0, log: [], lastRecords: {},
-      totals: blankTotals(), ptotals: blankTotals(), highs: {}, tradeRequests: 0,
+      totals: blankTotals(), ptotals: blankTotals(), highs: {}, tradeRequests: 0, careerWear:0,
       pending: null, done: false, end: null, legacy: null, dna: prime.dna, story: [], pendingStory:null, franchiseLoyalty:0,
        trainingFocus:'balanced',training:{},trainingHistory:[],role:'balanced',agenda:'winning',agendaVictories:0,agendaHistory:[],trainingReward:0,rivalries:{},
     };
@@ -627,7 +627,7 @@ HL.SkillDraft = (function () {
     let missed = 0, injury = null;
     const eliteCondition = Math.max(0, (Math.min(me.attrs.stam || 65, me.attrs.dur || 65) - 70) / 29);
     const ageRisk = Math.max(0, c.age - 32) * 0.012 * (1 - 0.7 * eliteCondition);
-    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk + (ROLES[c.role]?.injury||0), 0.01, 0.75))) {
+    if (R.chance(HL.clamp(0.05 + Math.max(0, 70 - me.attrs.dur) * 0.004 + ageRisk + (ROLES[c.role]?.injury||0) + (c.careerWear||0), 0.01, 0.75))) {
       const inj = HL.rollInjury(1.2);
       missed = Math.min(L.games, inj.games);
       if (inj.lasting) for (const k in inj.lasting) c.prime.attrs[k] = HL.clamp(c.prime.attrs[k] + inj.lasting[k], 25, 99);
@@ -636,6 +636,12 @@ HL.SkillDraft = (function () {
     const res = interactive ? await simSeasonInteractive(L,team,me,missed,c.role,c.press?.pledge) :
       simSeason(L,team,me,missed,c.role,c.press?.pledge);
     const s={age:c.age,yr:c.yr,key:String(L.season),team:metaOf(team),ovr:me.ovr,salary:c.contract?c.contract.amount:0,injury,role:c.role,...res};
+    // Aggressive game-night strategies carry a small workload risk forward.
+    // A balanced season fades that risk instead of accumulating forever.
+    const planWear=(s.gameNights||[]).reduce((v,e)=>v+(e.wear||0),0)/
+      Math.max(1,(s.gameNights||[]).length);
+    c.careerWear=+(HL.clamp((c.careerWear||0)*.4+planWear*.006,0,.045).toFixed(4));
+    s.gameNightWear=c.careerWear;
     s.agenda=finishAgenda(c,s,L.games);
     HL.SkillPress?.resolve(c,s);
     if(L.season>HL.LATEST_SEASON){
