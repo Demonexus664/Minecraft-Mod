@@ -127,17 +127,17 @@ HL.progressionDelta = function (age, potentialGap, workEthic, difficultyMult = 1
   // Work ethic helps young players grow and slows the decline of veterans.
   base += (workEthic - 50) / (base < 0 ? 60 : 40);
   // Variance: breakouts, busts and sudden drops.
-  return base + R.normal(0, age >= 30 ? 1.6 : 2.2);
+  return HL.clamp(base + R.normal(0, age >= 30 ? 0.8 : 1.5), age >= 30 ? -3.2 : -2.5, age >= 30 ? 1.5 : 4.5);
 };
 
 HL.applyProgression = function (p, delta) {
   const physical = new Set(['speed', 'vert', 'stam']);
   for (const k of HL.ATTR_KEYS) {
     if (k === 'dur') continue;
-    let d = delta + HL.RNG.normal(0, 1.4);
+    let d = delta + HL.RNG.normal(0, 0.65);
     // Athleticism fades faster with age; skills hold up.
-    if (delta < 0 && physical.has(k)) d *= 1.6;
-    if (delta < 0 && (k === 'iq' || k === 'ft' || k === 'pass')) d *= 0.4;
+    if (delta < 0 && physical.has(k)) d *= 1.45;
+    if (delta < 0 && ['three','mid','ft','iq','pass','post','handle'].includes(k)) d *= 0.25;
     if (delta > 0 && k === 'iq') d += 0.5;
     const cap = (p.caps && p.caps[k]) || 99;
     p.attrs[k] = Math.round(HL.clamp(p.attrs[k] + d, 25, cap));
