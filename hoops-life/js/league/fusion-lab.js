@@ -57,6 +57,7 @@ HL.FusionLab=(function(){
   if(!a||!b)return null;
   // Odds are fixed by the two actual basketball profiles. Failed rolls never
   // improve the probability of a later experiment.
+  const base=rating(a,b);
   const chance=Math.round(clamp(base.chance,.5,89)*10)/10;
   return {...base,chance,display:chance.toFixed(1)+'%',rare:chance<=8};
  }
