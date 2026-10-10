@@ -637,13 +637,54 @@ HL.SkillDraft = (function () {
     }
   }
 
+
+  // The generated league's award field is sampled from real possessions in
+  // CURRENT rosters: new rookies, improving players and aging stars.
+  function generatedAwardField(L) {
+    if(L._careerAwardField)return L._careerAwardField;
+    const totals=new Map(), sampled={};
+    for(const t of L.teams)sampled[t.id]=0;
+    const rules={...L.rules,profile:L.profile};
+    for(const gm of R.shuffle(L.schedule.slice())) {
+      if(sampled[gm.home]>=8||sampled[gm.away]>=8)continue;
+      const home=L.teams[gm.home],away=L.teams[gm.away];
+      const team=t=>({id:t.id,abbr:t.abbr,strategy:t.strategy||HL.DEFAULT_STRATEGY(),
+        players:HL.League.teamPlayers(t.id).sort((a,b)=>b.ovr-a.ovr).slice(0,15)});
+      const result=HL.simGame(team(home),team(away),rules);
+      sampled[home.id]++;sampled[away.id]++;
+      for(const side of [result.home,result.away])for(const [id,box] of Object.entries(side.box||{})){
+        if(!box.gp)continue;
+        const pid=+id,acc=totals.get(pid)||{g:0,pts:0,reb:0,ast:0,min:0};
+        acc.g+=box.gp;acc.pts+=box.pts||0;
+        acc.reb+=(box.orb||0)+(box.drb||0);acc.ast+=box.ast||0;acc.min+=box.min||0;
+        totals.set(pid,acc);
+      }
+    }
+    const field=[];
+    for(const p of Object.values(L.players)){
+      if(p.retired||p.teamId==null)continue;
+      const x=totals.get(p.id);
+      if(!x||x.g<2)continue;
+      const team=L.teams[p.teamId],mpg=x.min/Math.max(1,x.g);
+      const g=Math.round(L.games*HL.clamp(.86+((p.attrs.dur||75)-75)*.002,.68,.96));
+      const row={pts:x.pts/x.g,trb:x.reb/x.g,ast:x.ast/x.g,g};
+      const wp=team.real.w/Math.max(1,team.real.w+team.real.l);
+      field.push({pid:p.id,name:p.name,row,player:p,wp,
+        qual:x.g>=4&&mpg>=15&&g>=L.games*.7,
+        v:voteValue(row.pts,p.ovr,row.trb,row.ast,g,L.games),
+        def:defValue(p.attrs,g,L.games)*(mpg<18?.7:1)});
+    }
+    L._careerAwardField=field;
+    return field;
+  }
+
   // ---------- one season: real schedule, awards voted against the real field, playoff path ----------
   function simSeason(L, team, me, missed) {
     const roster = HL.League.teamPlayers(team.id).sort((a, b) => b.ovr - a.ovr).slice(0, 14);
-    const realRows = HL.History.seasonRows(String(L.season));
-    // Minutes: a coach plays him by quality, up to what that era's stars played.
-    const stars = realRows.filter(r => r.g >= L.games / 2).sort((a, b) => b.ovr - a.ovr).slice(0, 10);
-    const starMin = Math.min(44, stars.reduce((s, r) => s + r.mpg, 0) / Math.max(1, stars.length));
+    const historical=L.season<=HL.LATEST_SEASON;
+    const realRows=historical?HL.History.seasonRows(String(L.season)):[];
+    const stars=realRows.filter(r=>r.g>=L.games/2).sort((a,b)=>b.ovr-a.ovr).slice(0,10);
+    const starMin=historical?Math.min(44,stars.reduce((n,r)=>n+r.mpg,0)/Math.max(1,stars.length)):36;
     me.teamId = team.id;
     // The coach slots him by where he ranks on the roster; the real players' minutes shrink to make room.
     const rankOnTeam = roster.filter(p => p.ovr > me.ovr).length;
@@ -689,12 +730,14 @@ HL.SkillDraft = (function () {
     const wp = games ? w / games : 0;
 
     // ---- Awards: voted against that season's real players (with voting noise) ----
-    const RA = realAwards(L.season);
-    const field = realRows.map(r => {
-      const main = r.stints.slice().sort((a, b) => b[1] - a[1])[0];
-      const t = L.teams.find(x => x.bref === main[0]);
-      return { pid: r.pid, row: r, v: voteValue(r.pts, r.ovr, r.trb, r.ast, r.g, L.games), wp: t ? realWp(t) : 0.5, def: defValue(HL.History.unpack(r.attrs, HL.HISTORY.attrs), r.g, L.games), qual: r.g >= L.games * 0.7 };
-    });
+    const RA=historical?realAwards(L.season):{};
+    const field=historical?realRows.map(r=>{
+      const main=r.stints.slice().sort((a,b)=>b[1]-a[1])[0];
+      const t=L.teams.find(x=>x.bref===main[0]);
+      return {pid:r.pid,name:nameOf(r.pid),row:r,v:voteValue(r.pts,r.ovr,r.trb,r.ast,r.g,L.games),wp:t?realWp(t):.5,
+        def:defValue(HL.History.unpack(r.attrs,HL.HISTORY.attrs),r.g,L.games),qual:r.g>=L.games*.7};
+    }):generatedAwardField(L);
+    const competitorName=pid=>field.find(f=>f.pid===pid)?.name||nameOf(pid);
     const mine = { v: voteValue(ppg, me.ovr, rpg, apg, g, L.games) + R.normal(0, 1.2), wp };
     const mvpScore = x => x.v + (x.wp - 0.5) * 90;
     const myDef = defValue(me.attrs, g, L.games) + R.normal(0, 1.5);
@@ -705,25 +748,39 @@ HL.SkillDraft = (function () {
     };
     const above = ranks.value - 1;
     const awards = [], altered = [];
-    const nAllNba = ['All-NBA 1st', 'All-NBA 2nd', 'All-NBA 3rd'].map(k => (RA[k] || []).length);
-    const nAllStar = (RA['All-Star'] || []).length;
-    const realMvp = (RA['nba mvp'] || [])[0];
-    if (realMvp && g >= L.games * 0.7 && ranks.mvp === 1) { awards.push({ award: 'MVP', over: nameOf(realMvp) }); altered.push(`MVP instead of ${nameOf(realMvp)}`); }
+    const nAllNba=historical?['All-NBA 1st','All-NBA 2nd','All-NBA 3rd'].map(k=>(RA[k]||[]).length):[5,5,5];
+    const nAllStar=historical?(RA['All-Star']||[]).length:24;
+    const realMvp=historical?(RA['nba mvp']||[])[0]:field.slice().sort((a,b)=>
+      (b.v+(b.wp-.5)*90)-(a.v+(a.wp-.5)*90))[0]?.pid;
+    if(realMvp!=null&&g>=L.games*.7&&ranks.mvp===1){
+      awards.push({award:'MVP',over:competitorName(realMvp)});
+      altered.push('MVP over '+competitorName(realMvp));
+    }
     if (nAllNba[0] && above < nAllNba[0]) awards.push('All-NBA 1st');
     else if (nAllNba[1] && above < nAllNba[0] + nAllNba[1]) awards.push('All-NBA 2nd');
     else if (nAllNba[2] && above < nAllNba[0] + nAllNba[1] + nAllNba[2]) awards.push('All-NBA 3rd');
     if (nAllStar && g >= L.games * 0.4 && above < nAllStar) awards.push('All-Star');
-    const realDpoy = (RA['nba dpoy'] || [])[0];
-    if (realDpoy && g >= L.games * 0.7 && ranks.dpoy === 1) { awards.push({ award: 'DPOY', over: nameOf(realDpoy) }); altered.push(`Defensive Player of the Year instead of ${nameOf(realDpoy)}`); }
-    const realRoy = (RA['nba roy'] || [])[0];
-    if (me.age === 19 && realRoy) {
-      const rr = field.find(f => f.pid === realRoy);
-      if (rr && mine.v > rr.v) { awards.push({ award: 'ROY', over: nameOf(realRoy) }); altered.push(`Rookie of the Year instead of ${nameOf(realRoy)}`); }
+    const realDpoy=historical?(RA['nba dpoy']||[])[0]:field.slice().sort((a,b)=>b.def-a.def)[0]?.pid;
+    if(realDpoy!=null&&g>=L.games*.7&&ranks.dpoy===1){
+      awards.push({award:'DPOY',over:competitorName(realDpoy)});
+      altered.push('Defensive Player of the Year over '+competitorName(realDpoy));
+    }
+    const rookieField=field.filter(f=>f.player?.yearsPro===0);
+    const realRoy=historical?(RA['nba roy']||[])[0]:rookieField.slice().sort((a,b)=>b.v-a.v)[0]?.pid;
+    if(me.age===19&&realRoy!=null){
+      const rr=field.find(f=>f.pid===realRoy);
+      if(rr&&mine.v>rr.v){
+        awards.push({award:'ROY',over:competitorName(realRoy)});
+        altered.push('Rookie of the Year over '+competitorName(realRoy));
+      }
     }
     // Statistical titles: per game, against qualified real players.
     for (const [lab, mineV, key] of [['Scoring title', ppg, 'pts'], ['Rebounding title', rpg, 'trb'], ['Assists title', apg, 'ast']]) {
       const q = field.filter(f => f.qual).sort((a, b) => b.row[key] - a.row[key])[0];
-      if (q && g >= L.games * 0.7 && mineV > q.row[key]) { awards.push({ award: lab, over: nameOf(q.pid) }); altered.push(`${lab} (${mineV.toFixed(1)}) over ${nameOf(q.pid)} (${q.row[key]})`); }
+      if(q&&g>=L.games*.7&&mineV>q.row[key]){
+        awards.push({award:lab,over:competitorName(q.pid)});
+        altered.push(lab+' ('+mineV.toFixed(1)+') over '+competitorName(q.pid)+' ('+q.row[key].toFixed(1)+')');
+      }
     }
 
     // ---- Playoffs: that year's qualifying spots, format and opponents ----
@@ -789,7 +846,8 @@ HL.SkillDraft = (function () {
     if (champion && realChamp && LIN()[realChamp] !== LIN()[team.bref]) altered.push(`Won the title that went to the ${rcT ? rcT.name : realChamp}`);
     const mates = roster.filter(p => p.id !== me.id).slice(0, 3).map(p => ({ name: p.name, ovr: p.ovr, nbaId: p.nbaId, pos: p.pos }));
     return {
-      g, line, pline, ppg, rpg, apg, ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
+      g, line, pline, ppg, rpg, apg, leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
+      ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
       w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,
       realChamp: rcT ? fullName(rcT) : realChamp || null, games: L.games, nTeams: L.teams.length,
     };
