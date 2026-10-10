@@ -5,8 +5,11 @@ function viable(c){const years=[];for(let age=19;age<=100;age++){c.age=age;c.me.
 test('a maximum prime card alone does not give an ordinary build a decades-long plateau',()=>{
  const c=career(80,80,99),w=HL.SkillDraft.primeWindow(c);assert.ok(w.end<=39);assert.ok(HL.SkillDraft.ratingsAt(c,45).speed<60);
 });
-test('a joint extraordinary build may remain viable for roughly 45–55 NBA seasons',()=>{
- const c=career(99,99,99);assert.equal(HL.SkillDraft.extraordinaryLongevity(c),true);const years=viable(c);assert.ok(years.length>=45&&years.length<=55,`${years.length} viable seasons`);
+test('extraordinary durability has a rare extended career, not 50 viable seasons',()=>{
+ const c=career(99,99,99);assert.equal(HL.SkillDraft.extraordinaryLongevity(c),true);const years=viable(c);
+ assert.ok(years.length>=17&&years.length<=30,`${years.length} eligible ages`);
+ assert.ok(HL.SkillDraft.careerLimit(c)<=25,'No 45–55 year NBA career');
+ assert.ok(HL.SkillDraft.primeWindow(c).seasons<=14,'Even all-time greats decline');
  assert.ok(!HL.SkillDraft.extraordinaryLongevity(career(99,99,80)));
 });
 test('200 varying ordinary builds and elite builds have sensible viability distributions',()=>{
