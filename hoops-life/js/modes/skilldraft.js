@@ -1187,7 +1187,7 @@ HL.SkillDraft = (function () {
       const v = skillValue(pk, cat);
       return `<div class="tile on t-${FX.tierOf(v).key}" data-cat="${id}"><span class="lab">${esc(label)}</span><span class="val">${hide ? '?' : id === 'body' ? HL.fmtHeight(bio[3]) : v}</span><span class="who">${esc(bio[0])} · ${yrLabel(pk.season)}</span></div>`;
     }).join('');
-    return `${HL.DNA.board(dna,{compact:true})}${Object.keys(st.picks).length>=3?HL.DNA.powerMap(dna):''}<section class="block"><header><h3>Your build</h3><span class="ml-auto t3 sm">${CATS.length - remaining().length}/${CATS.length}</span>${prime && !hide ? `<span>${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body"><div class="board">${tiles}</div></div></section>`;
+    return `${HL.DNA.board(dna,{compact:true})}${Object.keys(st.picks).length>=3?HL.DNA.powerMap(dna,{compact:true}):''}<section class="block"><header><h3>Your build</h3><span class="ml-auto t3 sm">${CATS.length - remaining().length}/${CATS.length}</span>${prime && !hide ? `<span>${U.rating(HL.computeOvr(prime.attrs, prime.pos))}</span>` : ''}</header><div class="body"><div class="board">${tiles}</div></div></section>`;
   }
 
   function buildDetail(prime) {
