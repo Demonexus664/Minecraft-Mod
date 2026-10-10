@@ -198,7 +198,19 @@ HL.DNA = (function () {
     ['jumper','contested','Pressure Jumper',{highRelease:.6,clutchChoice:.62},'violet'],
     ['motor','speed','Nonstop Two-Way Engine',{transition:.76,rotations:.46},'ember'],
     ['motor','perD','Forty-Eight-Minute Pest',{laneDisruption:.74,rotations:.64},'scarlet'],
-    ['steal','speed','Steal-to-Dunk Express',{laneDisruption:.66,transition:.77},'emerald']
+    ['steal','speed','Steal-to-Dunk Express',{laneDisruption:.66,transition:.77},'emerald'],
+    ['three','contested','Logo Pressure Specialist',{range:.69,clutchChoice:.9,highRelease:.52},'violet'],
+    ['three','motor','Endless Relocator',{screenMove:.9,relocation:.78,gravity:.54},'arc'],
+    ['jumper','handle','Pull-Up Separation Lab',{creation:.97,quickRelease:.67},'violet'],
+    ['jumper','pass','Catch-Read-Fire',{quickRelease:.84,precision:.74},'gold'],
+    ['handle','iq','The Tempo Thief',{screenRead:.94,anticipation:.86},'violet'],
+    ['pass','contested','One More or One-on-One',{precision:.89,clutchChoice:.72},'gold'],
+    ['pass','reb','Rebound-to-Break Outlet',{precision:.75,transition:.88,boxPosition:.37},'ember'],
+    ['inside','mid','Post-Fade Decision Tree',{postFootwork:.89,creation:.72},'earth'],
+    ['vert','perD','Recovery Above the Screen',{rotations:.91,lob:.47},'emerald'],
+    ['steal','iq','Anticipate the Skip',{laneDisruption:.89,anticipation:.82},'scarlet'],
+    ['intD','motor','Nonstop Paint Protector',{rimIntimidation:.9,rotations:.75},'emerald'],
+    ['reb','pass','Outlet Surgeon',{boxPosition:.84,precision:.78,transition:.48},'gold']
   ];
   const COMBO_TRIOS=[
     [['three','handle','jumper'],'Logo-to-Release Chain',{range:1,creation:.9,quickRelease:1.1},'arc'],
@@ -214,7 +226,17 @@ HL.DNA = (function () {
     [['three','inside','pass'],'Unsolvable Inside-Out',{gravity:.87,postRead:.91,precision:.79},'arc'],
     [['inside','vert','pass'],'Lob and Kick-Out Threat',{lob:1,postRead:.83,precision:.73},'ember'],
     [['pass','handle','speed'],'Seven-Second Floor General',{screenRead:.95,transition:.98,precision:.95},'gold'],
-    [['strength','intD','reb'],'Paint Fortress',{rimIntimidation:.99,boxPosition:1.12,rotations:.6},'earth']
+    [['strength','intD','reb'],'Paint Fortress',{rimIntimidation:.99,boxPosition:1.12,rotations:.6},'earth'],
+    [['three','handle','contested'],'The Four-Level Bag',{creation:1.18,clutchChoice:1.15,range:.91},'violet'],
+    [['three','pass','jumper'],'Quick-Skip Shooting Grid',{precision:1.06,quickRelease:1.07,gravity:.86},'arc'],
+    [['three','motor','speed'],'Cardio Nightmare',{screenMove:1.2,relocation:1.13,transition:.84},'arc'],
+    [['mid','iq','contested'],'Last-Five-Seconds Solver',{clutchChoice:1.17,anticipation:1.04,creation:.79},'gold'],
+    [['handle','pass','iq'],'Unscripted Floor General',{screenRead:1.21,precision:1.12,postRead:.61},'gold'],
+    [['inside','strength','vert'],'Violent Contact Pressure',{contactBalance:1.13,deepSeal:.89,lob:1.02},'earth'],
+    [['reb','pass','speed'],'Grab and Go Machine',{boxPosition:.98,transition:1.14,precision:.94},'ember'],
+    [['perD','steal','iq'],'Predictive Ball Pressure',{laneDisruption:1.2,rotations:1.02,anticipation:.84},'scarlet'],
+    [['perD','intD','motor'],'No Rest on Defense',{rotations:1.24,rimIntimidation:.84,laneDisruption:.57},'emerald'],
+    [['inside','pass','contested'],'Help-Defense Trap',{postDouble:1.07,postRead:1.08,clutchChoice:.7},'earth']
   ];
   const TEAM_CHAINS=[
     [['three',91],['post',89],['vision',87],'The Floor-Splitting Triangle',{gravity:1.1,deepSeal:1.05,postRead:.89},'arc'],
@@ -224,7 +246,13 @@ HL.DNA = (function () {
     [['post',92],['three',94],['dreb',90],'Paint, Pop and Rebound',{deepSeal:1.01,gravity:.95,boxPosition:.99},'earth'],
     [['mid',94],['handle',91],['three',91],'Three-Level Scoring Hydra',{creation:1.17,gravity:.81,clutchChoice:.89},'violet'],
     [['speed',91],['vision',90],['dunk',93],'Run the Whole Floor',{transition:1.17,precision:.87,lob:.91},'ember'],
-    [['intD',89],['perD',91],['iq',91],'Five-Man Defensive Geometry',{rotations:1.2,rimIntimidation:.82},'emerald']
+    [['intD',89],['perD',91],['iq',91],'Five-Man Defensive Geometry',{rotations:1.2,rimIntimidation:.82},'emerald'],
+    [['three',91],['screen',88],['vision',90],'Screen and Relocate',{screenMove:1.19,screenRead:1.04,gravity:.83},'arc'],
+    [['pass',92],['post',89],['three',90],'Inverted Offense',{postRead:1.18,precision:1.09,gravity:.81},'gold'],
+    [['steal',90],['speed',91],['dunk',91],'Defend to Detonate',{laneDisruption:.94,transition:1.24,lob:.87},'emerald'],
+    [['block',92],['dreb',91],['vision',88],'Stop and Start',{rimIntimidation:1.12,boxPosition:.93,precision:.79},'emerald'],
+    [['three',92],['mid',91],['pass',87],'Impossible Help Decision',{gravity:1.14,creation:.96,precision:.98},'violet'],
+    [['oreb',91],['str',90],['post',90],'Second-Chance Punishment',{secondChance:1.2,deepSeal:1.04,boxPosition:1.11},'earth']
   ];
   const sourceGrade=e=>Math.max(0,...(CATEGORY_ATTRS[e.cat]||[]).map(k=>e.attrs[k]||0));
   function derivedChemistry(entries,mode){
@@ -406,6 +434,50 @@ HL.DNA = (function () {
         '</div></details>')+
       '</div></section>';
   }
+
+  // Live combination visualization: show exactly which borrowed ingredients
+  // connected, which powers activate, and what a possession can actually do.
+  function powerMap(dna){
+    if(!dna)return '';
+    const active=[...(dna.mutations||[]),...(dna.trios||[]),...(dna.pairs||[]),...(dna.signatures||[])];
+    const sorted=active.slice().sort((a,b)=>{
+      const rank=f=>f.type==='mutation'||f.type==='evolved'?4:f.type.includes('trio')?3:
+       f.type.includes('duo')?2:1;
+      return rank(b)-rank(a)||Object.keys(b.mechanics||{}).length-Object.keys(a.mechanics||{}).length;
+    });
+    const selected=sorted.slice(0,7);
+    const dot=key=>'<span class="power-map-source">'+esc(key)+'</span>';
+    const nodes=selected.map((f,i)=>{
+      const ingredients=[...new Set((f.ingredients||[]).map(e=>name(e.pid)))];
+      const trigger=Object.entries(f.mechanics||{}).sort((a,b)=>b[1]-a[1]).slice(0,3);
+      return '<article class="power-map-node" style="--power-order:'+i+';--power-a:'+f.colors[0]+'">'+
+        '<div class="power-map-top"><span>'+esc(f.type.replaceAll('-',' '))+'</span><b>'+
+          (f.type==='mutation'||f.type==='evolved'?'APEX':f.type.includes('trio')?'TRIO':
+            f.type.includes('duo')?'DUO':'SIGNATURE')+'</b></div>'+
+        '<h4>'+esc(f.name)+'</h4><div class="power-map-parents">'+
+          (ingredients.length?ingredients.map(dot).join('<i>+</i>'):f.players.map(pid=>dot(name(pid))).join('<i>+</i>'))+'</div>'+
+        '<div class="power-map-active">'+trigger.map(([key,v])=>
+          '<div><b>'+esc(key.replace(/([A-Z])/g,' $1'))+'</b><span>'+
+           Math.round(v*100)+'% potency</span></div>').join('')+'</div>'+
+        '<details><summary>When does this actually activate?</summary><p>'+esc(f.activation)+'</p>'+
+          '<p>'+esc(f.description)+'</p><p>'+esc(f.qualification||'Historical attributes confirmed.')+
+          '</p></details></article>';
+    }).join('');
+    return '<section class="block power-map"><header><h3>POWER NETWORK · ACTIVE ON-COURT ABILITIES</h3>'+
+      '<span class="ml-auto t3 sm">'+active.length+' unlocked · '+(dna.mutations||[]).length+
+      ' rare mutations</span></header><div class="body stack">'+
+      '<div class="power-map-scoreboard"><div><strong>'+(dna.pairs||[]).length+
+      '</strong><span>Elite duos</span></div><div><strong>'+(dna.trios||[]).length+
+      '</strong><span>Power trios</span></div><div><strong>'+(dna.signatures||[]).length+
+      '</strong><span>Individual tools</span></div><div><strong>'+(dna.mutations||[]).length+
+      '</strong><span>Rare forms</span></div></div>'+
+      '<p class="t2 sm">Each strand has named historical sources and measurable gameplay interactions. Stronger combinations unlock different possessions, not free permanent OVR boosts.</p>'+
+      '<div class="power-map-network">'+(nodes||
+       '<div class="power-map-empty">Draft your first verified elite basketball tool to light the network.</div>')+
+      '</div><details><summary>Explore every possible and missing power combination</summary>'+
+      codex(dna)+'</details></div></section>';
+  }
+
   function preview(entries,candidate,options={}){const next=analyze([...entries,candidate],options),old=analyze(entries,options);return [...next.mutations,...next.trios,...next.pairs].find(f=>!old.active.some(o=>o.id===f.id))||null;}
-  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,COMBO_DUOS,COMBO_TRIOS,TEAM_CHAINS,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,codex,preview,esc,PALETTE};
+  return {STARS,RELATIONS,FORMS:RECIPES.filter(r=>r.mode==='team'),RECIPES,PROFILES,CATEGORY_ATTRS,MECHANIC_TEXT,COMBO_DUOS,COMBO_TRIOS,TEAM_CHAINS,analyze,bonusEffects,mergeMechanics,mechanicsFor,reconcileAttributes,basketballContext,applyBuild,applyTeam,visual,board,codex,powerMap,preview,esc,PALETTE};
 })();
