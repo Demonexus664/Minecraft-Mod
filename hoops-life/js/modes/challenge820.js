@@ -700,6 +700,16 @@ HL.Challenge = (function () {
     const posterTeam = { abbr: 'YOU', city: 'The', name: 'Five', color: '#c9a227', color2: '#111111', espn: null };
     const rows = r.players.slice(0, SLOTS.length).map(p => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${p.slot.startsWith('B') ? 'Bench' : p.slot}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl/g).toFixed(1)}</td><td>${(l.blk/g).toFixed(1)}</td><td>${(l.tpa/g).toFixed(1)}</td><td>${l.fga+.44*l.fta ? (100*l.pts/(2*(l.fga+.44*l.fta))).toFixed(1) : '-'}</td></tr>`; }).join('');
     const k = Math.round(r.w / r.games * 10);
+    const mission='<section class="block"><header><h3>SEASON MISSION</h3></header><div class="body stack">'+
+      '<h2 class="'+(r.mission.completed?'win':'loss')+'">'+(r.mission.completed?'MISSION COMPLETE':'MISSION FAILED')+'</h2>'+
+      '<b>'+esc(r.mission.title)+'</b><p class="t2">'+esc(r.mission.detail)+'</p></div></section>';
+    const rivals='<section class="block"><header><h3>MARQUEE GAMES & COACHING FILM</h3></header><div class="body stack">'+
+      (r.marqueeLog.length?r.marqueeLog.map(e=>'<div class="kv"><span>Game '+e.g+' · '+esc(e.opp)+'</span><b class="'+
+        (e.won?'win':'loss')+'">'+(e.won?'W':'L')+' '+e.for+'-'+e.against+'</b></div>').join(''):'')+
+      (r.coachLog?.length?'<div class="caps">Coaching adjustments</div>'+r.coachLog.map(e=>
+        '<div class="kv"><span>Game '+e.g+' · '+esc(e.opp)+'</span><b>'+
+        esc(HL.Legacy.gamePlans[e.plan]?.title||e.plan)+'</b></div>').join(''):'')+
+      '</div></section>';
     const share = `${r.games}-0 Challenge${st.daily ? ` · Daily ${st.date}` : ''} · ${yrLabel(st.playSeason)}\n${r.w}-${r.l} · ${tier}\n${'🟩'.repeat(k)}${'🟥'.repeat(10 - k)}\n${STARTERS.map(s => `${s} ${HL.HISTORY.players[st.lineup[s].row.pid][0]}`).join(' · ')}`;
     return `<div class="stack" style="gap:14px">${HL.GFX.championPoster(posterTeam, r.players.slice(0, 5), '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
       <section class="block"><div class="body row wrap" style="gap:24px">
@@ -711,6 +721,7 @@ HL.Challenge = (function () {
       ${r.specialDraft?`<section class="block"><header><h3>Legendary roster discovered</h3></header><div class="body"><p>✦ ${esc(r.specialDraft)} supplied one of your drafted players. No extra draft slot was awarded.</p></div></section>`:''}
       ${HL.DNA.board(st.dna)}
       ${identityReport(r)}
+       ${mission}${rivals}
       <section class="block"><header><h3>Postseason: The second challenge</h3></header><div class="body stack"><p>Now take your drafted superteam through four best-of-seven playoff series, one game at a time. Close finishes can become interactive clutch possessions. The regular-season 82–0 record stays separate.</p><button class="btn go" data-start-playoffs>Start the playoffs</button>${st.playoffs?.completed?`<p>${st.playoffs.champion?'NBA CHAMPIONS':'Playoff run ended'} · ${st.playoffs.history.length} games played.</p>`:''}</div></section>
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
       <section class="block"><header><h3>Season scouting report</h3></header><div class="body stack">
@@ -798,7 +809,7 @@ HL.Challenge = (function () {
     U.applyTeamTheme(null);
     U.setEra('modern');
     const all = [1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020];
-    const cfg = { mode: 'classic', decades: all.slice(), playSeason: HL.LATEST_SEASON, daily: false };
+    const cfg = { mode: 'classic', decades: all.slice(), playSeason: HL.LATEST_SEASON, daily: false, mission:'perfect',coach:'steady',timeouts:true };
     const years = [];
     for (let y = HL.LATEST_SEASON; y >= 1946; y--) years.push(y);
     const dailyDone = bestRuns().find(r => r.daily === today());
@@ -817,6 +828,9 @@ HL.Challenge = (function () {
         </section>
         <section class="block"><header><h3>Options</h3></header><div class="body stack">
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Mode</b><div class="d">HoopIQ hides ratings and stats, so you draft from memory.</div></div>${U.seg('mode', [['classic', 'Classic'], ['hoopiq', 'HoopIQ']], cfg.mode)}</div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Season Mission</b><div class="d">Choose another victory condition measured from the actual season.</div></div><select data-mission>${Object.entries(CHALLENGES).map(([id,c])=>`<option value="${id}" ${cfg.mission===id?'selected':''}>${esc(c.title)} · ${esc(c.detail)}</option>`).join('')}</select></div>
+          <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Coaching Identity</b><div class="d">Your coach adapts actual gameplay tactics to opponents or momentum.</div></div><select data-coach>${Object.entries(COACHES).map(([id,c])=>`<option value="${id}" ${cfg.coach===id?'selected':''}>${esc(c.title)} · ${esc(c.description)}</option>`).join('')}</select></div>
+          <div class="setting"><div class="grow"><b>Broadcast Timeouts</b><div class="d">Choose schemes at games 21, 41 and 61. Uncheck for continuous sim.</div></div><input type="checkbox" data-timeouts ${cfg.timeouts?'checked':''}></div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Play the season in</b><div class="d">Your team joins that year's real league: its teams, rules (no three-point line before 1979-80), schedule length and era look.</div></div>
             <select data-play-season>${years.map(y => `<option value="${y}" ${y === cfg.playSeason ? 'selected' : ''}>${yrLabel(y)}${y === HL.LATEST_SEASON ? ' (today)' : ''}</option>`).join('')}</select></div>
           <div class="setting" style="flex-wrap:wrap"><div class="grow"><b>Decades in the spin</b><div class="d">Each pick uses a different decade while possible. Tick one decade for an all-'90s team.</div></div>
@@ -828,6 +842,9 @@ HL.Challenge = (function () {
       FX.bindSound(app);
       app.querySelectorAll('[data-seg] button').forEach(b => b.onclick = () => { cfg.mode = b.dataset.v; draw(); });
       app.querySelectorAll('[data-dec]').forEach(cb => cb.onchange = () => { const d = +cb.dataset.dec; cfg.decades = cb.checked ? [...cfg.decades, d] : cfg.decades.filter(x => x !== d); });
+      app.querySelector('[data-mission]').onchange=e=>{cfg.mission=e.target.value;};
+      app.querySelector('[data-coach]').onchange=e=>{cfg.coach=e.target.value;};
+      app.querySelector('[data-timeouts]').onchange=e=>{cfg.timeouts=e.target.checked;};
       const ps = app.querySelector('[data-play-season]');
       ps.onchange = () => { cfg.playSeason = +ps.value; U.setEra(HL.eraForSeason(cfg.playSeason)); };
       app.querySelector('[data-go]').onclick = () => { if (cfg.decades.length < 1) return U.toast('Pick at least one decade.'); newRun({ ...cfg, decades: cfg.decades.slice().sort() }); render(); };
