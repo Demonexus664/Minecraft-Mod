@@ -43,8 +43,10 @@ test('historical Bay trio transforms only its verified peak seasons, and explain
  assert.ok(m.mechanics.relocation);assert.equal(HL.DNA.analyze(good.map(e=>({...e,season:2020})),{mode:'team'}).mutations.length,0);
 });
 test('preview, reveal and final mutation qualification respect the same physical dependencies',()=>{
- const ps=[entry('wembavi01','intD',2023),entry('jamesle01','iq'),entry('westbru01','speed'),entry('bogutan01','body'),entry('nowitdi01','vert')];
- const low=HL.DNA.analyze(ps);assert.equal(low.build.attrs.block,89);assert.ok(!low.mutations.some(m=>m.id==='mutation:rim-network'));
+ // Veteran Garnett supplies genuinely low elevation; better scouted Wembanyama
+ // help timing makes the old Dirk fixture no longer below the recipe threshold.
+ const ps=[entry('wembavi01','intD',2023),entry('jamesle01','iq'),entry('westbru01','speed'),entry('bogutan01','body'),entry('garneke01','vert')];
+ const low=HL.DNA.analyze(ps);assert.ok(low.build.attrs.block<90);assert.ok(!low.mutations.some(m=>m.id==='mutation:rim-network'));
  const final=HL.DNA.analyze(ps,{build:{height:low.build.height,attrs:low.build.attrs}});assert.equal(JSON.stringify(low.mutations),JSON.stringify(final.mutations));
  const incomplete=HL.DNA.analyze(ps.filter(e=>e.cat!=='vert'));assert.ok(!incomplete.mutations.some(m=>m.id==='mutation:rim-network'));
  const strong=ps.map(e=>e.cat==='vert'?entry('cartevi01','vert'):e),high=HL.DNA.analyze(strong);assert.ok(high.mutations.some(m=>m.id==='mutation:rim-network'));
