@@ -92,3 +92,33 @@ test('presentation loads fully while preserving reduced-motion choices',()=>{
  assert.match(css,/\.scout-panel/);
  assert.match(css,/prefers-reduced-motion:reduce/);
 });
+
+test('Skill Draft season simulations never permanently shrink teammates minutes',async()=>{
+ HL.RNG.setSeed(322);
+ const L=await career.leagueFor(2026);
+ const team=L.teams[0],roster=HL.League.teamPlayers(team.id).slice();
+ const snapshot=new Map(roster.map(p=>[p.id,p.realMpg]));
+ const donor=roster.sort((a,b)=>b.ovr-a.ovr)[0];
+ const me=HL.createPlayer({name:'Rotation Audit',pos:'PG',age:24,height:75,ovr:90,
+   arch:'scorer',real:false,season:L.season});
+ me.id=999999;me.teamId=team.id;me.attrs={...donor.attrs};
+ me.ovr=HL.computeOvr(me.attrs,me.pos);
+ career.simSeason(L,team,me,0,'scorer');
+ for(const p of roster)assert.equal(p.realMpg,snapshot.get(p.id),
+   p.name+' original realMpg restored after first year');
+ career.simSeason(L,team,me,0,'balanced');
+ for(const p of roster)assert.equal(p.realMpg,snapshot.get(p.id),
+   p.name+' original realMpg restored after repeated season');
+});
+
+test('swapping roles or replaying a season cannot stack usage tendency boosts',()=>{
+ const p=HL.createPlayer({name:'Role Audit',pos:'PG',age:22,height:75,ovr:82,
+   arch:'twoway',real:false,season:2026});
+ const base=HL.completeTendencies(p);
+ career.customizeRole(p,'scorer');
+ const first=p.tend.usage;
+ career.customizeRole(p,'scorer');
+ assert.equal(p.tend.usage,first,'role bonuses do not stack each time a mode is selected');
+ career.customizeRole(p,'balanced');
+ assert.equal(p.tend.usage,base.usage,'switching back to balanced restores the natural role');
+});
