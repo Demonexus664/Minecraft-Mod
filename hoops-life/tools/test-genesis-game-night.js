@@ -45,7 +45,7 @@ test('a successful hybrid has inheritance tradeoffs, and can be a parent again',
  assert.ok(node.ancestry.includes('curryst01')&&node.ancestry.includes('bryanko01'));
  assert.ok(node.attrs.three<99||node.attrs.mid<99,'does not inherit both players perfect');
  assert.ok(node.mechanics&&Object.keys(node.mechanics).length>0);
- const next=F.attempt(node,shaq,{roll:()=>0});
+ const next=F.attempt(node,shaq,{roll:()=>0,frame:'right'});
  assert.equal(next.ok,true);
  assert.equal(next.node.depth,2);
  assert.ok(next.node.ancestry.includes('onealsh01'));
