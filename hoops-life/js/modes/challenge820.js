@@ -207,7 +207,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -267,6 +267,37 @@ HL.Challenge = (function () {
     const t=st.lineup[a];st.lineup[a]=st.lineup[b];st.lineup[b]=t;
     st.dna=HL.DNA.analyze(SLOTS.filter(k=>st.lineup[k]).map(k=>({pid:st.lineup[k].row.pid,cat:k,row:st.lineup[k].row,season:st.lineup[k].season})),{mode:'team'});
     FX.sfx.flip();render();
+  }
+
+
+  // Players can override their auto-coach at three broadcast checkpoints.
+  // These are the same tactical controls used by the real possession engine.
+  async function filmRoom(run,g,opp,L,record) {
+    if(!run.timeouts)return;
+    if(st!==run)return;
+    const leaders=HL.League.teamPlayers(opp.id).sort((a,b)=>b.ovr-a.ovr).slice(0,3);
+    const layer=document.createElement('div');layer.className='coach-break';
+    layer.innerHTML='<div class="coach-panel"><div class="coach-broadcast">FILM ROOM · GAME '+(g+1)+
+      ' / '+L.games+'</div><div class="coach-panel-inner"><div class="coach-report">'+
+      '<div class="caps">NEXT OPPONENT</div><h2>'+esc(opp.city+' '+opp.name)+'</h2><p>'+
+      'Threats: '+esc(leaders.map(p=>p.name+' · '+p.ovr+' OVR').join(', '))+'</p>'+
+      '<p>Record: <b>'+record.w+'-'+record.l+'</b>. Your choice changes team possessions going forward.</p></div>'+
+      '<div class="caps">CALL THE ADJUSTMENT</div><div class="coach-choices">'+
+      Object.entries(HL.Legacy.gamePlans).map(([id,p])=>
+        '<button class="coach-option '+(id===run.plan?'on':'')+'" data-film-plan="'+id+'">'+
+        '<strong>'+esc(p.title)+'</strong><small>'+esc(p.caption)+'</small><span>'+
+        (id===run.plan?'Keep this plan':'Change scheme')+'</span></button>').join('')+
+      '</div><button class="btn small" data-film-auto>Auto-coach the rest</button></div></div>';
+    document.body.appendChild(layer);FX.sfx.clutch?.();
+    return new Promise(resolve=>{
+      let closed=false;
+      const finish=id=>{if(closed)return;closed=true;if(HL.Legacy.gamePlans[id])run.plan=id;
+        run.coachLog.push({g:g+1,opp:opp.name,plan:run.plan});
+        layer.remove();run.cancelSeason=null;resolve();};
+      run.cancelSeason=()=>finish(run.plan);
+      layer.querySelectorAll('[data-film-plan]').forEach(b=>b.onclick=()=>finish(b.dataset.filmPlan));
+      layer.querySelector('[data-film-auto]').onclick=()=>{run.timeouts=false;finish(run.plan);};
+    });
   }
 
   // ---------- the season, played live ----------
@@ -331,7 +362,8 @@ HL.Challenge = (function () {
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
     const marqueeIds=new Set(marqueeOpponents(opps).map(t=>t.id));
     const marqueeLog=[],schemeCounts={};
-    const baseStrategy={...dream.strategy},coaching=COACHES[st.coach]||COACHES.steady;
+    let baseStrategy={...dream.strategy};const coaching=COACHES[st.coach]||COACHES.steady;
+    st.coachLog=[];
     let closeGames=0,closeWins=0;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
@@ -346,6 +378,13 @@ HL.Challenge = (function () {
     const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
       const opp = schedule[g];
+      if(g>0&&g%20===0){
+        await filmRoom(run,g,opp,L,{w,l});
+        if(st!==run)return;
+        const plan=HL.Legacy.gamePlans[st.plan]||HL.Legacy.gamePlans.balanced;
+        baseStrategy={...baseStrategy,focus:plan.focus,pace:plan.pace,
+          defense:plan.defense,crash:plan.crash};
+      }
       const oppPlayers=opp.customPlayers||HL.League.teamPlayers(opp.id);
       const oppObj={id:opp.id,abbr:opp.abbr,strategy:opp.strategy,players:oppPlayers};
       const adapted=coaching.adjust(baseStrategy,oppPlayers,{streak,lastLoss:g>0&&!gameLog[g-1].win});
@@ -375,7 +414,7 @@ HL.Challenge = (function () {
       pf += mine.score; pa += theirs.score;
       gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
       if(Math.abs(mine.score-theirs.score)<=5){closeGames++;if(won)closeWins++;}
-      if(marqueeIds.has(opp.id))marqueeLog.push({g:g+1,opp:opp.name,won,for:mine.score,against:theirs.score});
+      if(marqueeIds.has(opp.id)){marqueeLog.push({g:g+1,opp:opp.name,won,for:mine.score,against:theirs.score});FX.sfx.rival?.();}
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
       if (!won) { log.push({ opp, score: `${mine.score}-${theirs.score}`, g: g + 1 }); if (!firstLoss) firstLoss = { g: g + 1, opp }; }
       // Live ticker.
@@ -404,7 +443,7 @@ HL.Challenge = (function () {
     }
     st.result = {w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,best,losses:log,lines,players,firstLoss,gameLog,
       absences,injuriesLog,specialEncounter:null,dna:st.dna,specialDraft:st.special?.label||null,
-      closeGames,closeWins,marqueeLog,schemeCounts,coach:st.coach,
+      closeGames,closeWins,marqueeLog,schemeCounts,coach:st.coach,coachLog:st.coachLog,
       mission:missionStatus({w,l,games,season:st.playSeason,pf:pf/games,pa:pa/games,closeGames,closeWins},st.mission)};
     st.playoffTeams=L.teams;st.playoffRules=Object.assign({},L.rules,{profile:L.profile});
     st.result.identity = HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
