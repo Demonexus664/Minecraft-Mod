@@ -381,3 +381,30 @@ button:focus-visible,input:focus-visible,select:focus-visible,.gcard:focus-visib
  .role-card b{font-size:16px;}
  .season-goal-report{flex-direction:column;align-items:flex-start;}
 }
+
+
+/* Rivalries are measured, persistent career storylines, not random title rolls. */
+.rivalry-ledger {background:radial-gradient(ellipse at 97% 7%,rgba(230,98,111,.1),transparent 60%),var(--surface);}
+.rival-line {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:22px;row-gap:9px;
+  padding:14px;border-radius:12px;border:1px solid rgba(187,196,223,.16);
+  background:linear-gradient(135deg,rgba(38,42,63,.66),rgba(14,20,31,.92));
+  align-items:center;
+}
+.rival-line b {font:800 22px var(--display);text-transform:uppercase;letter-spacing:.02em;}
+.rival-line small {display:block;color:var(--text-3);font-size:11px;margin-top:4px;}
+.rival-line strong {font:850 27px var(--display);font-variant-numeric:tabular-nums;letter-spacing:.025em;}
+.rival-pips {grid-column:1/-1;display:flex;gap:4px;flex-wrap:wrap;}
+.rival-pips i {display:block;width:18px;height:5px;border-radius:3px;background:#e0737c;opacity:.78;}
+.rival-pips i.won {background:#82d6a0;box-shadow:0 0 7px rgba(117,225,172,.24);}
+.season-rivalry {
+  position:relative;overflow:hidden;border:1px solid rgba(201,132,145,.35);
+  padding:17px 20px;border-radius:13px;background:radial-gradient(ellipse at 90% 10%,rgba(204,94,112,.11),transparent),rgba(20,24,38,.86);
+}
+.season-rivalry::before {content:"";position:absolute;top:0;left:0;bottom:0;width:3px;background:#cb7180;}
+.season-rivalry.won {border-color:rgba(242,199,104,.52);background:
+  radial-gradient(ellipse at right,rgba(236,181,87,.13),transparent 70%),rgba(18,28,35,.92);}
+.season-rivalry.won::before {background:#f7d99d;}
+.season-rivalry strong {font:850 24px var(--display);text-transform:uppercase;letter-spacing:.03em;}
+.season-rivalry span {font-weight:750;font-variant-numeric:tabular-nums;color:var(--text-2);}
+.season-rivalry p {margin:10px 0 0;}
