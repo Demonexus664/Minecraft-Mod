@@ -696,3 +696,32 @@ html[data-fx-level=off] .press-live i{animation:none!important}
 .sound-level input{accent-color:var(--team);width:80px;height:21px;cursor:pointer;}
 .sound-level input:focus-visible{outline:2px solid #90c7ff;outline-offset:2px;border-radius:4px;}
 @media(max-width:620px){.sound-level input{width:58px}.sound-level{gap:4px;font-size:9px;}}
+
+
+/* Real promise receipts carry forward into the next offseason. */
+.press-prior{display:flex;flex-wrap:wrap;gap:13px;align-items:center;padding:13px 17px;
+ border:1px solid rgba(246,186,132,.32);border-radius:11px;background:rgba(126,93,58,.12);}
+.press-prior b{font:850 11px var(--body);letter-spacing:.13em;color:#e9c39d;}
+.press-prior span{flex:1;min-width:180px;font:750 13px var(--body);color:var(--text-2);}
+.press-prior strong{font:900 17px var(--display);letter-spacing:.08em;}
+.press-prior small{color:var(--text-3);font:700 12px var(--body);}
+.press-season-outcome{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+ padding:16px;border:1px solid rgba(185,83,107,.4);border-radius:13px;
+ background:linear-gradient(90deg,rgba(126,52,73,.16),rgba(17,27,41,.9));}
+.press-season-outcome.delivered{border-color:rgba(227,185,104,.48);
+ background:linear-gradient(90deg,rgba(135,101,45,.19),rgba(17,27,41,.91));}
+.press-season-outcome span{font:850 13px var(--body);letter-spacing:.1em;color:#eeb3bd;}
+.press-season-outcome.delivered span{color:#f4dca2;}
+.press-season-outcome b{font:900 24px var(--display);text-transform:uppercase;letter-spacing:.03em;}
+.press-season-outcome small{font:500 11px/1.4 var(--body);color:var(--text-2);}
+.press-classic .press-phone{border-radius:6px;padding:8px;
+ background:linear-gradient(145deg,#b5a581,#4d452f);transform:rotate(-2deg);}
+.press-classic .press-screen{border-radius:0;background:
+ repeating-linear-gradient(0deg,transparent 0 23px,rgba(23,21,16,.11) 24px),
+ linear-gradient(140deg,#e4d5b0,#bdb18c);}
+.press-classic .press-live,.press-classic .press-big,.press-classic .press-story-mark,
+.press-classic .press-caption,.press-classic .press-screen p{color:#292419;text-shadow:none;}
+.press-classic .press-live i{display:none;}
+.press-classic .press-big{font-family:Georgia,serif;font-size:clamp(27px,3vw,42px);letter-spacing:-.02em;}
+.press-classic .press-caption{border-top:1px solid rgba(30,26,18,.4);}
+.press-classic .press-screen::before,.press-classic .press-screen::after{display:none;}
