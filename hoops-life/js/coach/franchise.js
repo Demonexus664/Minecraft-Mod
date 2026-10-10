@@ -13,7 +13,7 @@ HL.Franchise = (function () {
     ['home', 'Home', [['overview', 'Overview'], ['news', 'News'], ['mediaday', 'Media Day']]],
     ['team', 'Team', [['roster', 'Roster'], ['rotation', 'Rotation & Game Plan'], ['people', 'People & Relationships'], ['schedule', 'Schedule'], ['stats', 'Player Stats']]],
     ['league', 'League', [['standings', 'Standings'], ['leaders', 'Leaders'], ['playoffs', 'Playoffs'], ['players', 'Players'], ['history', 'History']]],
-    ['office', 'Front Office', [['trades', 'Trades'], ['freeagency', 'Free Agency'], ['draft', 'Draft', 1], ['finances', 'Finances'], ['staff', 'Staff', 1]]],
+    ['office', 'Front Office', [['trades', 'Trades'], ['freeagency', 'Free Agency'], ['draft', 'Draft'], ['finances', 'Finances'], ['staff', 'Staff', 1]]],
     ['league-office', 'League Office', [['rules', 'Rulebook'], ['settings', 'Settings']]],
   ];
   const go = (sec, pg, state = {}) => { section = sec; page = pg; pageState = state; render(); window.scrollTo(0, 0); };
@@ -146,7 +146,7 @@ HL.Franchise = (function () {
       <button class="btn go small" data-sim="day">${U.icon('play')}<span class="lbl">Next day</span></button>
       <button class="btn small" data-sim="round"><span>Round</span></button>
       <button class="btn small" data-sim="season">${U.icon('ff')}<span class="lbl">Finish</span></button>`;
-    return `<button class="btn go small" data-sim="advance">${U.icon('next')}<span class="lbl">Start ${Lg.season + 1}-${String(Lg.season + 2).slice(2)}</span></button>`;
+    return `<button class="btn go small" data-sim="advance">${U.icon('next')}<span class="lbl">${Lg.draftRoom?.stage === 'complete' ? `Start ${Lg.season + 1}-${String(Lg.season + 2).slice(2)}` : 'Draft night'}</span></button>`;
   }
 
   function sim(kind) {
@@ -158,7 +158,13 @@ HL.Franchise = (function () {
         HL.History.load(nextKey).then(() => sim('advance')).catch(e => U.toast(esc(e.message)));
         return;
       }
-      HL.League.advanceToNextSeason();
+      if (!Lg.draftRoom) {
+        const result = HL.DraftRoom.prepare(Lg);
+        if (!result.ok) { U.toast(esc(result.reason)); return; }
+      }
+      if (Lg.draftRoom.stage !== 'complete') { go('office', 'draft'); autosave(); return; }
+      const result = HL.League.advanceToNextSeason();
+      if (result?.ok === false) { U.toast(esc(result.reason)); return; }
       U.toast(`The ${Lg.season}-${String(Lg.season + 1).slice(2)} season is here. The draft, player progression, retirements and free agency are complete.`);
       go('home', 'overview');
       autosave();
@@ -339,7 +345,7 @@ HL.Franchise = (function () {
       <div class="en"><span>${k(Math.round(r.reposts * 0.6))} replies</span><span>${k(r.reposts)} reposts</span><span>${k(r.likes)} likes</span></div></div></div>`;
   }
   function kicker(n) {
-    const types = { people: 'People & relationships', media: 'Media day', game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
+    const types = { draft: 'Draft night', people: 'People & relationships', media: 'Media day', game: 'Game recap', injury: 'Injury report', award: 'Awards', playoffs: 'Playoffs', champion: 'Champions', retire: 'Retirement', phase: 'League', rules: 'League office', transaction: 'Transactions' };
     const events = { 'game.buzzer_beater': 'Buzzer-beater', 'game.game_winner': 'Game-winner', 'game.comeback': 'Comeback', 'record.single_game': 'Record book', 'record.single_game_tie': 'Record book', 'record.minutes_sixth_overtime': 'Record book', 'court.four_point_play': 'Four-point play', 'court.five_point_play': 'Five-point play', 'court.charge_triple': 'Defense', 'court.no_field_goals_quarter': 'Defense' };
     const label = n.type === 'event' ? (events[n.key] || 'Rare feat') : (types[n.type] || n.type);
     return `${label} · ${HL.fmtDay(n.season, n.day, { year: 1 })}`;
@@ -694,7 +700,8 @@ HL.Franchise = (function () {
     },
   };
   for (const k of ['trades', 'freeagency', 'finances']) PAGES[k] = () => HL.FrontOfficeUI.render(page, pageState);
-  for (const k of ['draft', 'staff']) PAGES[k] = PAGES.soon;
+  PAGES.staff = PAGES.soon;
+  PAGES.draft = () => HL.DraftRoomUI.render(pageState);
   PAGES.people = HL.PeopleUI.render;
 
   function renderPage() {
@@ -703,6 +710,7 @@ HL.Franchise = (function () {
     bindCommon(el);
     if (['trades', 'freeagency', 'finances'].includes(page)) HL.FrontOfficeUI.bind(page, el, pageState, save => { renderPage(); if (save) autosave(); });
     if (page === 'people') HL.PeopleUI.bind(el, () => { renderPage(); autosave(); });
+    if (page === 'draft') HL.DraftRoomUI.bind(el, pageState, save => { render(); if (save) autosave(); });
     if (BIND[page]) BIND[page](el);
   }
 

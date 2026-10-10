@@ -711,6 +711,44 @@ html[data-era="60s"] .court { background: linear-gradient(#8d8d8d, #6f6f6f); }
 .gfx-uniform > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(.98); transform-origin: bottom center; }
 .gfx-uniform-print { position: absolute; top: 95%; left: 30%; width: 40%; text-align: center; color: #fff; font-family: var(--display); font-weight: 800; line-height: 1; }
 .gfx-uniform-number { display: block; font-size: clamp(12px, 5cqi, 48px); text-shadow: 1px 1px 0 var(--trim), -1px -1px 0 var(--trim); }
+
+/* Draft night: one stage, a clear clock, and scouting dossiers. */
+.draft-stage { padding: 30px; margin-bottom: 22px; border: 1px solid var(--rule); border-top: 3px solid var(--team); background: var(--surface-2); }
+.draft-stage h2 { font-family: var(--display); font-size: clamp(30px,4vw,52px); line-height: 1.05; margin: 8px 0 12px; }
+.draft-stage p { max-width: 740px; color: var(--text-2); margin-bottom: 20px; }
+.draft-kicker { font-size: 12px; letter-spacing: .12em; font-weight: 800; color: var(--team); }
+.draft-status { display: flex; flex-wrap: wrap; gap: 12px 26px; padding: 0 0 15px; color: var(--text-2); font-size: 12px; font-weight: 700; }
+.draft-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 16px; margin: 18px 0 24px; }
+.draft-prospect { position: relative; background: var(--surface); border: 1px solid var(--rule); padding: 20px 15px; color: var(--text); text-align: left; cursor: pointer; min-width: 0; }
+.draft-prospect:hover,.draft-prospect.pinned { border-color: var(--team); background: var(--surface-2); }
+.draft-prospect h3 { margin: 10px 0 2px; font-family: var(--display); font-size: 23px; line-height: 1.05; }
+.draft-prospect p { margin: 0 0 12px; }
+.draft-rank { display: block; font-size: 10px; letter-spacing: .08em; font-weight: 800; color: var(--text-3); margin-bottom: 10px; }
+.draft-pin { display: block; margin-top: 12px; font-size: 10px; letter-spacing: .08em; font-weight: 800; color: var(--team); }
+.draft-estimate { display: flex; gap: 14px; margin: 16px 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 12px 0; font-size: 12px; }
+.draft-estimate span { flex: 1; color: var(--text-2); }
+.draft-estimate b { display: block; font-size: 24px; font-family: var(--display); color: var(--text); }
+.draft-filters { margin: 18px 0; }
+.draft-filters input { min-width: 0; flex: 1; }
+.draft-clock { display: flex; align-items: center; gap: 20px; }
+.draft-ticker { max-height: 400px; overflow: auto; }
+.draft-tick { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--rule); }
+.draft-tick > b { width: 34px; font-family: var(--display); font-size: 22px; }
+.draft-tick > div { display: flex; flex-direction: column; flex: 1; }
+.draft-dossier { display: flex; flex-direction: column; gap: 12px; }
+.draft-dossier blockquote { margin: 0; padding: 12px 16px; background: var(--surface-2); border-left: 3px solid var(--team); }
+.draft-dossier small { display: block; margin-top: 8px; color: var(--text-3); }
+.lottery-grid { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 10px; margin: 20px 0; }
+.lottery-envelope { min-height: 138px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 1px solid var(--rule); background: var(--surface); padding: 12px 8px; gap: 6px; }
+.lottery-envelope.mine { border: 2px solid var(--team); }
+.lottery-hidden { font-family: var(--display); font-size: 48px; color: var(--text-3); }
+.lottery-drum { display: flex; gap: 8px; margin-bottom: 22px; }
+.lottery-drum i { width: 32px; height: 32px; border-radius: 50%; background: var(--text); color: var(--bg); display: grid; place-items: center; font-style: normal; font-weight: 800; box-shadow: inset -3px -4px 0 #0002; }
+.lottery-envelope.revealed { animation: draft-reveal .3s ease-out; }
+@keyframes draft-reveal { from { opacity: 0; transform: translateY(12px) rotateX(20deg); } to { opacity: 1; transform: none; } }
+@media(max-width:900px) { .draft-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .lottery-grid { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+@media(max-width:600px) { .draft-stage { padding: 20px; } .draft-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; } .lottery-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } .draft-prospect { padding: 14px 10px; } .draft-clock { align-items: flex-start; } .draft-tick { gap: 10px; padding: 12px; } }
+@media(prefers-reduced-motion:reduce) { .lottery-envelope.revealed { animation: none; } }
 .face { display: inline-grid; place-items: center; }
 .face-initials { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--text-2); }
 .face.ok .face-initials, .gfx-head.ok .gfx-placeholder { visibility: hidden; }

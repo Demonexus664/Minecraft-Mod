@@ -605,6 +605,7 @@ HL.League = {};
 
   HL.League.advanceToNextSeason = function () {
     if (L.phase !== 'offseason') return;
+    if (HL.DraftRoom && L.draftRoom && L.draftRoom.year === L.season + 1 && L.draftRoom.stage !== 'complete') return { ok: false, reason: 'Finish or delegate the draft before starting the next season.' };
     const season = L.season, next = season + 1;
     const real = HL.League.usesRealHistory() && HL.HISTORY_SEASONS[String(next)];
     if (real) applyFranchiseChanges(HL.HISTORY_SEASONS[String(next)], next);
@@ -612,6 +613,7 @@ HL.League = {};
     progressAndRetire(season, next, real);
     if (HL.FrontOffice) HL.FrontOffice.rollover(L, season, next);
     contractsAndFreeAgency(season, next);
+    if (L.draftRoom && L.draftRoom.year === next) delete L.draftRoom;
     for (const t of L.teams) Object.assign(t, blankRecord());
     L.season = next;
     L.day = 0;
@@ -665,6 +667,14 @@ HL.League = {};
   function keepRecord(t, meta) { const { id, strategy } = t; return Object.assign(meta, { id, strategy }); }
 
   function runDraft(season, next, real) {
+    if (HL.DraftRoom) {
+      const ready = HL.DraftRoom.prepare(L);
+      if (!ready.ok) throw new Error(ready.reason);
+      if (!L.draftRoom.lottery) HL.DraftRoom.lottery(L);
+      if (L.draftRoom.stage !== 'complete') HL.DraftRoom.simulate(L, false);
+      HL.DraftRoom.commit(L);
+      return;
+    }
     const order = draftOrder();
     let pool;
     if (real) {
@@ -782,7 +792,8 @@ HL.League = {};
         setContract(p, next);
       }
       // Preserve negotiated roster moves ahead of automatic depth signings and draft additions.
-      const r = roster().sort((a, b) => !!a.userRosterMove - !!b.userRosterMove || a.ovr - b.ovr);
+      const priority = p => p.userRosterMove ? (p.draft?.year === next ? 2 : 1) : 0;
+      const r = roster().sort((a, b) => priority(a) - priority(b) || a.ovr - b.ovr);
       while (r.length > 15) { const cut = r.shift(); cut.teamId = null; }
     }
     L.newTeams = [];

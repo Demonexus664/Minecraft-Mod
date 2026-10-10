@@ -87,6 +87,12 @@ HL.World = (function () {
       news.reactions = news.reactions.filter(Boolean);
     }
   }
+  function onDraft(L, p, slot) {
+    const t = L.teams.find(t => t.id === slot.teamId);
+    memory(L, person(L, p.id), 'draft', `You selected ${p.name} at number ${slot.pick} for the ${t.name}.`, { trust: 5, like: 3 });
+    memory(L, club(L, t.id), 'draft', `${p.name} joins at pick ${slot.pick}; development is now the club's responsibility.`, { fans: p.boardRank > slot.pick + 8 ? -3 : 3, owner: 1 });
+    world(L).watches.push({ kind: 'draftRookie', pid: p.id, teamId: t.id, targetGames: 5, games: 0, appearances: 0, minutes: 0, pts: 0, wins: 0, seen: [], season: L.season });
+  }
   function afterGame(L, g, res) {
     if (!L.world) return;
     for (const w of L.world.watches) {
@@ -99,14 +105,20 @@ HL.World = (function () {
       if (w.seen.includes(gameKey)) continue;
       w.seen.push(gameKey); w.games++;
       const s = side.box[w.pid]; w.minutes += s?.min || 0; w.pts += s?.pts || 0;
+      if (w.kind === 'draftRookie' && s?.min > 0) w.appearances++;
       const opp = side === res.home ? res.away : res.home; if (side.score > opp.score) w.wins++;
-      if (w.games < 3) continue;
+      if (w.games < (w.targetGames || 3)) continue;
       w.resolved = true;
       const r = person(L, p.id), avgMin = w.minutes / w.games, avgPts = w.pts / w.games;
       if (w.kind === 'minutesPromise') {
         const kept = avgMin >= w.target;
         memory(L, r, 'promise_result', `You ${kept ? 'kept' : 'broke'} the minutes promise: ${avgMin.toFixed(1)} per game across ${w.games} team games.`, { trust: kept ? 7 : -12, respect: kept ? 3 : -4 }); morale(p, kept ? 5 : -8);
         story(L, p, kept ? `${p.name}: ${L.teams.find(t => t.id === w.teamId).name} keeps its promise` : `${p.name} calls out a broken minutes promise`, `${avgMin.toFixed(1)} minutes per game across ${w.games} team games, against a promised ${w.target}. Did-not-play games count.`, kept ? 'They said I would get an opportunity, and they delivered.' : 'I was told I would get a bigger role. The rotation tells a different story.', 'people.minutes_promise', g.gid);
+      } else if (w.kind === 'draftRookie') {
+        const t = L.teams.find(t => t.id === w.teamId), opportunity = avgMin >= 12;
+        memory(L, club(L,t.id), 'rookie_verdict', `${p.name}: ${avgPts.toFixed(1)} points and ${avgMin.toFixed(1)} minutes across his first ${w.games} team games, with ${w.appearances} appearances.`, { fans: opportunity ? 2 : -2 });
+        memory(L,r,'rookie_opportunity',opportunity ? `The ${t.name} gave him an early opportunity to develop.` : `He waited for a role during the ${t.name}'s first five games.`, { trust: opportunity ? 3 : -3 });
+        story(L,p,`${p.name}: ${opportunity ? 'first steps after draft night' : 'rookie waits for an opening'}`,`${avgPts.toFixed(1)} points and ${avgMin.toFixed(1)} minutes per team game over ${w.games} games; ${w.appearances} appearances, team ${w.wins}-${w.games-w.wins}. Did-not-play games count. This is an opportunity check, not a verdict on his career.`,opportunity ? 'They have given me a chance. Now I need to turn minutes into progress.' : 'I am staying ready. I want a clear plan for earning minutes.','draft.rookie_opportunity',g.gid);
       } else {
         const promising = w.wins >= 2 || avgPts >= 18;
         const t = L.teams.find(t => t.id === w.teamId);
@@ -116,5 +128,5 @@ HL.World = (function () {
     }
     L.world.watches = L.world.watches.filter(w => !w.resolved || L.season <= w.season + 1).slice(-200);
   }
-  return { ACTIONS, relationship, teamMood, meet, onTransaction, afterGame };
+  return { ACTIONS, relationship, teamMood, meet, onTransaction, onDraft, afterGame };
 })();
