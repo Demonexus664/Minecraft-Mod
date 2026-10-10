@@ -376,7 +376,7 @@ HL.Challenge = (function () {
     const schedule = R.shuffle(Array.from({ length: games }, (_, i) => opps[i % opps.length]));
     st.bosses=st.gauntlet?gauntletSchedule(opps,schedule):[];
     const marqueeIds=new Set(marqueeOpponents(opps).map(t=>t.id));
-    const marqueeLog=[],schemeCounts={};
+    const marqueeLog=[],schemeCounts={},schemeRecords={};
     let baseStrategy={...dream.strategy};const coaching=COACHES[st.coach]||COACHES.steady;
     st.coachLog=[];
     let closeGames=0,closeWins=0;
