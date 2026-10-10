@@ -688,3 +688,11 @@ html[data-fx-level=off] .dna-fusion *,
 html[data-fx-level=off] .press-screen::before,
 html[data-fx-level=off] .press-screen::after,
 html[data-fx-level=off] .press-live i{animation:none!important}
+
+
+/* Audio mixer controls. Small, visible and shared by both modes. */
+.sound-level{display:inline-flex;gap:8px;align-items:center;color:var(--text-3);font:800 10px var(--body);
+ letter-spacing:.12em;white-space:nowrap;text-transform:uppercase;}
+.sound-level input{accent-color:var(--team);width:80px;height:21px;cursor:pointer;}
+.sound-level input:focus-visible{outline:2px solid #90c7ff;outline-offset:2px;border-radius:4px;}
+@media(max-width:620px){.sound-level input{width:58px}.sound-level{gap:4px;font-size:9px;}}
