@@ -246,6 +246,30 @@ HL.SkillDraft = (function () {
 
 
 
+
+  function rememberRival(c,s) {
+    const r=s.rival;if(!r||!r.name)return;
+    c.rivalries ||= {};
+    const id=String(r.pid);
+    const f=c.rivalries[id]||{name:r.name,met:0,wins:0,losses:0,history:[]};
+    f.met++;
+    if(r.win)f.wins++;else f.losses++;
+    f.history.push({yr:s.yr,win:r.win,impact:r.myScore,opponent:r.theirScore});
+    c.rivalries[id]=f;
+  }
+  function rivalryView(c) {
+    const rivals=Object.values(c.rivalries||{}).sort((a,b)=>b.met-a.met||b.losses-a.losses).slice(0,5);
+    if(!rivals.length)return '';
+    return '<section class="block rivalry-ledger"><header><h3>RIVALRY LEDGER</h3>'+
+      '<span class="ml-auto t3 sm">The MVP race through the years</span></header>'+
+      '<div class="body stack"><p class="t2 sm">You go against the best real competitor every season. Repeated matchups build actual career rivalries.</p>'+
+      rivals.map(r=>'<div class="rival-line"><div><b>'+esc(r.name)+'</b><small>'+r.met+
+        ' season'+(r.met===1?'':'s')+' battling for impact</small></div><strong>'+r.wins+'-'+r.losses+'</strong>'+
+        '<div class="rival-pips">'+r.history.map(h=>'<i class="'+(h.win?'won':'lost')+
+        '" title="'+esc(yrLabel(h.yr)+(h.win?' win':' loss'))+'"></i>').join('')+'</div></div>').join('')+
+      '</div></section>';
+  }
+
   // An on-court identity changes usage, shot selection and defensive behavior
   // during possessions. Ratings are never padded to imitate the choice.
   const ROLES={
@@ -546,7 +570,7 @@ HL.SkillDraft = (function () {
       seasons: [], awards: [], rings: 0, teams: [], pick: null, altered: [], earnings: 0, log: [], lastRecords: {},
       totals: blankTotals(), ptotals: blankTotals(), highs: {}, tradeRequests: 0,
       pending: null, done: false, end: null, legacy: null, dna: prime.dna, story: [], pendingStory:null, franchiseLoyalty:0,
-       trainingFocus:'balanced',training:{},trainingHistory:[],role:'balanced',agenda:'winning',agendaVictories:0,agendaHistory:[],trainingReward:0,
+       trainingFocus:'balanced',training:{},trainingHistory:[],role:'balanced',agenda:'winning',agendaVictories:0,agendaHistory:[],trainingReward:0,rivalries:{},
     };
   }
 
@@ -620,6 +644,7 @@ HL.SkillDraft = (function () {
       };
     }
     c.seasons.push(s);
+    rememberRival(c,s);
     addLine(c.totals, res.line); addLine(c.ptotals, res.pline);
     c.earnings += s.salary;
     for (const a of res.awards) c.awards.push({ season: c.yr, award: a.award || a, over: a.over });
@@ -932,6 +957,14 @@ HL.SkillDraft = (function () {
       }
     }
 
+    const topRival=field.filter(f=>f.qual).sort((a,b)=>mvpScore(b)-mvpScore(a))[0];
+    const rival=topRival?{
+      pid:topRival.pid,name:topRival.name||competitorName(topRival.pid),
+      win:mvpScore(mine)>mvpScore(topRival),
+      myScore:+mvpScore(mine).toFixed(1),theirScore:+mvpScore(topRival).toFixed(1),
+      ppg:+topRival.row.pts.toFixed(1)
+    }:null;
+
     // ---- Playoffs: that year's qualifying spots, format and opponents ----
     const fmt = HL.playoffFormat(L.season);
     const realPlayoff = L.teams.filter(t => t.real.playoffs);
@@ -997,7 +1030,7 @@ HL.SkillDraft = (function () {
     return {
       g, line, pline, ppg, rpg, apg, leagueSource:historical?'Historical':'Generated', rivalCount:field.length,
       ts: (line.fga + 0.44 * line.fta) ? line.pts / (2 * (line.fga + 0.44 * line.fta)) : 0,
-      w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,
+      w, l, seed, spots, made, series, rounds, playoffRound: round, champion, awards, altered, ranks, highs, counts, mates,rival,
       realChamp: rcT ? fullName(rcT) : realChamp || null, games: L.games, nTeams: L.teams.length,
     };
   }
@@ -1186,6 +1219,7 @@ HL.SkillDraft = (function () {
     if (last) out.push(seasonReport(last));
     out.push(trainingView(c));
     if (c.seasons.length) out.push(milestoneView(c));
+    if (c.seasons.length) out.push(rivalryView(c));
     if (c.seasons.length) out.push(careerTable(c));
     if (c.log.length) out.push(timeline(c));
     return out.join('');
@@ -1217,6 +1251,7 @@ HL.SkillDraft = (function () {
     return `<section class="block"><header><h3>${yrLabel(s.yr)} season report</h3><span class="ml-auto row sm">${U.logo(s.team, 22)} ${esc(s.team.name)} · ${s.ovr} OVR</span></header><div class="body stack">
       ${statStrip(l, s.g, s.g ? (l.min / s.g).toFixed(1) : '0.0')}
       ${s.agenda?'<div class="season-goal-report '+(s.agenda.complete?'complete':'')+'"><div><div class="caps">Season contract · '+esc(ROLES[s.role]?.title||'Balanced')+'</div><b>'+esc(s.agenda.title)+'</b><p>'+esc(s.agenda.detail)+'</p></div><strong>'+(s.agenda.complete?'GOAL ACHIEVED':'GOAL MISSED')+'</strong></div>':''}
+      
       ${s.leagueRecap ? `<details open><summary>League evolution · new rookies, rising players & scoring rivals</summary>
         <div class="cols c2" style="gap:12px">
         <div class="stack"><div class="caps">New rookie class</div>${s.leagueRecap.rookies.map(p=>`<div class="kv"><span>${esc(p.name)} · ${esc(p.team)}</span><b>${p.ovr} OVR</b></div>`).join('')||'<div class="t3">No rookies in this class</div>'}</div>
