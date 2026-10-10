@@ -5,7 +5,8 @@ HL.FusionLab=(function(){
  let creations=[],history=[],tries={},serial=0;
  const SAVE_KEY='hoops-life-genesis-v1';
  function save(){
-  try{if(typeof localStorage!=='undefined')localStorage.setItem(SAVE_KEY,
+  if(typeof localStorage==='undefined')return false;
+  try{localStorage.setItem(SAVE_KEY,
    JSON.stringify({v:1,creations,history,tries,serial}));return true;}catch{return false;}
  }
  function restore(){
