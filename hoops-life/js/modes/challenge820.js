@@ -225,7 +225,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[],fusionSlots:{},pendingFusionId:null,gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[],fusionSlots:{},fusionSpent:{},fusionUsedCards:{},draftView:'roster',pendingFusionId:null,gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -264,7 +264,7 @@ HL.Challenge = (function () {
   // A Genesis hybrid is a replacement for one of the eight drafted players.
   // It retains its own ratings, frame and mechanics. The original source is
   // not secretly still contributing its historical team DNA.
-  const fusionAllowed=()=>!!st&&!st.daily&&st.mode!=='hoopiq'&&st.phase==='ready';
+  const fusionAllowed=()=>!!st&&!st.daily&&st.mode!=='hoopiq'&&['spin','hand','ready'].includes(st.phase)&&filled()>=2;
   function fusionAt(slot){
     const id=st?.fusionSlots?.[slot];
     return id&&HL.FusionLab?.find(id)||null;
@@ -277,15 +277,20 @@ HL.Challenge = (function () {
   }
   function refreshTeamDna(){st.dna=HL.DNA.analyze(teamDnaEntries(),{mode:'team'});}
   function assignFusion(slot,node){
-    if(!fusionAllowed()||!SLOTS.includes(slot)||!st.lineup[slot]||!node||!HL.FusionLab.find(node.id))return false;
-    // Identical hybrids can't play twice at once; move instead of cloning.
-    for(const key of Object.keys(st.fusionSlots))if(st.fusionSlots[key]===node.id)delete st.fusionSlots[key];
-    st.fusionSlots[slot]=node.id;st.pendingFusionId=null;refreshTeamDna();return true;
+    if(!fusionAllowed()||!SLOTS.includes(slot)||!st.lineup[slot]||!node||!HL.FusionLab?.find(node.id))return false;
+    const ids=node.parentIds||[];
+    const matched=SLOTS.filter(k=>st.lineup[k]&&ids.includes(fusionAt(k)?.id||
+      HL.FusionLab.fromDraftCard(st.lineup[k]).id));
+    if(matched.length!==2||!matched.includes(slot))return false;
+    const removed=matched.find(k=>k!==slot);
+    // Two drafted cards become one actual roster player; the second slot opens.
+    st.fusionSlots[slot]=node.id;
+    delete st.fusionSlots[removed];st.lineup[removed]=null;
+    st.round=Math.max(0,st.round-1);st.phase='spin';
+    st.pendingFusionId=null;st.draftView='roster';
+    refreshTeamDna();return true;
   }
-  function clearFusion(slot){
-    if(!fusionAllowed()||!fusionAt(slot))return false;
-    delete st.fusionSlots[slot];refreshTeamDna();return true;
-  }
+  function clearFusion(slot){return false;}
   function fusionFit(node,slot) {
     if(!STARTERS.includes(slot))return 0;
     const natural=POSI[node.pos]??2,distance=Math.abs(natural-POSI[slot]);
@@ -293,33 +298,29 @@ HL.Challenge = (function () {
     return Math.round([0,2,6,11,16][distance]+(distance?size:0));
   }
   function genesisPanel(){
-    if(!fusionAllowed())return '';
+    const drafted=SLOTS.filter(slot=>st.lineup[slot]);
+    const unlocked=fusionAllowed();
     const pending=HL.FusionLab?.find(st.pendingFusionId);
-    const records=SLOTS.filter(slot=>fusionAt(slot)).map(slot=>({slot,node:fusionAt(slot)}));
-    const ancestry=records.map(({slot,node})=>{
-      const img=HL.FusionUI?.portrait(
-        {photo:node.images?.[0]||'',name:node.heads?.[0]||'Parent A'},
-        {photo:node.images?.[1]||'',name:node.heads?.[1]||'Parent B'},true)||'';
-      return '<article class="genesis-roster-entry">'+img+
-        '<div><span class="caps">'+slot+' · GEN '+node.depth+'</span><b>'+esc(node.name)+'</b>'+
-        '<small>'+node.ovr+' OVR · '+esc(node.family)+' · '+
-        esc(Object.keys(node.mechanics||{}).slice(0,4).join(' / '))+'</small></div>'+
-        '<button class="btn small" data-fusion-remove="'+slot+'">Restore original</button></article>';
-    }).join('');
-    return '<section class="block genesis-820-panel"><header><h3>GENESIS FUSION LABORATORY</h3>'+
-      '<span class="ml-auto t3 sm">Exclusive to 82-0 · Custom rosters</span></header>'+
-      '<div class="body stack"><p class="t2 sm">Experiment with any two historical players. Success creates a new basketball identity; failure creates no playable hybrid. Keep combining successful hybrids for unlimited generations. Replace any drafted player with your creation before the season.</p>'+
-      '<button class="btn go big" data-fusion-open>OPEN GENESIS WORKSTATION</button>'+
-      (pending?'<div class="genesis-assignment"><span class="caps">CREATION READY · '+esc(pending.name)+
-        ' · '+pending.ovr+' OVR</span><h3>Choose the roster spot to replace</h3>'+
-        '<div class="genesis-slot-grid">'+SLOTS.filter(slot=>st.lineup[slot]).map(slot=>
-          '<button class="genesis-slot-choice" data-fusion-assign="'+slot+'"><b>'+slot+'</b><span>'+
-          esc(HL.HISTORY.players[st.lineup[slot].row.pid][0])+'</span><small>'+
-          (fusionAt(slot)?'Replaces '+esc(fusionAt(slot).name):'Original card')+'</small></button>').join('')+
-        '</div><button class="btn small" data-fusion-cancel>Cancel assignment</button></div>':'')+
-      '<div class="caps">EQUIPPED HYBRIDS · '+records.length+' / 8</div>'+
-      (ancestry||'<p class="t3 sm">No hybrids equipped. Your drafted eight remain unchanged until you assign a fusion.</p>')+
-      '<p class="t3 sm">Custom fusion teams are excluded from standardized Daily and HoopIQ runs. Stats, size and actual on-court DNA mechanics transfer into the season; the original card does not remain as a hidden bonus.</p>'+
+    const nodes=drafted.map(slot=>({slot,node:fusionAt(slot)||
+      HL.FusionLab.fromDraftCard(st.lineup[slot])}));
+    return '<section class="block genesis-820-panel"><header><h3>GENESIS · PLAYER FUSION</h3>'+
+      '<span class="ml-auto t3 sm">'+drafted.length+' drafted</span></header>'+
+      '<div class="body stack"><p class="t2 sm">Select any two players YOU drafted. Each parent gets one fusion attempt in this run, win or lose. Matching positions do not guarantee success. A successful hybrid consumes both cards, then frees one slot for another roll.</p>'+
+      (unlocked?'<button class="btn go big" data-fusion-open>CHOOSE TWO DRAFTED PLAYERS</button>':
+        '<div class="genesis-disabled">Draft two players in Classic to unlock.</div>')+
+      (pending?'<div class="genesis-assignment"><h3>SUCCESS · '+esc(pending.name)+'</h3>'+
+        '<p>Pick the parent slot where the combined player will play. The other becomes a new empty draft slot.</p>'+
+        '<div class="genesis-slot-grid">'+drafted.filter(slot=>pending.parentIds?.includes(fusionAt(slot)?.id||
+          HL.FusionLab.fromDraftCard(st.lineup[slot]).id)).map(slot=>
+          '<button class="genesis-slot-choice" data-fusion-assign="'+slot+'"><b>'+slot+
+          '</b><span>'+esc(fusionAt(slot)?.name||HL.HISTORY.players[st.lineup[slot].row.pid][0])+
+          '</span><small>Keep hybrid here</small></button>').join('')+'</div>'+
+        '<button class="btn small" data-fusion-cancel>Close</button></div>':'')+
+      '<div class="caps">DRAFTED PLAYERS · '+nodes.length+'</div>'+
+      '<div class="genesis-source-grid">'+nodes.map(({slot,node})=>
+        '<div><b>'+slot+'</b><span>'+esc(node.name)+'</span><small>'+node.ovr+
+        ' OVR · '+(st.fusionUsedCards[node.id]?'Attempt used':'Available')+'</small></div>').join('')+'</div>'+
+      '<p class="t3 sm">One genuine roll per parent; no retries, global archive search or reroll farming. Future successful hybrids can be fused if they have not already spent their attempt.</p>'+
       '</div></section>';
   }
 
