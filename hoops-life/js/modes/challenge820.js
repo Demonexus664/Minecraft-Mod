@@ -120,7 +120,7 @@ HL.Challenge = (function () {
   function newRun(cfg) {
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 1, era: 1 }, usedSkips: 0, used: [], result: null, pulls: [] };
+      skips: { team: 1, era: 1 }, usedSkips: 0, used: [], plan: 'balanced', result: null, pulls: [] };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -198,23 +198,33 @@ HL.Challenge = (function () {
       players.push(b);
     }
     dream.players = players;
-    dream.strategy.starters = players.slice(0, 5).map(p => p.id);
+    dream.strategy.starters = players.slice(0,5).map(p=>p.id);
+    const tactical=HL.Legacy.gamePlans[st.plan] || HL.Legacy.gamePlans.balanced;
+    Object.assign(dream.strategy,{focus:tactical.focus,pace:tactical.pace,defense:tactical.defense,crash:tactical.crash});
     const opps = L.teams;
     const rules = Object.assign({}, L.rules, { profile: L.profile });
     let w = 0, l = 0, pf = 0, pa = 0, streak = 0, best = 0, firstLoss = null;
     const lines = {};
     for (const p of players) lines[p.id] = HL.blankStatLine();
-    const log = [];
+    const log = [],gameLog=[],injuriesLog=[];
+    const absences=Object.fromEntries(players.map(p=>[p.id,0]));
     const q = sel => document.querySelector(sel);
     const batch = FX.reduced() ? games : 1;
     for (let g = 0; g < games; g++) {
       const opp = opps[g % opps.length];
       const oppObj = { id: opp.id, abbr: opp.abbr, strategy: opp.strategy, players: HL.League.teamPlayers(opp.id) };
-      for (const p of players) p.injury = null;
+      for(const p of players) {if(p.injury?.games>0)absences[p.id]++;else p.injury=null;}
       const home = g % 2 === 0;
       const res = home ? HL.simGame(dream, oppObj, rules) : HL.simGame(oppObj, dream, rules);
       const mine = home ? res.home : res.away, theirs = home ? res.away : res.home;
+      for(const p of players) if(p.injury?.games>0)p.injury.games--;
+      for(const injury of res.injuries||[]) if(injury.teamId===dream.id) {
+        const victim=players.find(p=>p.id===injury.pid);
+        if(victim){victim.injury={name:injury.name||'Injury',games:Math.max(1,Math.round(injury.games||1))};
+          injuriesLog.push({g:g+1,player:victim.name,reason:victim.injury.name,games:victim.injury.games});}
+      }
       const won = mine.score > theirs.score;
+      gameLog.push({g:g+1,opp:opp.name,home,for:mine.score,against:theirs.score,win:won});
       if (won) { w++; streak++; best = Math.max(best, streak); } else { l++; streak = 0; }
       pf += mine.score; pa += theirs.score;
       for (const id in mine.box) for (const k in lines[id]) lines[id][k] += mine.box[id][k] || 0;
@@ -229,7 +239,8 @@ HL.Challenge = (function () {
       // Starts quick, and slows down when a perfect season is still alive late.
       if ((g + 1) % batch === 0) await FX.wait(!l && g > games - 8 ? 320 : g < 10 ? 90 : 50);
     }
-    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss };
+    st.result = { w, l, games, pf: pf / games, pa: pa / games, best, losses: log, lines, players, firstLoss,gameLog,injuriesLog,absences };
+    st.result.identity=HL.Legacy.teamReport(st.result,st.playSeason,st.plan);
     st.result.unlocked = achievements();
     saveBest();
     const [tier, line] = verdict(w, games);
@@ -347,8 +358,9 @@ HL.Challenge = (function () {
     const reel = (label, inner, landed) => `<div class="reel ${landed ? 'landed' : ''}"><div class="reel-label">${label}</div><div class="reel-win"><div class="reel-item" style="height:96px">${inner}</div></div></div>`;
     const showResult = fm && st.phase !== 'reeling' && st.phase !== 'spin';
     const reelHost = `<div id="reels"><div class="reels">${reel('Franchise', showResult ? U.logo(fm, 62) : '?', showResult)}${reel('Decade', showResult ? `${st.decade}s` : '?', showResult)}</div></div>`;
+    const gameplan=st.phase==='ready'?'<div class="gameplan-select"><b>Coaching identity</b><div class="gameplan-grid">'+Object.entries(HL.Legacy.gamePlans).map(([key,plan])=>'<button class="gameplan-option '+(st.plan===key?'active':'')+'" data-gameplan="'+key+'"><b>'+esc(plan.title)+'</b></button>').join('')+'</div><p class="t3 sm">Your scheme changes possessions and era fit.</p></div>':'';
     const controls = done
-      ? `<div class="stack" style="align-items:center;gap:8px;margin-top:16px"><div class="result">Your team is set</div><div class="t2 sm">Drag cards between spots to fix the fit, then play the ${yrLabel(st.playSeason)} season.</div><button class="btn spin" data-play>Play the season</button></div>`
+      ? `<div class="stack" style="align-items:center;gap:8px;margin-top:16px"><div class="result">Your team is set</div><div class="t2 sm">Drag cards between spots to fix the fit, then play the ${yrLabel(st.playSeason)} season.</div>${gameplan}<button class="btn spin" data-play>Play the season</button></div>`
       : `<div class="row" style="justify-content:center;gap:10px;margin-top:16px;flex-wrap:wrap">
           <button class="btn spin" data-spin ${st.phase !== 'spin' ? 'disabled' : ''}>${st.round === 0 ? 'Spin' : `Spin pick ${st.round + 1}`}</button>
           <button class="btn" data-skip="team" ${st.skips.team && st.phase === 'hand' ? '' : 'disabled'}>Team skip (${st.skips.team})</button>
@@ -369,6 +381,20 @@ HL.Challenge = (function () {
       <div class="sub">Tip-off…</div></div></section>`;
   }
 
+  function identityReport(r) {
+    const d=r.identity || HL.Legacy.teamReport(r,st.playSeason,st.plan);
+    return '<section class="block"><header><h3>Season film: your team identity</h3></header><div class="body stack">'+
+      '<p class="dossier-lead">'+esc(r.w===r.games?'A perfect season, earned one game at a time.':r.w>=70?'A historic juggernaut, but far from invincible.':r.w>=55?'A contender shaped by schemes and matchups.':'A team whose fit was tested every night.')+'</p>'+
+      d.badges.map(x=>'<article class="dossier-honor"><h3>'+esc(x.name)+'</h3><p>'+esc(x.proof)+'</p></article>').join('')+
+      '<p>Close games: '+d.closeWins+'-'+(d.closeGames-d.closeWins)+' · 20-point blowouts: '+d.blowouts+' · Average scoring margin: '+d.margin.toFixed(1)+'.</p>'+
+      '<p>Shot selection: '+(d.threeRate*100).toFixed(1)+'% of attempts from three; '+(d.ts*100).toFixed(1)+'% true shooting; '+d.assists.toFixed(1)+' assists per game.</p>'+
+      '<p>Scheme: '+esc(d.plan.title)+'. In '+yrLabel(st.playSeason)+', the opponent context and era rules change the value of those strengths.</p>'+
+      '<details><summary>Availability and injuries ('+(r.injuriesLog||[]).length+')</summary>'+
+      (r.injuriesLog||[]).map(x=>'<p>Game '+x.g+': '+esc(x.player)+' · '+esc(x.reason)+' ('+x.games+' games).</p>').join('')+'</details>'+
+      '<details><summary>Every game ('+(r.gameLog||[]).length+')</summary><div class="scouting-games">'+
+      (r.gameLog||[]).map(g=>'<div class="kv"><span>#'+g.g+' vs '+esc(g.opp)+'</span><b>'+(g.win?'W ':'L ')+g.for+'-'+g.against+'</b></div>').join('')+'</div></details>'+
+    '</div></section>';
+  }
   function resultView() {
     const r = st.result;
     const [tier, line] = verdict(r.w, r.games);
@@ -383,6 +409,7 @@ HL.Challenge = (function () {
           <div class="t3 sm" style="margin-top:8px">${r.pf.toFixed(1)} PPG · ${r.pa.toFixed(1)} allowed · longest win streak ${r.best}${r.firstLoss ? ` · first loss: game ${r.firstLoss.g} vs the ${esc(r.firstLoss.opp.name)}` : ''}</div></div>
         <div class="stack" style="gap:8px"><button class="btn spin" data-new>Play again</button><button class="btn" data-share>Copy result</button></div>
       </div></section>
+      ${identityReport(r)}
       <section class="block"><header><h3>Achievements</h3></header><div class="body"><div class="achv">${r.unlocked.map(a => `<span class="${a.got || a.had ? '' : 'locked'}">${a.fresh ? 'NEW · ' : ''}${esc(a.name)}</span>`).join('')}</div></div></section>
       <section class="block"><header><h3>Season stats</h3></header><div class="body flush"><div class="tbl-wrap"><table class="tbl"><thead><tr><th class="l">Player</th><th>MIN</th><th>PTS</th><th>REB</th><th>AST</th><th>FG%</th></tr></thead><tbody>${rows}</tbody></table></div></div></section>
       <textarea hidden data-share-text>${esc(share)}</textarea></div>`;
@@ -446,6 +473,7 @@ HL.Challenge = (function () {
     FX.bindSound(app);
     const sp = app.querySelector('[data-spin]'); if (sp) sp.onclick = () => { if (st.phase === 'spin') spin(); };
     app.querySelectorAll('[data-skip]').forEach(b => b.onclick = () => { const k = b.dataset.skip; if (!st.skips[k] || st.phase !== 'hand') return; st.skips[k]--; st.usedSkips++; spin(k); });
+    app.querySelectorAll('[data-gameplan]').forEach(b=>b.onclick=()=>{st.plan=b.dataset.gameplan;render();});
     const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
     const sh = app.querySelector('[data-share]');
     if (sh) sh.onclick = async () => { const t = app.querySelector('[data-share-text]').value; try { await navigator.clipboard.writeText(t); U.toast('Result copied. Paste it anywhere.'); } catch (e) { U.toast('Copy failed. Here it is:<br>' + esc(t).replace(/\n/g, '<br>')); } };
