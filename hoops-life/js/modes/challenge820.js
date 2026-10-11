@@ -280,27 +280,14 @@ HL.Challenge = (function () {
   // Both source cards disappear. Success replaces only the first with a new
   // hybrid; failure frees both draft slots with no consolation player.
   function commitFusion(outcome,first,second){
-    if(!st||!outcome||!SLOTS.includes(first)||!SLOTS.includes(second)||
-       first===second||!st.lineup[first]||!st.lineup[second])return false;
-    const parentA=fusionAt(first)||HL.FusionLab.fromDraftCard(st.lineup[first]);
-    const parentB=fusionAt(second)||HL.FusionLab.fromDraftCard(st.lineup[second]);
-    if(outcome.ok&&(!outcome.node||!outcome.node.parentIds.includes(parentA.id)||
-      !outcome.node.parentIds.includes(parentB.id)))return false;
-    // Keep only a lightweight card adapter for History.makePlayer. The real
-    // lineup identity and actual simulated attributes come from fusionAt().
-    const adapter=st.lineup[first];
-    st.lineup[first]=null;st.lineup[second]=null;
-    delete st.fusionSlots[first];delete st.fusionSlots[second];
-    if(outcome.ok){
-      st.lineup[first]={...adapter,fusionId:outcome.node.id};
-      st.fusionSlots[first]=outcome.node.id;
-    }
-    st.fusionHistory.push({ok:!!outcome.ok,hybrid:outcome.node?.name||null,
-      parents:[parentA.name,parentB.name],slots:[first,second],chance:outcome.chance,
-      failureReason:outcome.failureReason||null});
-    st.round=filled();st.hand=[];st.phase=st.round>=SLOTS.length?'ready':'spin';
+    if(!st||!fusionAllowed()||!SLOTS.includes(first)||!SLOTS.includes(second))return false;
+    if(!HL.FusionLab.commitRoster(st,outcome,first,second))return false;
+    st.round=filled();
+    st.hand=[];
+    st.phase=st.round>=SLOTS.length?'ready':'spin';
     st.draftView='roster';
-    refreshTeamDna();render();
+    refreshTeamDna();
+    render();
     return true;
   }
   function fusionFit(node,slot) {
