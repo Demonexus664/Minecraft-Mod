@@ -1,21 +1,41 @@
 # Hoops Life: Arena Edition Overhaul Checkpoint
 
+## LATEST AUTHORITATIVE CHECKPOINT · 82-0 FUSION REBUILD (2026-10-10)
+
+**This section supersedes all older fusion rules further down.** User clarified: 82-0 gets roster fusion AND actual on-court teammate duos/trios/chemistry. Skill Draft gets combinations among the skills of one assembled player, NOT roster-parent team chemistry.
+
+- **Genesis launches directly from the My Team court, not a detached Fusion tab.** Choose two currently rostered cards. The attempt permanently consumes BOTH immediately. On success, one hybrid goes directly into the first lineup slot; the second slot is empty. On failure, BOTH slots are empty and there is NO consolation card. Successful hybrids can be used for more fusions.
+- **Atomic gameplay transaction**: `HL.FusionLab.commitRoster()` verifies the inputs and performs immediate success/failure updates before the charge/collision/reveal animation. Original-player lineage survives repeated fusions, including photos; a three-way hybrid displays THREE original portrait strips, a four-way hybrid FOUR, etc. Names show Paint Trinity (3), Paint Titans (4), or appropriately counted alternative identifiers.
+- **Dominant statistical power**: successful generational interior hybrids inherit elite post scoring, contact finishing, strength, rebounding, blocks, vision and double-team reads, with genuine effects in the possession engine. They get realistic elite minute targets and meaningful usage, crash and rim protection, not a cosmetic OVR or fake box-score bonus.
+- **Actual stats visible**: 82-0 results include Genesis Season Spotlight with the fusion's original ancestors and real simulated PPG, RPG, APG, BPG, MPG and TS%. The old sample's 77.4 was TRUE SHOOTING %, not 77.4 OVR. Best-run records and share summaries use the hybrid's name rather than the adapter-card name.
+- **Controlled full-bench synthetic test**: the deterministic 12-game illustrative Wilt + David Robinson + Shaq-style experiment produced around 45–50 PPG and 20–24 RPG in successive balanced builds, substantially above the ordinary elite center and two-way fusion. These are elite synthetic profiles, NOT verified historical archival season predictions or guaranteed live-game numbers.
+- **Mode presentation**: no solo historical named mutations for an 82-0 card just because Carmelo or another player was drafted. Team Combos shows actual duo/trio/team chemistry. Skill Draft's own ability display is driven by collected skill attributes.
+- **Verified**: GitHub Actions run 38106597937 passed 82/82 tests on the preceding gameplay version. Subsequent UI cleanup requires an updated run. `tools/test-genesis-820.js` checks two-to-one roster replacement, total failure loss, 3/4-way ancestry and real full-rotation NBA possessions. Previous draft-first regression tests were updated to new irreversible rules.
+- **Not visually inspected in a real browser**: the user's remotely connected PC remained offline. Source styling and code exist, but screenshots, animations and mobile pixel polish are not yet user-validated.
+
+### Next iteration
+1. Inspect actual running browser visuals (cards, reactor animation, failure, 3/4-way portrait, results) and fix what looks wrong.
+2. Verify 82-0 combinations with ordinary team-mate duos/trios, clear requirements, and measured action counts in possession logs.
+3. Deepen Skill Draft *personal* skill-fusion recipes and on-court skill activation, preserving the drafting-first UI.
+4. Run wider era-by-era scoring and stat-balance tests and address save/resume or roster persistence bugs.
+
+---
 ## CURRENT DIRECTION: DRAFTING FIRST (user correction, 2026-10-10)
 
 This section supersedes earlier ideas about expanding Skill Draft seasons with media, game-night decisions, press rooms, career training and role studios. The user explicitly rejected that bloat. **Do not re-add these career UI systems unless specifically requested.** Spend the development effort on the actual card drafting, skill inheritance, team-building, duo/trio interactions and mutation displays.
 
 ### Now implemented
 
-- **82-0 team workshop** uses separate My Team, Combos and Fusion tabs in a compact two-column, independently scrolling UI. Both sides remain immediately accessible without a full-page DNA and highs wall. HoopIQ/Daily do not show fusion.
+- **Historical note (superseded):** 82-0 now has My Team and Combos views. Fusion is an immersive reactor launched from the My Team court, never a separate tab.
 - **Genesis moves exclusively to 82-0**, usable as soon as two Classic-mode players are drafted (not after eight). The selector can choose only from players the user actually rolled into the current lineup. Every parent card is eligible for exactly **one attempt per run**, regardless of success/failure. Fusion odds are computed from real player skill profiles, size, similarity and tension, capped below certainty even for two players at the same position. Repeated attempts never improve odds.
-- Success consumes both source cards and creates one hybrid with inherited ratings, frame and special mechanics. One spot opens for another draft roll; an equipped hybrid can later become a source if its own attempt is unused. Failure leaves both original cards on the team but permanently consumes their fusion opportunities for this run.
+- **Updated rule:** BOTH cards are permanently consumed on any attempted fusion. Successful hybrid replaces one; failure leaves both spaces vacant. Successful hybrids can fuse again.
 - Real 82-0 sim creates fused players with real attributes, out-of-position penalties, tendencies, body frame and actual possession mechanics. The original parent no longer quietly contributes double team DNA. Hybrid lineup cards show a split source portrait and can be dragged between slots.
 - Every rolled 82-0 card now shows a compact **best open position / effective OVR / potential new duo, trio or rare DNA** indicator. This is information at the moment of selecting a player, not a distant results panel.
 - **Skill Draft** has separate My Skills and Abilities & Combos tabs. Skill cells can be filtered to All, Collected or Empty, with an independently scrolling grid. Free Choice's list of available skills is grouped into tabs for Skills, Playstyle and Career Traits, and potential new duos, trios and rare DNA reactions are previewed *before* selection.
 - **Skill Draft career was slimmed down on purpose**: recurrent Press Room, training, role selection, public promise, gameplay-night, rivalry reports, repeated DNA telemetry and auto-generated media were removed from its active gameplay path. The career sidebar is a compact player card and basic numbers, while season recaps contain team record, player box-score strip, awards and an optional playoff details fold. Existing basketball league evolution, records, free agency, playoffs, aging and retirement remain.
 - Legacy unused helpers/files may remain for compatibility with older tests, but are not presented in Skill Draft or invoked by its standard career loop. The user does not want these reintroduced.
 - Regression suites were updated for no-roll-farming probability and no hidden offseason rating boosts. New `tools/test-draft-first.js` validates successful two-into-one fusion, one-attempt failures, unavailable fusion in HoopIQ/Daily and draft-only tabs. CI invokes it with the other season/draft tests.
-- Last fully verified hosted regression before the final UI cleanup: **76 passed, 0 failed** (run `38095129692`). Recheck latest CI before claiming the final post-cleanup build is green.
+- **Verified current gameplay:** GitHub-hosted workflow run 38106597937 completed 82 tests, 82 passed, 0 failed. Recheck later commits.
 
 ### Next iteration targets
 
