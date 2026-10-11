@@ -264,7 +264,7 @@ HL.Challenge = (function () {
   // A Genesis hybrid is a replacement for one of the eight drafted players.
   // It retains its own ratings, frame and mechanics. The original source is
   // not secretly still contributing its historical team DNA.
-  const fusionAllowed=()=>!!st&&!st.daily&&st.mode!=='hoopiq'&&['spin','hand','ready'].includes(st.phase)&&filled()>=2;
+  const fusionAllowed=()=>!!st&&!st.daily&&st.mode!=='hoopiq'&&['spin','ready'].includes(st.phase)&&filled()>=2;
   function fusionAt(slot){
     const id=st?.fusionSlots?.[slot];
     return id&&HL.FusionLab?.find(id)||null;
@@ -329,7 +329,8 @@ HL.Challenge = (function () {
     const oldDna=st.dna;
     st.lineup[slot] = c;
     refreshTeamDna();
-    const unlocked=st.dna.mutations.find(x=>!oldDna?.mutations.some(y=>y.id===x.id));
+    const unlocked=[...(st.dna?.pairs||[]),...(st.dna?.trios||[])]
+      .find(x=>![...(oldDna?.pairs||[]),...(oldDna?.trios||[])].some(y=>y.id===x.id));
     if (c.legendary && !st.pulls.includes(c.row.pid)) st.pulls.push(c.row.pid);
     st.used.push(st.decade);
     st.hand = [];
@@ -340,7 +341,7 @@ HL.Challenge = (function () {
     render();
     const el = document.querySelector(`.slot-wrap[data-slot="${slot}"]`);
     if (el) FX.burst(el, FX.tierOf(rating(c)).colors.concat('#fff'), FX.tierIndex(rating(c)) >= 3 ? 30 : 14, 0.6);
-    if(unlocked)HL.DNAFX.reveal(unlocked,{title:'LEGENDARY TEAM FUSION'});
+    if(unlocked){FX.sfx.achievement?.();U.toast('<b>'+esc(unlocked.name)+'</b> · DUO/TRIO SYNERGY ACTIVATED');}
     if (pen >= 10) U.toast(`<b>${esc(HL.HISTORY.players[c.row.pid][0])}</b> at ${slot}: −${pen} out of position.`);
   }
   function swap(a,b){
@@ -396,8 +397,7 @@ HL.Challenge = (function () {
     const games = L.games;
     const dream = { id: 999, abbr: 'YOU', city: 'Your', name: 'Five', color: '#c9a227', color2: '#111111', conf: 'East', strategy: HL.DEFAULT_STRATEGY() };
     const players = [];
-    // Load archived seasons for unlocked historical forms before changing cards.
-    for(const form of st.dna?.mutations||[])if(form.year){await HL.History.load(String(form.year));if(st!==run)return;}
+    // Team chemistry comes from *active* relationships, not solo historical mutations.
     const minutes = { PG: 34, SG: 34, SF: 34, PF: 33, C: 33, B1: 22, B2: 18, B3: 14 };
     for (const slot of SLOTS) {
       const c = st.lineup[slot];
@@ -425,17 +425,6 @@ HL.Challenge = (function () {
       // Position changes cost decision-making and role execution, not God-given height,
       // shooting touch or strength. Bigs running PG lose creation, not their post game.
       p.attrs = fittedAttributes(c, slot, p.attrs);
-      const forms=(st.dna?.mutations||[]).filter(m=>m.target===c.row.pid);
-      for(const form of forms){
-        if(!form.year)continue;
-        const historic=HL.History.seasonRows(String(form.year))?.find(r=>r.pid===c.row.pid);
-        if(!historic)continue;
-        const transformed=HL.historicalAttributes(historic);
-        // In a fantastical mutation we preserve the drafted player's best
-        // tools while changing his form toward the partnered historical peak.
-        for(const [key,value] of Object.entries(transformed))if(Number.isFinite(p.attrs[key]))p.attrs[key]=Math.max(p.attrs[key],value);
-      }
-      p.mutationNames=forms.map(x=>x.name);
       p.realMpg = minutes[slot];
       if (c.season < 1979 && st.playSeason >= 1979 && p.attrs.three >= 55) { const move = Math.round(p.tend.mid * 0.45 * (p.attrs.three - 40) / 59); p.tend.three += move; p.tend.mid -= move; }
       p.ovr = Math.min(100,Math.max(effRating(c,slot),HL.computeOvr(p.attrs,p.pos)));
@@ -451,7 +440,7 @@ HL.Challenge = (function () {
       players.push(b);
     }
     const dnaEntries=SLOTS.filter(slot=>!fusionAt(slot)).map(slot=>({pid:st.lineup[slot].row.pid,cat:slot,row:st.lineup[slot].row,season:st.lineup[slot].season,playerId:players[SLOTS.indexOf(slot)].id}));
-    // Historical mutations remain distinct from team chemistry.
+    // Duos and trios boost on-court cooperation; hybrids have their own powers.
     st.dna=HL.DNA.applyTeam(players.slice(0,8),dnaEntries);
     const hybrids=[];
     for(let i=0;i<SLOTS.length;i++){
@@ -728,9 +717,7 @@ HL.Challenge = (function () {
   function cardFor(c, opts = {}) {
     const slot=slotForCard(c),hybrid=slot&&fusionAt(slot);
     if(hybrid){
-      const left={photo:hybrid.images?.[0]||'',name:hybrid.heads?.[0]||'Parent A'};
-      const right={photo:hybrid.images?.[1]||'',name:hybrid.heads?.[1]||'Parent B'};
-      const visual=HL.FusionUI?.portrait(left,right,true)||'';
+      const visual=HL.FusionUI?.portrait(hybrid,null,true)||'';
       return '<div class="gcard placed genesis-lineup-card" data-from="'+slot+'">'+visual+
         '<div class="genesis-lineup-meta"><b>'+esc(hybrid.name)+'</b>'+
         '<span>'+hybrid.ovr+' OVR · GEN '+hybrid.depth+'</span></div></div>';
@@ -738,7 +725,7 @@ HL.Challenge = (function () {
     const bio = HL.HISTORY.players[c.row.pid];
     const team = teamMeta(LINEAGE[c.club]) || null;
     const r = c.row;
-    const forms=(st.dna?.mutations||[]).filter(m=>m.target===c.row.pid);
+    const forms=[];
     return HL.Cards.card({
       pid: c.row.pid, name: bio[0], nbaId: bio[1], team, pos: r.pos, rating: opts.rating != null ? opts.rating : rating(c),
       meta: `${forms.length ? '✦ MUTATED: '+forms.map(f=>f.name).join(' / ')+' · ' : ''}${c.legendary ? '★ LEGENDARY TEAM · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
@@ -772,21 +759,24 @@ HL.Challenge = (function () {
       ${STARTERS.map(spotHtml).join('')}
     </div>
     <div class="bench">${bench}</div>
-    ${avg != null && !hide ? `<div class="t2 sm" style="text-align:center">Starting five: <b>${avg}</b> average after position fit</div>` : ''}`;
+    ${avg != null && !hide ? `<div class="t2 sm" style="text-align:center">Starting five: <b>${avg}</b> average after position fit</div>` : ''}
+    ${!st.daily&&st.mode!=='hoopiq'&&!['season','result','playoffs'].includes(st.phase)?
+      '<div class="genesis-court-console"><b>GENESIS REACTOR</b><span>Fuse two roster cards. Both are consumed immediately. Success gives one stronger hybrid; failure gives nothing. Re-fuse successful creations.</span>'+
+      '<button class="btn go" data-fusion-open '+(fusionAllowed()?'':'disabled')+'>FUSE TWO TEAM CARDS</button></div>':''}`;
   }
 
 
   function draftSidebar(){
     const drafting=!['season','result','playoffs'].includes(st.phase);
     if(!drafting)return '<aside class="draft-side">'+courtView()+'</aside>';
-    const view=['roster','dna','fusion'].includes(st.draftView)?st.draftView:'roster';
+    const view=['roster','dna'].includes(st.draftView)?st.draftView:'roster';
     const names=[['roster','MY TEAM',filled()+'/8'],['dna','COMBOS',st.dna?.pairs?.length||0]];
-    if(!st.daily&&st.mode!=='hoopiq')names.push(['fusion','FUSION',Object.keys(st.fusionSlots).length]);
+    // Fusion lives inside the team court, never in a detached roster tab.
     const tabs='<nav class="draft-workspace-tabs" aria-label="Team-building views">'+
       names.map(([id,label,n])=>'<button data-team-view="'+id+'" aria-pressed="'+(view===id)+
         '" class="'+(view===id?'on':'')+'"><span>'+label+'</span><b>'+n+'</b></button>').join('')+'</nav>';
-    const content=view==='roster'?courtView():view==='fusion'?genesisPanel():
-      '<section class="block"><header><h3>DUOS, TRIOS & TEAM DNA</h3></header>'+
+    const content=view==='roster'?courtView():
+      '<section class="block"><header><h3>TEAM CHEMISTRY · DUOS & TRIOS</h3></header>'+
       '<div class="body stack">'+(st.dna?HL.DNA.board(st.dna,{compact:true})+
        (filled()>=3?'<details><summary>View detailed chemistry network</summary>'+
          HL.DNA.powerMap(st.dna,{compact:true})+'</details>':''):
@@ -1101,17 +1091,11 @@ HL.Challenge = (function () {
       const sources=SLOTS.filter(slot=>st.lineup[slot]).map(slot=>({
         slot,node:fusionAt(slot)||HL.FusionLab.fromDraftCard(st.lineup[slot])
       }));
-      HL.FusionUI?.openDraft(sources,st.fusionSpent,st.fusionUsedCards,node=>{
-        if(!fusionAllowed())return;
-        st.pendingFusionId=node.id;render();
+      HL.FusionUI?.openDraft(sources,st.fusionSpent,st.fusionUsedCards,(outcome,slotA,slotB)=>{
+        if(!fusionAllowed())return false;
+        return commitFusion(outcome,slotA,slotB);
       });
     });
-    app.querySelectorAll('[data-fusion-assign]').forEach(b=>b.onclick=()=>{
-      const node=HL.FusionLab?.find(st.pendingFusionId);
-      if(assignFusion(b.dataset.fusionAssign,node)){FX.sfx.achievement?.();render();}
-    });
-    const cancelFusion=app.querySelector('[data-fusion-cancel]');
-    if(cancelFusion)cancelFusion.onclick=()=>{st.pendingFusionId=null;render();};
     const pl = app.querySelector('[data-play]'); if (pl) pl.onclick = () => playSeason();
     app.querySelectorAll('[data-start-playoffs]').forEach(b=>b.onclick=()=>{startPlayoffs();render();});
     app.querySelectorAll('[data-finish-playoffs]').forEach(b=>b.onclick=()=>{st.phase='result';render();});
