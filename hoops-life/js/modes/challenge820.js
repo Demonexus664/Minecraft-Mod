@@ -393,7 +393,7 @@ HL.Challenge = (function () {
       if(hybrid){
         p.name=hybrid.name;p.nbaId=null;p.real=false;p.height=hybrid.height;
         p.weight=hybrid.weight;p.pos=STARTERS.includes(slot)?slot:hybrid.pos;
-        p.attrs=HL.completeAttributes({...hybrid.attrs},hybrid.height);
+        p.attrs=HL.completeAttributes({...hybrid.attrs},hybrid.height,hybrid.weight);
         const pen=fusionFit(hybrid,slot);
         if(pen){
           const limited=STARTERS.includes(slot)&&['PG','SG'].includes(slot)?
@@ -411,7 +411,7 @@ HL.Challenge = (function () {
           ...draftTend,
           usage:elite?99:87,shotHunt:elite?99:82,
           drive:elite?97:86,post:elite?99:90,crash:elite?99:94,
-          drawFoul:elite?97:90,passFirst:elite?12:24,moveBall:elite?31:43,
+          drawFoul:elite?97:90,passFirst:elite?44:28,moveBall:elite?62:43,
           three:Math.min(draftTend.three||20,elite?16:28),
           mid:Math.min(draftTend.mid||35,elite?32:43),
           iso:Math.min(draftTend.iso||44,49)
@@ -434,6 +434,7 @@ HL.Challenge = (function () {
         p.genesisMechanics={...hybrid.mechanics};
         p.historicalPid=hybrid.id;
         p.realMpg=STARTERS.includes(slot)?(ancestors>=3?42:38):(ancestors>=3?32:27);
+        p.ovr=HL.computeOvr(p.attrs,p.pos);
         p.slot=slot;players.push(p);
         continue;
       }
