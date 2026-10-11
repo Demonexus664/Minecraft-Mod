@@ -66,7 +66,10 @@ HL.FusionLab=(function(){
  function fusionName(lineage){
   const names=lineage.map(x=>String(x.name).split(' ').at(-1)||'Legend');
   const n=names.length;
-  return (n===2?'DUAL':n===3?'TRIAD':n===4?'QUAD':'LEGACY '+n)+' / '+names.slice(-Math.min(3,n)).join(' · ');
+  const prefix=n===2?'DUAL':n===3?'TRIAD':n===4?'QUAD':n===5?'PENTAD':'LEGACY '+n;
+  const parents=n<=4?names.join(' · '):
+    names.slice(0,2).join(' · ')+' +'+(n-4)+' MORE · '+names.slice(-2).join(' · ');
+  return prefix+' / '+parents;
  }
  const pairKey=(a,b)=>[a.id,b.id].sort().join('|');
  function preview(a,b){
@@ -167,7 +170,8 @@ HL.FusionLab=(function(){
   const lineage=[...lineageOf(a),...lineageOf(b)];
   const name=(p.rare?'APEX · ':'')+
    (lineage.length>=3&&p.tags.includes('deepSeal')&&p.tags.includes('rimIntimidation')?
-    'THE PAINT TRINITY / '+lineage.map(x=>x.name.split(' ').at(-1)).join(' · '):
+    (lineage.length===3?'THE PAINT TRINITY':lineage.length===4?'THE PAINT TITANS':'THE PAINT DYNASTY')+
+      ' / '+lineage.map(x=>x.name.split(' ').at(-1)).join(' · '):
     fusionName(lineage));
   const id='fusion:'+(++serial),pos=height>=81?'C':height>=79?'PF':height>=77?'SF':height>=75?'SG':'PG';
   const node={id,name,attrs,height,weight,ovr:HL.computeOvr?.(attrs,pos)||overall({attrs}),
