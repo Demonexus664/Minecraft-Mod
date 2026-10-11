@@ -5,6 +5,7 @@ const {load}=require('./load');
 const HL=load(['js/core/rng.js','data/injuries.js','js/league/ratings.js',
  'js/league/player.js','js/league/gamesim.js','js/league/fusion-lab.js']);
 const F=HL.FusionLab;
+HL.RNG.setSeed(125); // Repeatable elite source attributes across CI machines.
 const attr={...HL.buildAttributes(96,'C',85,'rimbig'),post:98,close:99,block:97,
  dreb:98,oreb:98,boxout:97,str:96,dunk:98,intD:97,speed:90,vert:96,
  contactFinish:99,stam:97};
