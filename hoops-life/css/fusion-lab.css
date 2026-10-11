@@ -333,9 +333,11 @@ html[data-fx-level=off] .gf-collection-card{transition:none!important}
  color:#f6dcae;text-shadow:0 0 18px #fcc98878;letter-spacing:.14em;
  z-index:5;text-align:center;text-transform:uppercase;}
 .gf-reactor-ring{width:min(350px,65vw);aspect-ratio:1;display:grid;place-items:center;
- border:2px solid #f6d6b05e;border-radius:50%;margin:18px auto;
+ border:2px solid #f6d6b05e;border-radius:50%;margin:18px auto;position:relative;
  box-shadow:0 0 0 12px #ad93ff0b,0 0 0 28px #a1caff08,inset 0 0 36px #be8fff2a;
- animation:gf-reactor-spin 2.3s cubic-bezier(.4,0,.2,1) infinite;}
+}
+.gf-reactor-ring::before{content:"";position:absolute;inset:-19px;border:3px dashed #bfa8ff65;
+ border-radius:50%;pointer-events:none;animation:gf-reactor-spin 6s linear infinite;}
 .gf-reactor-ring-inner{width:80%;filter:drop-shadow(0 0 28px #d5b4ff83);}
 .gf-reactor-ring .gf-portrait-multi.mini{aspect-ratio:1;border-radius:50%;
  overflow:hidden;box-shadow:0 0 36px #ffcf8a4c;}
@@ -400,6 +402,7 @@ html[data-fx-level=off] .gf-collection-card{transition:none!important}
  .gf-draft-workbench .gf-odds .gf-risk-note{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){
  .gf-arena-reactor *, .gf-arena-reactor *::before,
+ .gf-arena-reactor .gf-reactor-ring::before,
  .gf-arena-reactor::before{animation:none!important;transition:none!important}
 }
 html[data-fx-level=off] .gf-arena-reactor *,
