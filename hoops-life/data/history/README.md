@@ -29,3 +29,21 @@ Simulating a real season with its real rosters vs what actually happened (single
 | 1990-91 | 0.79 | 0.96 / 1.5 | 0.94 | 0.96 | 0.93 | .483 / .487 |
 | 2004-05 | 0.78 | 0.96 / 1.4 | 0.93 | 0.96 | 0.92 | .480 / .482 |
 | 2025-26 | 0.85 | 0.96 / 1.6 | 0.92 | 0.95 | 0.86 | .552 / .546 |
+
+## 2026 recalibration pass
+
+`python3 tools/recalibrate-history.py` applies a reproducible pass to **all** generated
+player-seasons, recomputing three-point shooting with volume and accuracy gating,
+free throws with sample reliability, rebounds and measured defensive events with
+minutes scaling, and separating physical scouting estimates from OVR. OVR is then
+recomputed from the final attributes, never reached by increasing unrelated skills.
+No box score can reliably measure sprint speed, vertical leap or defense before
+blocks and steals were tracked; physical attributes are estimates. Limited
+scouting overrides are listed explicitly in the script, not hidden benchmarks.
+The build script applies this pass automatically after regenerating raw data.
+
+The game's full career progression is intentionally smoother than real-game
+rebaselining: very large one-year swings are constrained while new performance
+profiles are still allowed to converge in later seasons. Recalibration changes
+existing database values; saved Franchise worlds keep their already-created player
+objects until a new save is started.

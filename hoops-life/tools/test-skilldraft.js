@@ -7,7 +7,7 @@ const path = require('path');
 const runs = +(process.argv[2] || 20);
 const style = process.argv[3] || 'good';
 const seasons = fs.readdirSync(path.join(__dirname, '../data/history/seasons')).map(f => `data/history/seasons/${f}`);
-const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', ...seasons]);
+const HL = load(['js/core/rng.js', 'data/names.js', 'data/injuries.js', 'data/nbaids.js', 'js/league/teams.js', 'js/league/ratings.js', 'js/league/player.js', 'js/league/legend-dna.js', 'js/league/gamesim.js', 'js/league/draft.js', 'js/league/history.js', 'js/media/engine.js', 'js/media/news.js', 'js/league/season.js', 'data/history/index.js', 'data/history/career-traits.js', 'js/league/era-depth.js', 'js/league/legacy-experience.js', 'js/league/career-story.js', 'js/league/rare-encounters.js', ...seasons]);
 ctx.HL.UI = { esc: s => String(s), money: m => '$' + m.toFixed(1) + 'M', ordinal: n => n + 'th' };
 load(['js/modes/challenge820.js', 'js/modes/skilldraft.js']);
 const R = HL.RNG;
@@ -19,8 +19,7 @@ function draftPicks() {
   for (const [id, , keys] of HL.SkillDraft.CATS) {
     const dec = R.pick(decades);
     const team = R.pick(HL.Challenge.franchisesIn(dec));
-    const val = c => id === 'body' ? HL.HISTORY.players[c.row.pid][3] : keys.reduce((s, k) => s + HL.History.unpack(c.row.attrs, HL.HISTORY.attrs)[k], 0) / keys.length;
-    const list = HL.Challenge.candidates(team, dec).sort((a, b) => val(b) - val(a));
+    const list = HL.Challenge.skillCandidates(team, dec, HL.SkillDraft.CATS.find(c => c[0] === id));
     // "good": someone from the top three; "best": always the top value; "worst": the bottom; "random": anyone.
     const ix = style === 'worst' ? list.length - 1 : style === 'best' ? 0 : style === 'good' ? R.int(0, Math.min(2, list.length - 1)) : R.int(0, list.length - 1);
     picks[id] = list[ix];

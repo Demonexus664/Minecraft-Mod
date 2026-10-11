@@ -28,6 +28,29 @@ HL.defaultTendencies = function (p) {
   };
 };
 
+// These are estimated playing habits, not measurements from historical tracking.
+// Preserve original recorded shot-diet/usage tendency values where supplied.
+HL.completeTendencies = function(p) {
+  const a = HL.completeAttributes(p.attrs || {},p.height,p.weight);
+  const base = { ...HL.defaultTendencies({ ...p,attrs:a }), ...(p.tend || {}) };
+  const value = k => Number.isFinite(a[k]) ? a[k] : 65;
+  const t = (key, estimate) => Number.isFinite(base[key]) ? base[key] : Math.round(HL.clamp(estimate,0,100));
+  return {...base,
+    iso: t('iso', value('shotCreation')*.75 + value('handle')*.25 - 3),
+    pullUp: t('pullUp',value('shotCreation')*.5+value('mid')*.3+value('releaseSpeed')*.2),
+    catchShoot: t('catchShoot',value('three')*.53+value('shotArc')*.2+value('iq')*.27),
+    transition: t('transition',value('transition')*.8+value('speed')*.2),
+    attackMismatch: t('attackMismatch',value('iq')*.38+value('post')*.27+value('handle')*.35),
+    moveBall: t('moveBall',value('vision')*.55+value('pass')*.45),
+    shotHunt: t('shotHunt',HL.clamp(base.usage*.75+value('shotCreation')*.30,0,100)),
+    riskyPass: t('riskyPass',Math.max(18,value('vision')*.6+base.passFirst*.4-18)),
+    contest: t('contest',value('contestD')*.65+value('helpD')*.35),
+    crashGlass: t('crashGlass',base.crash*.7+value('boxout')*.3),
+    foulDiscipline: t('foulDiscipline',value('iq')*.65+value('helpD')*.35),
+    lateGame: t('lateGame',value('clutchShot')*.6+value('iq')*.4),
+  };
+};
+
 HL.estimateSalary = function (ovr, age) {
   // $M, rough market curve.
   if (ovr >= 90) return 45 + (ovr - 90) * 1.5;
@@ -70,7 +93,7 @@ HL.createPlayer = function ({ name, pos, age, height, ovr, arch, salary, injGame
     draft: null,
   };
   p.potential = potential ?? Math.max(p.ovr, Math.round(p.ovr + Math.max(0, (24 - age)) * R.range(1.2, 3.2)));
-  p.tend = HL.defaultTendencies(p);
+  p.tend = HL.completeTendencies(p);
   const sal = salary ?? HL.estimateSalary(p.ovr, age);
   p.contract = { amount: Math.round(sal * 10) / 10, exp: (season || 2025) + R.int(0, 3) };
   return p;

@@ -1,0 +1,111 @@
+/* Each identity/combination supplies two accent colors. Heavy effects are
+   revealed once, not constantly animated during regular drafting. */
+.dna-showcase{background:linear-gradient(140deg,rgba(35,42,59,.75),rgba(7,13,21,.94));border:1px solid #354152;border-radius:15px;padding:14px;overflow:hidden}
+.dna-section-label{font-size:10px;letter-spacing:.19em;color:#afbccc;font-weight:900;margin-bottom:12px}
+.dna-effect-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}
+.dna-effect{display:flex;align-items:flex-start;gap:10px;position:relative;isolation:isolate;padding:13px 12px;min-height:82px;overflow:hidden;border:1px solid color-mix(in srgb,var(--dna-a) 45%,#202839);border-radius:12px;background:linear-gradient(115deg,color-mix(in srgb,var(--dna-a) 13%,#10131b),#0b1019);box-shadow:inset 0 1px 0 #ffffff10}
+.dna-effect::before{content:'';position:absolute;inset:-60% auto auto -50%;width:170%;height:140%;opacity:.17;pointer-events:none;background:radial-gradient(ellipse,var(--dna-a),transparent 61%);transform:rotate(-25deg);z-index:-1}
+.dna-effect.dna-mutation,.dna-effect.dna-evolved{border:1px solid var(--dna-a);background:linear-gradient(120deg,color-mix(in srgb,var(--dna-a) 21%,#111),#0e1020 76%)}
+.dna-mark{display:grid;place-items:center;flex:0 0 32px;height:34px;background:linear-gradient(135deg,var(--dna-a),var(--dna-b));border-radius:9px;color:#070c10;font-weight:900;font-size:21px;box-shadow:0 0 12px color-mix(in srgb,var(--dna-a) 33%,transparent)}
+.dna-effect b{display:block;color:#f6f8ff;font-size:13px;margin:2px 0 5px;line-height:1.25}
+.dna-effect p{margin:0;color:#c2cada;font-size:11px;line-height:1.6}
+.dna-kind{text-transform:uppercase;letter-spacing:.14em;color:var(--dna-a);font-size:9px;font-weight:900}
+.dna-card-shell{position:relative;min-width:0;border-radius:16px;transition:transform .2s ease,filter .2s ease}
+.dna-card-shell.dna-star-card{background:linear-gradient(145deg,color-mix(in srgb,var(--dna-a) 23%,transparent),transparent 63%)}
+.dna-card-shell:hover{transform:translateY(-4px);filter:drop-shadow(0 0 7px var(--dna-a))}
+.dna-card-shell .gcard{width:100%}
+/* A gcard's faces are absolutely positioned, so its flex wrapper has no intrinsic
+   width. Never rely on percentage card width alone: it collapses to 0px. */
+.hand > .dna-card-shell{flex:0 0 168px;width:168px;max-width:100%;box-sizing:border-box}
+.hand > .dna-card-shell > .gcard{width:100%;display:block}
+.cols.c-main>.stack{min-width:0}
+@media(max-width:760px){.hand > .dna-card-shell{flex-basis:128px;width:128px}}
+
+.dna-card-hint{color:var(--dna-a);font-size:11px;font-weight:800;text-align:center;padding:7px 5px;max-width:180px;margin:auto;line-height:1.4}
+.dna-effect details{font-size:12px;line-height:1.6;color:#cbd4e2}.dna-effect summary{cursor:pointer;color:var(--dna-a);padding:4px 0}.dna-effect details p{margin:8px 0}
+/* Card choreography uses arcs, ground impacts, defensive shutters and flight lanes. */
+.dna-fusion{overflow:auto;background:#050810f5;padding:20px}
+.dna-fusion-atmosphere{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 35%,color-mix(in srgb,var(--dna-a) 20%,transparent),transparent 65%)}
+.dna-fusion-window{position:relative;width:min(1050px,100%);margin:auto;border:1px solid var(--dna-a);border-radius:24px;background:linear-gradient(145deg,#182133,#080c14);padding:22px;box-shadow:0 20px 100px #0009}
+.dna-fusion-window>header{display:flex;gap:10px;align-items:center;font-size:12px;color:var(--dna-a);letter-spacing:.14em;font-weight:900}.dna-fusion-window>header>span{margin-right:auto}
+.dna-fusion-status{text-align:center;font-size:18px;font-weight:800;margin:18px 0;color:#e8edf5}
+.dna-fusion-stage{position:relative;min-height:350px;display:grid;place-items:center;overflow:hidden;perspective:1100px}
+.dna-fusion-ingredients{display:flex;justify-content:center;gap:22px;width:100%;position:relative;z-index:2}
+.dna-fusion-input{flex:0 1 168px;min-width:0;text-align:center;transition:transform 1s cubic-bezier(.2,.7,.3,1),opacity .8s}
+.dna-fusion-input .gcard{width:100%;height:260px}.dna-fusion-input>b{display:block;font-size:12px;color:var(--dna-a);padding-top:9px}
+.dna-fusion-output{position:absolute;top:0;bottom:0;display:grid;place-items:center;opacity:0;transform:scale(.6) rotateY(-90deg);transition:transform .7s,opacity .5s;z-index:4}
+.dna-fusion-output>.gcard{width:178px;height:276px}.dna-fusion-output>.gfx{width:210px;max-height:310px}
+.dna-fusion-result{max-width:740px;margin:0 auto;text-align:center;color:#e7edf5}.dna-fusion-result h2{font-size:clamp(25px,4vw,38px);line-height:1.1;margin:6px 0 14px}.dna-fusion-result p{font-size:14px;line-height:1.65}.dna-fusion-result details{background:#ffffff07;border-radius:12px;padding:10px;text-align:left;font-size:13px}.dna-fusion-result summary{cursor:pointer;color:var(--dna-a)}
+.dna-fusion [hidden]{display:none!important}
+.dna-fusion-activation{margin:15px 0;padding:13px 18px;border-left:3px solid var(--dna-a);border-radius:12px;text-align:left;background:#ffffff08}.dna-fusion-activation p{margin:6px 0 0}
+.dna-fusion-evidence{text-align:center;color:#bec9d8;font-size:13px;line-height:1.6;margin:10px auto;max-width:70ch}
+.dna-fusion-court{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .3s}
+.dna-fusion[data-stage=interact] .dna-fusion-court,.dna-fusion[data-stage=climax] .dna-fusion-court{opacity:1}
+.dna-fusion[data-stage=climax] .dna-fusion-input{opacity:0;transform:translateY(50px) scale(.45)}
+.dna-fusion[data-stage=result] .dna-fusion-ingredients{visibility:hidden}.dna-fusion[data-stage=result] .dna-fusion-output{opacity:1;transform:scale(1) rotateY(0)}
+.dna-arc{display:none;position:absolute;left:15%;top:20%;width:70%;height:45%;border-top:3px dashed var(--dna-a);border-radius:50%;transform:rotate(-8deg)}.dna-arc.arc-two{top:40%;transform:rotate(13deg);border-color:var(--dna-b)}
+.dna-ball{display:none;position:absolute;top:40%;left:15%;height:15px;width:15px;border-radius:50%;background:#ffc263;box-shadow:0 0 18px #ffd294}
+.dna-fusion[data-family=shooting][data-stage=interact] .dna-fusion-input:nth-child(odd){transform:translateY(-22px) rotate(-5deg)}.dna-fusion[data-family=shooting][data-stage=interact] .dna-fusion-input:nth-child(even){transform:translateY(20px) rotate(5deg)}
+.dna-fusion[data-family=shooting] .dna-arc,.dna-fusion[data-family=shooting] .dna-ball{display:block}.dna-fusion[data-family=shooting][data-stage=interact] .dna-ball{animation:dna-shot-trail 1.2s ease-in-out both}
+@keyframes dna-shot-trail{0%{transform:translate(0,55px)}45%{transform:translate(280px,-90px)}100%{transform:translate(590px,40px)}}
+.dna-impact{display:none;position:absolute;left:20%;top:56%;width:60%;height:30%;border:5px solid var(--dna-a);border-radius:50%;transform:scale(.1);opacity:0}
+.dna-fusion[data-family=interior] .dna-impact{display:block}.dna-fusion[data-family=interior][data-stage=interact] .dna-fusion-input:first-child{transform:translateX(30px) rotateY(20deg)}.dna-fusion[data-family=interior][data-stage=interact] .dna-fusion-input:last-child{transform:translateX(-30px) rotateY(-20deg)}
+.dna-fusion[data-family=interior][data-stage=climax] .dna-impact{animation:dna-floor-impact .85s ease-out both}.dna-fusion[data-family=interior][data-stage=climax] .impact-two{animation-delay:.2s;border-color:var(--dna-b)}
+@keyframes dna-floor-impact{0%{opacity:1;transform:scale(.15)}100%{opacity:0;transform:scale(1.65)}}
+.dna-lockdown{display:none;position:absolute;inset:5% 10%;gap:12px;grid-template-columns:repeat(6,1fr)}.dna-lockdown i{border:2px solid var(--dna-a);background:linear-gradient(#2cdda920,transparent);border-radius:12px;transform:scaleY(0);transform-origin:bottom}
+.dna-fusion[data-family=defense] .dna-lockdown{display:grid}.dna-fusion[data-family=defense][data-stage=interact] .dna-lockdown i{animation:dna-block-lane .7s ease both}.dna-lockdown i:nth-child(2n){animation-delay:.3s!important;transform-origin:top}.dna-fusion[data-family=defense][data-stage=interact] .dna-fusion-input:nth-child(odd){transform:translateX(20px) rotateY(-16deg)}.dna-fusion[data-family=defense][data-stage=interact] .dna-fusion-input:nth-child(even){transform:translateX(-20px) rotateY(16deg)}
+@keyframes dna-block-lane{to{transform:scaleY(1)}}
+.dna-flight-trails{display:none;position:absolute;inset:5%}.dna-flight-trails i{position:absolute;left:10%;top:30%;width:70%;height:3px;background:linear-gradient(90deg,transparent,var(--dna-b));transform:rotate(-22deg)}.dna-flight-trails i:nth-child(2){top:50%}.dna-flight-trails i:nth-child(3){top:70%}
+.dna-fusion[data-family=flight] .dna-flight-trails{display:block}.dna-fusion[data-family=flight][data-stage=interact] .dna-fusion-input{transform:translateY(-28px) rotate(-12deg)}
+@media(max-width:600px){.dna-fusion{padding:8px}.dna-fusion-window{padding:12px;border-radius:16px}.dna-fusion-window>header{flex-wrap:wrap;font-size:10px}.dna-fusion-window>header>span{flex-basis:100%}.dna-fusion-ingredients{gap:7px;flex-wrap:wrap}.dna-fusion-input{flex-basis:104px;max-width:128px}.dna-fusion-input .gcard{height:185px}.dna-fusion-input .gc-name{font-size:13px}.dna-fusion-input .gc-stats{display:none}.dna-fusion-input>b{font-size:10px}.dna-fusion-stage{min-height:300px}.dna-fusion-output .gcard{height:260px}.dna-fusion-result p{font-size:13px}.dna-fusion .gc-meta{font-size:9px}}
+@media(prefers-reduced-motion:reduce){.dna-fusion *,.gcard .gc-inner{animation:none!important;transition:none!important}.dna-fusion-court{display:none}}
+@media(max-width:600px){.reels{gap:6px}.reels .reel{min-width:0;flex:1 1 0}.reels .reel .txt{font-size:14px}}
+.dna-choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:9px}
+.dna-choice{cursor:pointer;color:#f3f5ff;display:flex;justify-content:space-between;gap:9px;text-align:left;align-items:center;background:linear-gradient(135deg,#182338,#131820);border:1px solid #4b5871;border-radius:10px;padding:13px}
+.dna-choice:hover,.dna-choice:focus-visible{border-color:#edca72;background:linear-gradient(125deg,#4a3852,#1a233d)}
+.dna-choice strong{color:#f3d782;font-size:18px}
+.dna-legend-screen{border:1px solid #e9c66b!important;background:radial-gradient(ellipse at 40% 0%,#5d3c4880,transparent 70%),#161920}
+.dna-legend-title{font-weight:900;letter-spacing:.2em;color:#f5d473}
+.dna-reveal{position:fixed;inset:0;z-index:99999;display:grid;place-items:center;isolation:isolate;background:#03060cea;overflow:hidden}
+.dna-reveal-bg{position:absolute;inset:-20%;z-index:-2;background:radial-gradient(ellipse 35% 35% at 50% 45%,color-mix(in srgb,var(--dna-a) 40%,transparent),transparent 100%),conic-gradient(from 30deg at 50% 50%,transparent,var(--dna-a),transparent,var(--dna-b),transparent);opacity:.35;animation:dna-turn 7s linear infinite}
+.dna-reveal-core{z-index:2;text-align:center;width:min(600px,90vw);border:1px solid var(--dna-a);background:linear-gradient(150deg,color-mix(in srgb,var(--dna-a) 19%,#101421),#090d17);border-radius:28px;padding:42px 26px;box-shadow:0 0 85px color-mix(in srgb,var(--dna-a) 26%,transparent);animation:dna-arrive .68s cubic-bezier(.15,.8,.25,1) both}
+.dna-reveal-core small{font-size:12px;font-weight:900;letter-spacing:.22em;color:var(--dna-a)}
+.dna-reveal-core h2{font-size:clamp(26px,5vw,52px);line-height:1.1;color:#fff;text-wrap:balance;margin:10px 0}
+.dna-reveal-core p{color:#d5d7e1;font-size:13px;line-height:1.7;margin:0 0 20px}
+.dna-reveal-glyph{display:block;font-size:84px;line-height:1.3;color:var(--dna-a);text-shadow:0 0 25px var(--dna-a);animation:dna-glyph .9s ease-out both}
+.dna-particle{position:absolute;top:49%;left:49%;color:var(--dna-a);font-size:var(--sz);font-style:normal;animation:dna-spark 1.15s cubic-bezier(.12,.65,.25,1) var(--delay) both;pointer-events:none}
+@keyframes dna-arrive{from{opacity:0;transform:scale(.75) rotate(-2deg)}to{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes dna-spark{from{opacity:1;transform:translate(0,0) scale(.8)}to{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.4)}}
+@keyframes dna-turn{to{transform:rotate(360deg)}}
+@keyframes dna-glyph{from{opacity:0;transform:scale(1.6)}to{opacity:1;transform:scale(1)}}
+.dna-no-motion .dna-reveal-bg,.dna-no-motion .dna-reveal-core,.dna-no-motion .dna-reveal-glyph{animation:none}
+@media(prefers-reduced-motion:reduce){.dna-reveal *,.dna-card-shell{animation:none!important;transition:none!important}.dna-particle{display:none}.dna-reveal-bg{opacity:.15}}
+.dna-story-choice{border:1px solid #a8bdfc!important;background:linear-gradient(120deg,#1d2948,#131b2d)}
+.dna-story-choice h2{font-size:clamp(22px,3vw,34px)}
+.dna-film-chapters{display:grid;gap:11px}
+.dna-film{border-left:3px solid #b7a1f7;background:linear-gradient(105deg,#1d2134,#0b121d);padding:16px;border-radius:0 12px 12px 0}
+.dna-film span{font-size:10px;color:#cfb9ff;letter-spacing:.14em;font-weight:800}
+.dna-film p{font-size:14px;line-height:1.8;color:#e5e8f1;margin:9px 0 2px}
+.dna-first-loss{background:linear-gradient(135deg,#55292e,#24161b);border:1px solid #ef9d79;border-radius:14px;padding:17px;margin-top:15px;text-align:center}
+.dna-first-loss p{font-size:13px;margin:9px 0}
+.dna-playoff-clutch{border:1px solid #ffd879;background:linear-gradient(135deg,#493145,#121928);border-radius:16px;padding:18px}
+.dna-playoff-clutch select{display:block;margin:9px 0 15px;background:#141821;color:#fff;border:1px solid #888;border-radius:8px;padding:9px}
+
+/* Pattern variants are derived from each combination's immutable ID. All six
+   treatments animate only transforms/opacity, and none require image assets. */
+.dna-aura{position:absolute;inset:0;pointer-events:none;display:grid;place-items:center;isolation:isolate}
+.dna-aura i{grid-area:1/1;width:min(50vw,430px);aspect-ratio:1;border:1px solid var(--dna-a);border-radius:50%;opacity:.32;box-shadow:0 0 18px color-mix(in srgb,var(--dna-b) 28%,transparent);animation:dna-ring 2.4s ease-out infinite}
+.dna-aura i:nth-child(2){animation-delay:.8s}
+.dna-aura i:nth-child(3){animation-delay:1.6s}
+@keyframes dna-ring{0%{opacity:.6;transform:scale(.25)}100%{opacity:0;transform:scale(1.5)}}
+.dna-reveal[data-pattern="orbit"] .dna-aura i{border-style:dashed;animation:dna-orbit 4s linear infinite;opacity:.5}
+@keyframes dna-orbit{to{transform:rotate(360deg) scale(1.2)}}
+.dna-reveal[data-pattern="pulse"] .dna-aura i{border-width:3px;animation:dna-ring 1.2s cubic-bezier(.2,.7,.3,1) infinite}
+.dna-reveal[data-pattern="comet"] .dna-reveal-bg{animation:dna-sweep 2.8s ease-in-out infinite alternate}
+@keyframes dna-sweep{from{opacity:.1;transform:translate(-8%,-2%) rotate(-12deg)}to{opacity:.43;transform:translate(8%,2%) rotate(16deg)}}
+.dna-reveal[data-pattern="shards"] .dna-aura i{border-radius:12%;animation:dna-shear 3s ease-in-out infinite alternate}
+@keyframes dna-shear{from{transform:rotate(0) scale(.72);opacity:.6}to{transform:rotate(62deg) scale(1.26);opacity:.12}}
+.dna-reveal[data-pattern="crown"] .dna-aura i{border-radius:32% 68% 57% 43%;animation:dna-crown 2.3s ease-in-out infinite alternate}
+@keyframes dna-crown{from{transform:rotate(-35deg) scale(.8);opacity:.65}to{transform:rotate(35deg) scale(1.18);opacity:.22}}
+.dna-reveal[data-pattern="wave"] .dna-aura i{border-radius:49%;animation:dna-ring 3.2s ease-out infinite}
+@media(prefers-reduced-motion:reduce){.dna-reveal .dna-aura i,.dna-reveal .dna-reveal-bg{animation:none!important}.dna-reveal .dna-aura i{opacity:.08!important}}

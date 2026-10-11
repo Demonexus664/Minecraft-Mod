@@ -69,11 +69,16 @@ HL.History = (function () {
     return o;
   }
 
+  // Avoid rebuilding thousands of rows on every card search or award comparison.
+  const rowCache = new Map();
   function seasonRows(key) {
     const S = HL.HISTORY_SEASONS[key];
     if (!S) return null;
+    if (rowCache.has(key)) return rowCache.get(key);
     const F = H().seasonFields;
-    return S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); return o; });
+    const rows = S.players.map(r => { const o = {}; F.forEach((f, i) => { o[f] = r[i]; }); o.seasonStart = parseInt(key, 10); return o; });
+    rowCache.set(key, rows);
+    return rows;
   }
 
   // Load a season file (browser: script tag; node tests preload them).
@@ -92,16 +97,19 @@ HL.History = (function () {
   function makePlayer(row, seasonStart, teamId) {
     const bio = H().players[row.pid];
     const [name, nbaId, , height, weight, born, hof, college] = bio;
-    const attrs = unpack(row.attrs, H().attrs);
+    // A new roster player gets an independent mutable copy. The cached historical
+    // scouting record is shared across Skill Draft, 82-0 and Franchise, and must
+    // never be overwritten by training, injury changes, or legendary boosts.
+    const attrs = { ...HL.historicalAttributes(row) };
     const t = unpack(row.tend, H().tends);
     const p = {
       id: HL.nextPlayerId(), hid: row.pid,
       name, pos: row.pos, age: row.age, height, weight, wingspan: height + 3, arch: null,
       born: born || seasonStart - row.age, real: true, nbaId, hof: !!hof, college,
-      attrs, ovr: HL.computeOvr(attrs, row.pos),
+      attrs, ovr: HL.historicalSeasonOvr(row),
       traits: null, teamId, morale: 70, injury: null, contract: null, stats: {}, careerAwards: [], draft: null,
     };
-    p.tend = { usage: t.usage, three: t.three, mid: t.mid, drive: t.drive, post: t.post, passFirst: t.passFirst, gamble: t.gamble, crash: t.crash, effort: 75, foulAggr: t.foulAggr, drawFoul: t.drawFoul };
+    p.tend = HL.completeTendencies({ ...p, tend: { usage: t.usage, three: t.three, mid: t.mid, drive: t.drive, post: t.post, passFirst: t.passFirst, gamble: t.gamble, crash: t.crash, effort: 75, foulAggr: t.foulAggr, drawFoul: t.drawFoul } });
     const R = HL.RNG;
     p.traits = {
       workEthic: HL.clamp(Math.round(R.normal(60, 14)), 10, 99),

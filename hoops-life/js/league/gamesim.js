@@ -80,7 +80,19 @@ HL.DEFAULT_RULES = () => ({
         mins[p.id] = Math.max(0, m);
         left -= mins[p.id];
       }
-      if (left > 0) for (const p of order.slice(0, 8)) mins[p.id] += left / 8; // short-handed: starters play more
+      // Distribute unused rotation minutes without inventing 50+ minute regulation games.
+      // A depleted five-man lineup can each play 48; deeper rotations cap at 46.
+      const ceiling = players.length <= 5 ? 48 : 46;
+      let attempts = 0;
+      while (left > 0.001 && attempts++ < 15) {
+        const active = order.filter(p => mins[p.id] < ceiling - 0.001);
+        if (!active.length) break;
+        const each = left / active.length;
+        for (const p of active) {
+          const extra = Math.min(each, ceiling - mins[p.id]);
+          mins[p.id] += extra; left -= extra;
+        }
+      }
       return mins;
     }
     const sTemplate = [34, 33, 32, 31, 30];
@@ -227,9 +239,12 @@ HL.DEFAULT_RULES = () => ({
 
   function shotWeights(T, shooter, rules, strat, oppDef) {
     const t = shooter.tend;
-    let three = rules.threePoint ? t.three * 0.85 : 0;
-    let mid = t.mid;
-    let rim = t.drive + t.post * 0.6 + (isBig(shooter) ? 5 : 0);
+    let three = rules.threePoint ? t.three * .85 * (rules.eraPerimeter ?? 1) : 0;
+    let mid = t.mid * HL.clamp(.8+t.pullUp/330,.8,1.11);
+    let rim = (t.drive + t.post * 0.6 + (isBig(shooter) ? 5 : 0)) * (rules.eraRim ?? 1);
+    // Genesis is mode-specific: an elite hybrid's distinctive strength must
+    // affect where the possession actually goes, not just its card portrait.
+    if(shooter.genesisPower?.paint)rim*=shooter.genesisPower.paint;
     if (strat.focus === 'inside') { rim *= 1.3; three *= 0.8; }
     if (strat.focus === 'perimeter') { three *= 1.3; rim *= 0.85; }
     if (oppDef === 'zone') { three *= 1.25; rim *= 0.8; }
@@ -239,18 +254,44 @@ HL.DEFAULT_RULES = () => ({
     return { three: Math.max(0, three), mid: Math.max(1, mid), rim: Math.max(1, rim) };
   }
 
+  // Cross-attribute matchup effects: the shooting stroke, body, handle, strength,
+  // speed and defender all contribute to ONE contest. Kept modest so specialists
+  // matter without making basketball a height-only simulation.
+  HL.matchupEffects = function (shooter, defender, helper = defender) {
+    const a = shooter.attrs, d = defender.attrs;
+    const reach = p => (p.wingspan || p.height + 3) + (p.attrs.vert - 65) * 0.045;
+    const size = HL.clamp((shooter.height - helper.height) * 0.0035 +
+      ((shooter.weight || 210) - (helper.weight || 210)) * 0.00016, -0.05, 0.05);
+    const contest = HL.clamp((reach(defender) - reach(shooter)) * 0.0017, -0.025, 0.025);
+    const handleAdvantage = HL.clamp(((a.handle * .40 + a.speed * .24 + a.accel * .21+a.agility*.15) -
+      (d.perD * .50 + d.speed * .22+d.lateral*.28)) * 0.0005, -0.024, 0.024);
+    const postAdvantage = HL.clamp(((shooter.height - defender.height) * .0017 +
+      ((shooter.weight || 210) - (defender.weight || 210)) * .00013 +
+      (a.str - d.str) * .00018), -.035, .035);
+    return { size, contest, handleAdvantage, postAdvantage,
+      blockReach: HL.clamp((reach(helper) - reach(shooter)) * 0.003, -0.04, 0.04) };
+  };
+
+  const aValue = (p,k) => p.attrs[k]??65;
+  const dna = (p,key) => HL.clamp(p.dna?.effects?.[key] || 0,-0.03,0.095);
+
   // ---------- Main ----------
   HL.createGame = function (homeTeam, awayTeam, rules = HL.DEFAULT_RULES(), opts = {}) {
     // Live intentions belong to this game; never edit the league player's tendencies.
-    const own = t => ({ ...t, players: t.players.map(p => ({ ...p, tend: { ...p.tend } })) });
+    const own = t => ({ ...t, players: t.players.map(p => { const attrs=HL.completeAttributes(p.attrs || {},p.height,p.weight);return {...p, attrs, tend:HL.completeTendencies({...p,attrs})}; }) });
     homeTeam = own(homeTeam); awayTeam = own(awayTeam);
     rules = Object.assign(HL.DEFAULT_RULES(), rules);
+    const era = HL.eraContext ? HL.eraContext(rules.season ?? opts.season ?? 2025) : {perimeter:1,rim:1};
+    rules.eraPerimeter = era.perimeter; rules.eraRim=era.rim;
     const H = prepTeam(homeTeam, rules), A = prepTeam(awayTeam, rules);
+    const hasDNA=[...homeTeam.players,...awayTeam.players].some(p=>p.dna?.mechanics||p.dna?.links);
+    const dnaCache=new WeakMap();
     H.home = true;
     const pbp = opts.pbp ? [] : null;
     const injuries = [];
     // Facts for the event log (records, game-winners, four-point plays...), kept for every game.
-    const track = { four: [], goAhead: null, last: null, violations: [], clockResets: [], bonusTrips: [] };
+    const track = { four: [], goAhead: null, last: null, violations: [], clockResets: [], bonusTrips: [], dna:{home:{},away:{}} };
+    const recordDNA=(T,actions)=>{const counts=track.dna[T===H?'home':'away'];for(const action of actions)counts[action]=(counts[action]||0)+1;};
     const strategyAdjustments = [homeTeam, awayTeam]
       .filter(t => rules.illegalDefense && t.strategy && t.strategy.defense === 'zone')
       .map(t => ({ teamId: t.id, from: 'zone', to: 'man', reason: 'illegalDefense' }));
@@ -278,7 +319,7 @@ HL.DEFAULT_RULES = () => ({
       common: 0.068 * (prof && prof.ftr ? HL.clamp(prof.ftr / BASE.ftr, 0.8, 1.6) : 1),
     };
     const paceAdj = ((H.strat.pace + A.strat.pace) / 2 - 50) * 0.12;
-    const possPerTeam48 = E.pace * 1.045 + paceAdj + (opts.paceMod || 0);
+    const possPerTeam48 = E.pace * 1.025 + paceAdj + (opts.paceMod || 0);
     let avgPossSec = 2880 / (possPerTeam48 * 2);
     const regSeconds = rules.quarterLen * 60 * 4;
 
@@ -426,14 +467,14 @@ HL.DEFAULT_RULES = () => ({
       const initiator = pickBy(lineup, p => {
         // Usage tendency already encodes the real role (from usage %), so talent only nudges it.
         // Usage tendency maps back to usage % (usage/3.4 + 10): touches are proportional to it.
-        let w = (Math.max(0, p.tend.usage) / 3.4 + 10) * Math.pow(p.ovr / 75, 0.5) * RANK[order.indexOf(p)];
+        let w = (Math.max(0, p.tend.usage) / 3.4 + 10) * Math.pow(p.ovr / 75, 0.5) * RANK[order.indexOf(p)] * HL.clamp(0.72+(p.tend.shotHunt||55)/190,.78,1.25);
         if (focusStar) w *= Math.pow(p.ovr / 75, 3);
         if (play) {
           const recipient = ['pickPop', 'driveKick'].includes(play.play) ? play.partnerId : play.pid;
           if (p.id === recipient) w *= 3;
           if (p.id === play.pid && p.id !== recipient) w *= 1.35;
         }
-        if (O.livePassing?.has(p.id)) w *= HL.clamp(1.25 - p.tend.passFirst / 100, .3, 1.25);
+        if (O.livePassing?.has(p.id)) w *= HL.clamp(1.25 - (p.tend.passFirst + p.tend.moveBall)/200, .3, 1.25);
         if (D.matchup?.pressure === 'deny' && D.matchup.targetId === p.id && dline.some(x => x.id === D.matchup.pid)) w *= .65;
         if (strat.usageLock && strat.usageLock[p.id]) w *= strat.usageLock[p.id];
         return w;
@@ -449,6 +490,8 @@ HL.DEFAULT_RULES = () => ({
         return dline[index] || dline[0];
       };
       const defender = guarding(initiator, idx);
+      const dnaContext = (p, def, extra = {}) => hasDNA&&HL.DNA?.basketballContext({shooter:p,defender:def,lineup,dline,transition,clutch,coverage:dstrat.defense,play,cache:dnaCache,...extra});
+      const formation = dnaContext(initiator,defender);
       if (playEvent && !playEvent.cancelled) playEvent.actualPid = initiator.id;
 
       // The sim has no player coordinates: rule violations are exposure-based, driven by
@@ -482,7 +525,7 @@ HL.DEFAULT_RULES = () => ({
 
       // Turnovers
       const toSkill = (eff(O, initiator, 'handle') + eff(O, initiator, 'pass') + eff(O, initiator, 'iq')) / 3;
-      const dSteal = dline.reduce((s, p) => s + p.attrs.steal * (0.7 + p.tend.gamble / 166), 0) / 5;
+      const dSteal = dline.reduce((s, p) => s + (p.attrs.steal*.8+p.attrs.lateral*.2) * (0.7 + p.tend.gamble / 166), 0) / 5;
       // Lane/backcourt violations account for part of the previously generic turnover budget.
       let pTO = 0.121 + (68 - toSkill) * 0.0022 + (dSteal - 62) * 0.0018;
       if (dstrat.defense === 'press') pTO += 0.025;
@@ -490,12 +533,17 @@ HL.DEFAULT_RULES = () => ({
       if (play && ['pickRoll','handoff','driveKick'].includes(play.play)) pTO += .012 * (100 - initiator.attrs.pass) / 50;
       if (assigned && D.matchup.targetId === initiator.id && D.matchup.pressure === 'trap') pTO += .018;
       if (transition) pTO += 0.01;
+      pTO += ((initiator.tend.riskyPass || 50)-50)*.00015;
+      // Signature passing and defensive identities change actual turnover odds.
+      pTO -= dna(initiator,'assist')*.19;
+      pTO += dline.reduce((n,p)=>n+dna(p,'steal'),0)/Math.max(1,dline.length)*.12;
       pTO += E.tov;
+      pTO += formation?.turnover || 0;
       if (R.chance(HL.clamp(pTO, 0.06, 0.25))) {
         O.st[initiator.id].line.tov++;
         const stealP = 0.56 + (dSteal - 62) * 0.008;
         if (R.chance(HL.clamp(stealP, 0.3, 0.7))) {
-          const thief = pickBy(dline, p => Math.pow(p.attrs.steal, 3) * (0.6 + p.tend.gamble / 100));
+          const thief = pickBy(dline, p => Math.pow(p.attrs.steal*.85+p.attrs.lateral*.15, 3) * (0.6 + p.tend.gamble / 100));
           D.st[thief.id].line.stl++;
           log(`${thief.name} steals it from ${initiator.name}.`, D);
           return { keep: false, transition: R.chance(0.55) };
@@ -528,35 +576,69 @@ HL.DEFAULT_RULES = () => ({
 
       // The usage pick IS the player who uses the possession (like usage %). Whether a teammate
       // set the shot up is decided after the shot type (catch-and-shoot threes are usually assisted).
-      const shooter = initiator;
+      let shooter = initiator;
       let passer = null;
+      // A forced post double can turn this touch into a different player's shot.
+      if (formation?.kickChance > 0 && lineup.length > 1 && R.chance(formation.kickChance)) {
+        shooter=pickBy(lineup.filter(p=>p!==initiator),p=>Math.pow(Math.max(25,rules.threePoint?p.attrs.three:p.attrs.mid),3));
+        passer=initiator;
+        log(`${initiator.name} draws help and passes to ${shooter.name}.`,O);
+        recordDNA(O,['postKickout']);
+      }
       const sIdx = lineup.indexOf(shooter);
       const sDef = guarding(shooter, sIdx);
       const helper = dline.slice().sort((a, b) => (b.attrs.intD + b.attrs.block) - (a.attrs.intD + a.attrs.block))[0];
 
       const w = shotWeights(O, shooter, rules, strat, dstrat.defense);
+      const shotPlan=dnaContext(shooter,sDef);
+      if(shotPlan){w.three*=shotPlan.threeWeight;w.mid*=shotPlan.midWeight;w.rim*=shotPlan.rimWeight;}
+      // Shot IQ changes which attempts a player chooses, not merely his FG%.
+      // Preferences still control play style; intelligent players lean towards
+      // their strongest shot types, and poor decisions lead to worse choices.
+      if (!play && !transition) {
+        const decision = aValue(shooter,'shotSelection');
+        const quality = {rim:Math.max(aValue(shooter,'layup'),aValue(shooter,'close'),aValue(shooter,'post')),
+          mid:aValue(shooter,'mid'),three:aValue(shooter,'three')};
+        const mean=(quality.rim+quality.mid+(rules.threePoint?quality.three:quality.mid))/(rules.threePoint?3:3);
+        for (const k of (rules.threePoint?['rim','mid','three']:['rim','mid'])) {
+          w[k]*=HL.clamp(1+(decision-55)/45*(quality[k]-mean)*.015,.72,1.4);
+        }
+      }
       if (play) {
         if (['pickPop','catchShoot','driveKick'].includes(play.play)) { w.three *= 2.4; w.rim *= .55; }
         if (['pickRoll','postUp','cut'].includes(play.play)) { w.rim *= 2.4; w.three *= .5; }
         if (play.play === 'isolation') w.mid *= 1.4;
       }
+      // Catch-and-shoot is a shot preference, not a bonus to shooting accuracy.
+      // It must act before choosing a shot; the passer is assigned afterwards.
+      if (rules.threePoint && shooter.tend.catchShoot > 65) w.three *= 1 + (shooter.tend.catchShoot - 65) / 110;
       let type = R.weighted(['three', 'mid', 'rim'], k => w[k]);
       // Under two seconds there is only time for a catch-and-heave.
       const heave = secs < 2 && !transition;
       if (heave) type = rules.threePoint ? 'three' : 'mid';
-      if (transition && R.chance(0.45)) type = 'rim';
+      if (transition && R.chance(HL.clamp(.25 + shooter.tend.transition/300,.25,.62))) type = 'rim';
+      // An isolation scorer takes more self-created jumpers; off-ball specialists prefer catch-and-shoot.
+      if (!play && !transition) {
+        if (shooter.tend.iso > 70 && R.chance((shooter.tend.iso-65)/260)) type=shooter.attrs.mid>=shooter.attrs.three ? 'mid' : (rules.threePoint?'three':'mid');
+      }
       // Assisted or self-created: real NBA ~85% of made threes, ~55% at the rim, ~40% mid-range are assisted;
       // high-usage creators make their own shots far more often.
       const usgPct = shooter.tend.usage / 3.4 + 10;
-      let pAst = { three: 0.84, rim: 0.56, mid: 0.42 }[type] * HL.clamp(1.35 - usgPct * 0.021, 0.3, 1.2);
+      let pAst = { three: 0.86, rim: 0.63, mid: 0.49 }[type] * HL.clamp(1.38 - usgPct * 0.017, 0.3, 1.2);
+      // High-level passers convert otherwise similar opportunities into assisted shots.
+      const supportingPass = lineup.filter(p => p !== shooter).reduce((m, p) => Math.max(m, p.attrs.pass), 25);
+      pAst += HL.clamp((supportingPass - 75) * 0.003, -0.035, 0.055);
+      pAst += ((shooter.tend.moveBall||50)-50)*.00025;
       if (strat.focus === 'motion') pAst += 0.08;
+      pAst += dna(shooter,'assist') * .72;
+      pAst += shotPlan?.assist || 0;
       if (focusStar) pAst -= 0.05;
       if (play && ['catchShoot','cut','pickPop','handoff','driveKick'].includes(play.play)) pAst += .18;
       if (play?.play === 'isolation') pAst -= .2;
       if (transition) pAst += 0.1;
-      if (R.chance(HL.clamp(pAst, 0.05, 0.95))) {
+      if (!passer && R.chance(HL.clamp(pAst, 0.05, 0.95))) {
         const intended = play && ['pickPop','driveKick'].includes(play.play) ? play.pid : play?.partnerId;
-        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst) * (p.id === intended ? 3 : 1));
+        passer = pickBy(lineup.filter(p => p !== shooter), p => Math.pow(p.attrs.pass / 50, 3) * (20 + p.tend.passFirst) * (p.id === intended ? 3 : 1) * (1+(hasDNA?(HL.DNA?.mechanicsFor(p,lineup,dnaCache).precision||0)*.5:0)));
       }
 
       let makeP, value = 2, blockP = 0, foulP = 0, label;
@@ -565,34 +647,44 @@ HL.DEFAULT_RULES = () => ({
       const spacing = lineup.filter(p => p !== shooter).reduce((sum, p) => sum + p.attrs.three, 0) / Math.max(1, lineup.length - 1);
       const teamIQ = lineup.reduce((sum, p) => sum + p.attrs.iq, 0) / lineup.length;
       const contest = (key) => eff(D, sDef, key);
+      const matchup = HL.matchupEffects(shooter, sDef, helper);
       if (type === 'rim') {
         const isPost = play?.play === 'postUp' && shooter.id === play.pid || shooter.tend.post > 25 && R.chance(shooter.tend.post / 100);
         const finish = isPost
           ? (eff(O, shooter, 'post') * 0.6 + eff(O, shooter, 'close') * 0.4)
           : Math.max(eff(O, shooter, 'layup'), eff(O, shooter, 'dunk') * 0.92 + shooter.attrs.vert * 0.08, eff(O, shooter, 'close') * 0.97);
-        const help = (eff(D, helper, 'intD') + eff(D, helper, 'block')) / 2;
-        makeP = 0.682 + (soft(finish) - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013;
-        if (transition) makeP += 0.07;
+        const help = (eff(D, helper, 'intD') + eff(D, helper, 'block') + eff(D,helper,'helpD')) / 3;
+        makeP = 0.682 + ((aValue(shooter,'contactFinish')-65)*.00045 +(aValue(shooter,'footwork')-65)*.00022) + (soft(finish) - 70) * 0.0056 - (help - 70) * 0.0031 - (contest('intD') - 65) * 0.0013 + matchup.size + (isPost ? matchup.postAdvantage : matchup.handleAdvantage * 0.5);
+        if (transition) makeP += 0.07 + dna(shooter,'transition')*.7;
+        makeP += dna(shooter,'rim') * .85 - dna(sDef,'defense')*.62;
         if (dstrat.defense === 'drop') makeP -= 0.015;
-        blockP = 0.068 + (helper.attrs.block - 65) * 0.0022;
+        blockP = 0.068 + (helper.attrs.block - 65) * 0.0022 +
+          matchup.blockReach;
         foulP = 0.31 + (shooter.attrs.str + finish - 140) * 0.0012;
         label = isPost ? 'post' : (shooter.attrs.dunk > 70 && R.chance(0.35) ? 'dunk' : 'layup');
       } else if (type === 'mid') {
-        makeP = 0.455 + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024;
+        makeP = 0.455 + ((shooter.attrs.shotCreation-65)*.00042 +(shooter.attrs.contested-65)*.0003) + (soft(eff(O, shooter, 'mid')) - 70) * 0.0048 - (contest('perD') - 65) * 0.0024-(sDef.attrs.contestD-65)*.00028 - matchup.contest + matchup.handleAdvantage;
         if (dstrat.defense === 'drop') makeP += 0.02;
         blockP = 0.018; foulP = 0.06;
+        makeP += dna(shooter,'mid')*.85 - dna(sDef,'defense')*.60;
         label = 'jumper';
       } else {
         let deep = rules.fourPoint && R.chance(0.12);
         value = deep ? 4 : (rules.threeValue || 3);
-        makeP = 0.338 + (soft(eff(O, shooter, 'three')) - 70) * 0.0055 - (contest('perD') - 65) * 0.0015;
+        makeP = 0.338 + ((shooter.attrs.releaseSpeed-65)*.00045 +(shooter.attrs.shotArc-65)*.00035 +(shooter.attrs.releaseHeight-65)*.00028) + (soft(eff(O, shooter, 'three')) - 70) * 0.0055 - (contest('perD') - 65) * 0.0015-(sDef.attrs.contestD-65)*.00022 - matchup.contest * 0.75 + matchup.handleAdvantage * 0.6;
         if (deep) makeP -= 0.09;
-        if (passer) makeP += 0.018; else makeP -= 0.015;
+        makeP += dna(shooter,'three')*.88 - dna(sDef,'defense')*.6;
+        if (passer) makeP += 0.013 + (eff(O, passer, 'pass') - 65) * 0.00045 + (shooter.attrs.iq - 65) * 0.00014;
+        else makeP -= 0.015;
         if (dstrat.defense === 'switch') makeP -= 0.008;
         if (dstrat.defense === 'zone') makeP += 0.01;
         blockP = 0.008; foulP = 0.02;
         label = deep ? 'deep 4-pointer' : 'three';
       }
+      if (passer && type !== 'three') makeP += 0.008 + (eff(O, passer, 'pass') - 65) * 0.00035;
+      if (passer) makeP += (aValue(passer,'vision')-65)*.00022+(aValue(passer,'passingAccuracy')-65)*.00018;
+      if (type==='mid' && !passer) makeP += (aValue(shooter,'pullUp')-50)*.00025+(aValue(shooter,'fade')-65)*.00018;
+      if (type==='rim') makeP += (aValue(shooter,'burst')-65)*.00018+(aValue(shooter,'floater')-65)*.00013;
       if (play) {
         const partner = play.partnerId != null ? O.st[play.partnerId].p : null;
         if (play.play === 'pickRoll') makeP += ((partner?.attrs.str ?? 50) - 65) * .0006 + (dstrat.defense === 'switch' ? -.008 : .008);
@@ -608,12 +700,24 @@ HL.DEFAULT_RULES = () => ({
         if (pressure === 'trap') { makeP -= .025; if (passer) makeP += .035; }
       }
       if (O.huddle?.remaining > 0) makeP += O.huddle.boost;
+      // Exceptional tools influence both the shot and its contest. A 99 skill
+      // adds meaningful but resistible value, and weaker skills get no free boost.
+      const eliteShot = type === 'rim'
+        ? Math.max(shooter.attrs.close,shooter.attrs.layup,shooter.attrs.dunk,shooter.attrs.post)
+        : type === 'mid' ? Math.max(shooter.attrs.mid,shooter.attrs.fade*.94)
+        : shooter.attrs.three;
+      const eliteStop = type === 'rim' ? Math.max(sDef.attrs.intD,helper.attrs.block)
+        : Math.max(sDef.attrs.perD,sDef.attrs.contestD);
+      makeP += 0.042*HL.eliteImpact(eliteShot) - 0.026*HL.eliteImpact(eliteStop);
+      if (type === 'mid' && !passer) makeP += 0.016*HL.eliteImpact(shooter.attrs.fade);
+      if (type === 'rim') makeP += 0.016*HL.eliteImpact(shooter.attrs.contactFinish);
+      if (clutch) makeP += 0.017*HL.eliteImpact(shooter.attrs.clutchShot) + dna(shooter,'clutch')*.77;
       makeP -= (teamD - 66) * 0.0052;
       makeP += (teamIQ - 68) * 0.0024;
       if (type === 'rim') makeP += (spacing - 62) * 0.0018;
       if (rules.handCheck && type !== 'rim') makeP -= 0.012;
-      if (clutch) makeP += (shooter.traits.clutch - 55) * 0.0012;
-      makeP += homeBoost + E.efg;
+      if (clutch) makeP += ((shooter.traits?.clutch ?? 55) - 55) * 0.00085 + (shooter.attrs.clutchShot-65)*.00055 + (shooter.tend.lateGame-50)*.00025;
+      makeP += homeBoost + E.efg - 0.025; // Calibrate 2025-26 eFG and offensive efficiency to measured league rates.
       // Score effects: big leads breed complacency, trailing teams push harder.
       makeP -= HL.clamp(lead, -18, 26) * 0.0016;
       // Foul drawing: real players use their real free-throw rate; generated players use scoring talent.
@@ -621,13 +725,17 @@ HL.DEFAULT_RULES = () => ({
       foulP *= HL.clamp(draw, 0.35, 2.4) * E.ftr;
       if (rules.noFouls) foulP = 0;
       if (rules.tackling && type === 'rim') { makeP -= 0.06; }
+      const basketball=dnaContext(shooter,sDef,{type,assisted:!!passer,passer});
+      if(basketball){makeP+=basketball.make;blockP+=basketball.block;foulP*=1+basketball.foul;recordDNA(O,basketball.actions);}
       makeP = HL.clamp(makeP, 0.05, 0.9);
       if (heave) { makeP = 0.07; foulP = 0; label = 'heave'; }
       else if (secs < 4 && !transition) makeP -= 0.1; // rushed
 
       const sl = O.st[shooter.id].line;
       // Block
-      if (R.chance(HL.clamp(blockP, 0, 0.2))) {
+      if(type==='rim'&&helper.genesisPower?.rimProtection)
+        blockP+=(helper.genesisPower.rimProtection-1)*.075;
+      if (R.chance(HL.clamp(blockP, 0, helper.genesisPower?.rimProtection ? 0.24 : 0.2))) {
         const blocker = type === 'rim' ? helper : sDef;
         D.st[blocker.id].line.blk++;
         sl.fga++; if (value >= 3) sl.tpa++;
@@ -698,19 +806,28 @@ HL.DEFAULT_RULES = () => ({
     }
 
     function rebound(O, D, rules, type, log) {
-      const oStr = O.onCourt.reduce((s, p) => s + eff(O, p, 'oreb') * (0.75 + p.tend.crash / 200), 0) / 5;
-      const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb'), 0) / 5;
+      const frameRebound = p => HL.clamp((p.height - 79) * 0.8 + ((p.weight || 215) - 215) * 0.03, -11, 11);
+      const oStr = O.onCourt.reduce((s, p) => s + (eff(O, p, 'oreb') + frameRebound(p) + (p.attrs.boxout-65)*.18 + 12*HL.eliteImpact(p.attrs.oreb) + 6*HL.eliteImpact(p.attrs.boxout)) * (0.75 + p.tend.crash / 200), 0) / 5;
+      const dStr = D.onCourt.reduce((s, p) => s + eff(D, p, 'dreb') + frameRebound(p)+(p.attrs.boxout-65)*.18 + 12*HL.eliteImpact(p.attrs.dreb) + 6*HL.eliteImpact(p.attrs.boxout), 0) / 5;
       let pOff = 0.268 + (oStr - dStr) * 0.0045 + (O.strat.crash - 50) * 0.0012 + E.orb;
       if (type === 'three') pOff += 0.02;
+      pOff += O.onCourt.reduce((n,p)=>n+dna(p,'reb'),0)/Math.max(1,O.onCourt.length)*.36;
+      const positioning=(p,T)=>hasDNA&&HL.DNA?.mechanicsFor(p,T.onCourt,dnaCache)||{};
+      const offPosition=O.onCourt.reduce((n,p)=>{const m=positioning(p,O);return n+(m.boxPosition||0)*.012+(m.secondChance||0)*.025;},0)/5;
+      const defPosition=D.onCourt.reduce((n,p)=>n+(positioning(p,D).boxPosition||0)*.025,0)/5;
+      pOff+=HL.clamp(offPosition-defPosition,-.05,.06);
+      if(offPosition>0)recordDNA(O,['reboundPosition']);if(defPosition>0)recordDNA(D,['boxOutPosition']);
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
-        const r = pickBy(O.onCourt, p => Math.pow(p.attrs.oreb / 50, 1.7) * (0.5 + p.tend.crash / 100));
+        const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2+13*HL.eliteImpact(p.attrs.oreb)+8*(positioning(p,O).secondChance||0)) / 50, 1.7) * (0.5 + p.tend.crash / 100) *
+          (p.genesisPower?.boards||1));
         O.st[r.id].line.orb++;
         O.lastOreb = r.id;
         log(`Offensive rebound ${r.name}.`, O);
         return { keep: true, transition: false };
       }
-      const r = pickBy(D.onCourt, p => Math.pow(p.attrs.dreb / 50, 1.85));
+      const r = pickBy(D.onCourt, p => Math.pow(Math.max(25, p.attrs.dreb + frameRebound(p)+13*HL.eliteImpact(p.attrs.dreb)+8*(positioning(p,D).boxPosition||0)) / 50, 1.85) *
+        (p.genesisPower?.boards||1));
       D.st[r.id].line.drb++;
       // Defensive rebounds sometimes lead to a fast break; fast teams run more.
       return { keep: false, transition: R.chance(0.13 + (D.strat.pace - 50) * 0.002) };
@@ -731,6 +848,7 @@ HL.DEFAULT_RULES = () => ({
       away: { teamId: awayTeam.id, score: A.score, quarters: A.quarters, box: box(A) },
       ot, pbp, injuries,
       events: {
+        ...(Object.keys(track.dna.home).length||Object.keys(track.dna.away).length?{dna:track.dna}:{}),
         ...(tactical.length ? { tactical } : {}),
         violations: track.violations, clockResets: track.clockResets, bonusTrips: track.bonusTrips, strategyAdjustments,
         four: track.four, goAhead: track.goAhead, periods: 4 + ot,
@@ -821,7 +939,7 @@ HL.DEFAULT_RULES = () => ({
         const T = teams.find(T => T.team.id === teamId); if (!T) return false;
         Object.assign(T.strat, values);
         if (rules.illegalDefense && T.strat.defense === 'zone') T.strat.defense = 'man';
-        avgPossSec = 2880 / ((E.pace * 1.045 + ((H.strat.pace + A.strat.pace) / 2 - 50) * .12 + (opts.paceMod || 0)) * 2);
+        avgPossSec = 2880 / ((E.pace * 1.025 + ((H.strat.pace + A.strat.pace) / 2 - 50) * .12 + (opts.paceMod || 0)) * 2);
         return true;
       },
       playerControl(pid, values) {

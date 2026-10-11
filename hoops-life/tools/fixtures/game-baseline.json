@@ -2,55 +2,55 @@
   {
     "year": 2025,
     "seed": 1,
-    "hash": "4caf6c65b746d30a533ab3980a80aa13f34abbd17c8f971ca903a9259034d076",
-    "rng": 506956047
+    "hash": "18d43879f000f6b8d20b14e2838a8c160b5e91b729184078209163daac43b5ef",
+    "rng": 2545498051
   },
   {
     "year": 2025,
     "seed": 17,
-    "hash": "ad7077ef3208688e9f96b5c62f9b2df57718ed88d97eb41dd12e168b2ade9d86",
-    "rng": 1097579436
+    "hash": "c03d3fc6b1f4562859894eb331084f91b59a48a14688402bf82f254691e6caa8",
+    "rng": 1744567706
   },
   {
     "year": 2025,
     "seed": 91,
-    "hash": "7bc7871324726057ec5c801c61c0f1a79d05a74aeda19b5ac19723430a49628e",
-    "rng": 3008239120
+    "hash": "509ad42a7c9b804e3aa2ca20e6d873a9ab913b7dc53f33ce88848aeef0437461",
+    "rng": 4083417666
   },
   {
     "year": 1990,
     "seed": 1,
-    "hash": "22b0bc06f19fedba1c8117fa4d6574053394bf6763c4a1a1a190afd72d4cfabe",
-    "rng": 4159180576
+    "hash": "8fd8ba468d235def842cad77a544f660146b3b2a7e66090cba7e789450f64a0e",
+    "rng": 4279486670
   },
   {
     "year": 1990,
     "seed": 17,
-    "hash": "ce01efcb022277b8c2e42c5dedc98ca0d26c1e3b2d201b10fe360f3d757a1958",
-    "rng": 3365826531
+    "hash": "b169dfe5b07e4300b85088cd712e5d0918a7316c4db80b0c7ff9756ccf0a6b31",
+    "rng": 2406708576
   },
   {
     "year": 1990,
     "seed": 91,
-    "hash": "b4061254734d957cd0c2b98b4167249ee56816a49b3535f6d2718a7a573ac64c",
-    "rng": 3783109784
+    "hash": "02348c87d901de49b799e1d3e60cbe3654646ca06f9eec12a740484d3b171855",
+    "rng": 1823661577
   },
   {
     "year": 1964,
     "seed": 1,
-    "hash": "ce97bbb3c80f9d876fd564c512221c70a4834c881aeac2c00b324bc76a5cfe00",
-    "rng": 1924569478
+    "hash": "bb570d118faeb883acd99a7bca23ea305a8aa195da3e3951b69e4cdc0169e493",
+    "rng": 1702440687
   },
   {
     "year": 1964,
     "seed": 17,
-    "hash": "1423f2595ad82a3643c9f2aeb8f0d03d2fac111bd923bfe850138c983a830265",
-    "rng": 484227163
+    "hash": "206820081069b799c9e0aafccbf9c7633e5f909a7b1110f458408afe6fc587ad",
+    "rng": 1420616218
   },
   {
     "year": 1964,
     "seed": 91,
-    "hash": "4d54b46c81fa24baca5f1b244c12d8dbe6aa603acc4aedce3b26ccd54905a9e6",
-    "rng": 1349098795
+    "hash": "491eb81b7ca5ad188bcdf12cf33b838323d03c2683a5cb4e23b17a185031ff01",
+    "rng": 4094324763
   }
 ]

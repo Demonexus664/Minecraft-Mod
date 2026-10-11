@@ -706,11 +706,6 @@ html[data-era="60s"] .court { background: linear-gradient(#8d8d8d, #6f6f6f); }
 @media (max-width:1000px) { .fo-people { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media (max-width:700px) { .fo-people { grid-template-columns:minmax(0,1fr); } }
 /* Photo-first player art. Real headshots plus reusable photographic fabric. */
-.gfx-uniform { position: absolute; inset: 0; isolation: isolate; display: none; pointer-events: none; transform: translate(var(--jersey-x, 0%), var(--jersey-y, 3%)); }
-.gfx-figure:has(.gfx-head.ok) .gfx-uniform.ready { display: block; }
-.gfx-uniform > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scale(var(--jersey-scale, .98)); transform-origin: bottom center; }
-.gfx-uniform-print { position: absolute; top: 82%; left: 65%; width: 14%; text-align: center; color: #fff; font-family: var(--display); font-weight: 800; line-height: 1; }
-.gfx-uniform-number { display: block; font-size: clamp(8px, 5cqi, 24px); text-shadow: 1px 1px 0 var(--trim), -1px -1px 0 var(--trim); }
 
 /* Draft night: one stage, a clear clock, and scouting dossiers. */
 .draft-stage { padding: 30px; margin-bottom: 22px; border: 1px solid var(--rule); border-top: 3px solid var(--team); background: var(--surface-2); }
@@ -913,3 +908,41 @@ html:not([data-era]) .live-score-stage { background: radial-gradient(ellipse at 
 .live-bench-roster + .row .btn { max-width:100%; white-space:normal; }
 .live-huddle-replies { display:flex; flex-direction:column; gap:12px; margin:16px 0; padding:14px; border:1px solid var(--rule); border-radius:14px; }
 .live-huddle-replies .live-player { align-items:flex-start; }.live-huddle-replies .live-player strong { font-size:17px; }
+
+/* Player Career: editable stat ceilings and manual development controls. */
+.career-cap-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px;margin-top:14px}
+.career-cap{display:flex;flex-direction:column;gap:5px;border:1px solid var(--line,#30363b);border-radius:9px;padding:9px;min-width:0}
+.career-cap span{font-size:12px;font-weight:700}.career-cap small{font-size:11px;opacity:.72}
+.career-cap input{width:100%;min-width:0;box-sizing:border-box}
+.career-attributes>div{min-width:0}.career-attributes button{margin-top:7px}
+@media(max-width:480px){.career-cap-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Deeper scouting panels */
+.skill-ratings{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:12px 0}
+.skill-rating-group{background:var(--surface,#181a1f);padding:12px;border:1px solid rgba(155,170,190,.22);border-radius:10px}
+.skill-rating-row{display:flex;justify-content:space-between;gap:14px;padding:5px 2px;font-size:12px;border-bottom:1px solid rgba(155,170,190,.13)}
+.skill-rating-row strong{font-variant-numeric:tabular-nums}
+.skill-detail{padding:14px;border:1px solid rgba(155,170,190,.24);border-radius:12px}
+.skill-detail summary,.scouting-games summary{cursor:pointer;font-weight:700}
+.scouting-games{max-height:460px;overflow:auto}
+.scouting-games .kv{padding:7px 0}
+
+/* Documentary careers, team-identity evaluations, and explicit pre-season playbooks. */
+.dossier{overflow:hidden}.dossier .body{gap:20px}.dossier-lead{font:700 clamp(21px,3vw,32px)/1.3 var(--display);max-width:58ch;letter-spacing:-.02em;padding:10px 0}
+.dossier-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.dossier-two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.dossier-two>article,.dossier-honor{padding:18px;border:1px solid var(--rule);border-radius:15px;background:var(--surface-2);min-width:0}
+.dossier-honor h3,.dossier-two h3{font:750 clamp(19px,2vw,26px)/1.15 var(--display);margin:8px 0}
+.dossier-honor p,.dossier-two p,.dossier-chapter p{line-height:1.65;color:var(--text-2);margin:7px 0}
+.dossier-chapter{padding:14px 0;border-top:1px solid var(--rule);line-height:1.7}
+.dossier-chapter .caps{letter-spacing:.07em}.dossier-turns{display:grid;gap:6px}
+.dossier-turn{display:flex;gap:18px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--rule);line-height:1.55}
+.dossier-turn>b{font:800 24px var(--display);color:var(--team);min-width:28px}
+.dossier-data{border:1px solid var(--rule);border-radius:15px;padding:14px;max-width:100%}
+.dossier-data>summary,.dossier details>summary{cursor:pointer;font-weight:700;padding:8px}
+.gameplan-select{width:min(760px,100%);padding:12px;border:1px solid var(--rule);border-radius:15px}
+.gameplan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;margin:12px 0}
+.gameplan-option{text-align:left;padding:13px;border:1px solid var(--rule);background:var(--surface-2);border-radius:12px;color:var(--text);cursor:pointer}
+.gameplan-option b{display:block;font:750 16px var(--display);margin-bottom:6px}.gameplan-option small{color:var(--text-2);line-height:1.5}
+.gameplan-option.active{border-color:var(--team);box-shadow:inset 0 0 0 1px var(--team)}
+@media(max-width:620px){.dossier-two{grid-template-columns:1fr}.dossier-grid,.gameplan-grid{grid-template-columns:1fr}.dossier-honor{padding:14px}}

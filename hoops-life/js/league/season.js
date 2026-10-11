@@ -60,9 +60,14 @@ HL.fmtDay = function (season, day, opts = {}) {
 // ---------- Era rules, money, playoff formats ----------
 HL.eraRules = function (season) {
   const r = HL.DEFAULT_RULES();
+  r.season=season;
   r.threePoint = season >= 1979;
+  r.shortArc = season >= 1994 && season <= 1996;
+  r.laneWidth = season < 1951 ? 6 : season < 1964 ? 12 : 16;
+  r.takeFoul = season >= 2022;
   r.handCheck = season < 2004;
-  r.shotClock = season >= 1954 ? 24 : 35;
+  // Pre-1954 gameplay uses a generous possession window as an approximation; no real shot clock existed.
+  r.shotClock = season >= 1954 ? 24 : 60;
   r.shotClockReset = season >= 2018 ? 14 : r.shotClock;
   r.backcourtSeconds = season >= 2001 ? 8 : 10;
   r.defensiveThreeSeconds = season >= 2001;
@@ -757,11 +762,32 @@ HL.League = {};
       if (real && p.hid) {
         const row = realRows.get(p.hid);
         if (row) {
-          // Follow the real trajectory, keeping half of how this timeline has diverged.
-          const target = HL.History.unpack(row.attrs, HL.HISTORY.attrs);
+          // Follow real performance without snapping an elite player's entire profile
+          // from 99 to 91 in one summer. Skill-specific bounds preserve shooting touch.
+          const target = HL.completeAttributes(HL.History.unpack(row.attrs, HL.HISTORY.attrs), p.height, p.weight);
+          const prior = { ...p.attrs }, priorOvr = p.ovr;
           for (const k of HL.ATTR_KEYS) {
-            const drift = (p.attrs[k] - (p.realAttrs ? p.realAttrs[k] : p.attrs[k])) * 0.5;
-            p.attrs[k] = Math.round(HL.clamp(target[k] + drift + R.normal(0, 1.2), 25, 99));
+            const previous=Number.isFinite(prior[k]) ? prior[k] : target[k];
+            const drift = (previous - (p.realAttrs && Number.isFinite(p.realAttrs[k]) ? p.realAttrs[k] : previous)) * 0.45;
+            const desired = target[k] + drift + R.normal(0, 0.45);
+            const skill = ['three','mid','ft','iq','pass','post','handle'].includes(k);
+            const allowedDown = skill ? 2 : p.age > 32 ? 5 : 4;
+            p.attrs[k] = Math.round(HL.clamp(desired, Math.max(25, previous - allowedDown), Math.min(99, previous + 5)));
+          }
+          // Global guard keeps the published OVR stable without inventing skills.
+          const projected = HL.computeOvr(p.attrs, p.pos);
+          const floor = Math.max(25, priorOvr - 3), ceiling = Math.min(99, priorOvr + 5);
+          if (projected < floor || projected > ceiling) {
+            const targetOvr = HL.clamp(projected, floor, ceiling);
+            let lo = 0, hi = 1;
+            for (let i = 0; i < 12; i++) {
+              const alpha = (lo + hi) / 2;
+              const blended = Object.fromEntries(HL.ATTR_KEYS.map(k => [k, Math.round((Number.isFinite(prior[k]) ? prior[k] : target[k]) + (p.attrs[k] - (Number.isFinite(prior[k]) ? prior[k] : target[k])) * alpha)]));
+              const val = HL.computeOvr(blended, p.pos);
+              if ((projected < floor && val >= targetOvr) || (projected > ceiling && val <= targetOvr)) lo = alpha;
+              else hi = alpha;
+            }
+            for (const k of HL.ATTR_KEYS) p.attrs[k] = Math.round((Number.isFinite(prior[k]) ? prior[k] : target[k]) + (p.attrs[k] - (Number.isFinite(prior[k]) ? prior[k] : target[k])) * lo);
           }
           p.realAttrs = target;
           p.ovr = HL.computeOvr(p.attrs, p.pos);

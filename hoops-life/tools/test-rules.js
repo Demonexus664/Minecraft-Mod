@@ -98,7 +98,8 @@ test('short rebound resets speed up second-chance possessions', () => {
 });
 
 test('a rebound at the horn cannot shorten the next period opening possession', () => {
-  const game = batch({}, 1)[0];
+  const game = batch({}, 40).find(g=>g.pbp.some(p=>p.q===2&&p.t==='0:00'&&p.txt.startsWith('Offensive rebound')));
+  assert.ok(game,'seed sample contains an actual offensive rebound at the second-quarter horn');
   assert.ok(game.pbp.some(p => p.q === 2 && p.t === '0:00' && p.txt.startsWith('Offensive rebound')),
     'fixture includes a rebound at the second-quarter horn');
   for (let q = 1; q <= game.events.periods; q++) {

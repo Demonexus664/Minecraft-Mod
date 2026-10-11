@@ -24,7 +24,12 @@ test('training spends decisions and energy, is incremental/capped, and stays pri
  HL.Career.act(L,'train',{focus:'three'});HL.Career.act(L,'train',{focus:'three'});const snap=JSON.stringify(L);
  assert.equal(HL.Career.act(L,'train',{focus:'three'}).ok,false);assert.equal(JSON.stringify(L),snap);
  for(let w=1;w<=10;w++){L.day=w*7;HL.Career.act(L,'train',{focus:'three'});}
- assert.ok(p.attrs.three>start);assert.ok(p.attrs.three<=p.caps.three);
+ assert.equal(p.attrs.three,start,'training earns XP but never auto-spends points');
+ assert.ok(L.career.skillPoints>0,'training grants skill points after enough XP');
+ const before=L.career.skillPoints;const upgraded=HL.Career.upgrade(L,'three');
+ assert.equal(upgraded.ok,true);assert.equal(p.attrs.three,start+1);
+ assert.equal(L.career.skillPoints,before-HL.Career.upgradeCost(start));
+ assert.ok(p.attrs.three<=p.caps.three);
 });
 test('invalid tendency edits are atomic; valid shot/effort values change only the career player',()=>{
  const L=fixture(),p=L.players[L.career.pid],snap=JSON.stringify(L);
@@ -93,4 +98,47 @@ test('legacy hardship flag cannot let emergency cleanup release the career playe
  const L=fixture(),p=L.players[L.career.pid],tid=p.teamId;p.hardship=true;
  const g=L.schedule.find(g=>g.home===tid||g.away===tid);L.day=g.day;
  HL.League.simDay();assert.equal(p.teamId,tid);
+});
+
+
+test('creator supports independent 99 potential and never gifts starting attributes',()=>{
+ const c=HL.Career.preview(config),caps=Object.fromEntries(HL.ATTR_KEYS.map(k=>[k,99]));
+ const custom=HL.Career.preview({...config,caps});assert.equal(custom.ok,true);
+ assert.deepEqual(custom.player.attrs,c.player.attrs);
+ assert.equal(custom.player.potential,99);
+ assert.equal(custom.player.caps.three,99);
+ assert.equal(HL.Career.preview({...config,caps:{three:20}}).ok,false);
+ assert.equal(HL.Career.preview({...config,caps:{three:100}}).ok,false);
+ const L=fixture({caps}),p=L.players[L.career.pid];assert.equal(p.caps.three,99);
+ assert.equal(p.attrs.three,c.player.attrs.three);
+});
+
+test('earned upgrades are user-selected, do not change unrelated ratings, and stop at caps',()=>{
+ const L=fixture(),p=L.players[L.career.pid],other=p.attrs.mid,start=p.attrs.three;
+ L.career.skillPoints=50;
+ assert.equal(HL.Career.upgrade(L,'imaginary').ok,false);
+ assert.equal(p.attrs.three,start);
+ assert.equal(HL.Career.upgrade(L,'three').ok,true);
+ assert.equal(p.attrs.three,start+1);assert.equal(p.attrs.mid,other);
+ assert.equal(HL.Career.upgrade(L,'three').ok,true);
+ p.caps.three=p.attrs.three;
+ const snap=JSON.stringify(p.attrs),points=L.career.skillPoints;
+ assert.equal(HL.Career.upgrade(L,'three').ok,false);
+ assert.equal(JSON.stringify(p.attrs),snap);assert.equal(L.career.skillPoints,points);
+});
+
+test('actual box-score XP is exact-once, DNP awards none, and outcomes affect earnings',()=>{
+ const L=fixture(),c=L.career,base=c.xp;
+ const {g,res}=result(L,'xp-box',{min:32,pts:34,tpa:10});
+ const earned0=c.totalSkillPoints;
+ HL.Career.afterGame(L,g,res);
+ assert.ok(c.xp>base||c.skillPoints>0);
+ assert.ok(c.gameLog.at(-1).xp>0);
+ assert.equal(c.gameLog.at(-1).skillPoints,c.totalSkillPoints-earned0);
+ const snapshot=JSON.stringify({xp:c.xp,points:c.skillPoints,games:c.gameLog.length});
+ HL.Career.afterGame(L,g,res);
+ assert.equal(JSON.stringify({xp:c.xp,points:c.skillPoints,games:c.gameLog.length}),snapshot);
+ const {g:dnp,res:dr}=result(L,'dnp-xp',{min:0,pts:0,tpa:0});
+ HL.Career.afterGame(L,dnp,dr);
+ assert.equal(c.gameLog.at(-1).xp,0);
 });
