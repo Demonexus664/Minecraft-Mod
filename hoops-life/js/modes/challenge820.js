@@ -749,10 +749,9 @@ HL.Challenge = (function () {
     const bio = HL.HISTORY.players[c.row.pid];
     const team = teamMeta(LINEAGE[c.club]) || null;
     const r = c.row;
-    const forms=[];
     return HL.Cards.card({
       pid: c.row.pid, name: bio[0], nbaId: bio[1], team, pos: r.pos, rating: opts.rating != null ? opts.rating : rating(c),
-      meta: `${forms.length ? '✦ MUTATED: '+forms.map(f=>f.name).join(' / ')+' · ' : ''}${c.legendary ? '★ LEGENDARY TEAM · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
+      meta: `${c.legendary ? '★ LEGENDARY TEAM · ' : ''}${yrLabel(c.season)} · ${c.club}${bio[3] ? ' · ' + HL.fmtHeight(bio[3]) : ''}`,
       stat: [['PTS', r.pts], ['REB', r.trb], ['AST', r.ast]], hidden: st.mode === 'hoopiq' && st.phase !== 'result', down: opts.down, cls: opts.cls || '', attrs: opts.attrs || '',
     });
   }
@@ -839,10 +838,9 @@ HL.Challenge = (function () {
       {pid:c.row.pid,cat:best,row:c.row,season:c.season}],{mode:'team'});
     const duos=Math.max(0,(future.pairs?.length||0)-(current.pairs?.length||0));
     const trios=Math.max(0,(future.trios?.length||0)-(current.trios?.length||0));
-    const rare=future.mutations?.some(x=>!current.mutations?.some(y=>x.id===y.id));
     return '<div class="draft-fit-chip">'+
       [best+' FIT · '+effRating(c,best),duos?duos+' NEW DUO'+(duos>1?'S':''):'',
-       trios?trios+' NEW TRIO'+(trios>1?'S':''):'',rare?'✦ RARE DNA':''].filter(Boolean).map(esc).join(' · ')+
+       trios?trios+' NEW TRIO'+(trios>1?'S':''):''].filter(Boolean).map(esc).join(' · ')+
       '</div>';
   }
 
