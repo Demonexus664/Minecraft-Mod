@@ -735,7 +735,7 @@ HL.DEFAULT_RULES = () => ({
       // Block
       if(type==='rim'&&helper.genesisPower?.rimProtection)
         blockP+=(helper.genesisPower.rimProtection-1)*.075;
-      if (R.chance(HL.clamp(blockP, 0, 0.24))) {
+      if (R.chance(HL.clamp(blockP, 0, helper.genesisPower?.rimProtection ? 0.24 : 0.2))) {
         const blocker = type === 'rim' ? helper : sDef;
         D.st[blocker.id].line.blk++;
         sl.fga++; if (value >= 3) sl.tpa++;
