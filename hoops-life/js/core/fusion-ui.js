@@ -4,16 +4,24 @@ window.HL=window.HL||{};
 HL.FusionUI=(function(){
  const F=()=>HL.FusionLab,E=x=>HL.UI?.esc?HL.UI.esc(x):String(x??'');
  let root=null,a=null,b=null,onEquip=null,frame='blend',previous=null;
+
  function portrait(x,y,small=false){
-  const half=(p,side)=>{
-   const img=p.photo||p.images?.[side==='left'?0:1]||'';
-   const label=p.heads?.[side==='left'?0:1]||p.name||'Unknown';
-   return '<div class="gf-photo-half '+side+'">'+(img?
-     '<img src="'+E(img)+'" alt="'+E(label)+'" loading="lazy" onerror="this.remove()">':
-     '<span class="gf-initials">'+E(label.split(' ').map(x=>x[0]).slice(-2).join(''))+'</span>')+'</div>';
-  };
-  return '<div class="gf-portrait '+(small?'mini':'')+'">'+half(x,'left')+half(y,'right')+
-   '<div class="gf-seam"></div><span class="gf-image-label">TWO ORIGINAL PLAYERS · ONE HYBRID</span></div>';
+  const sources=[...(x?F().lineageOf(x):[]),...(y?F().lineageOf(y):[])];
+  if(!sources.length)return '';
+  const count=sources.length;
+  const tiles=sources.map((person,i)=>{
+   const label=String(person.name||'Original player');
+   const img=person.photo||'';
+   return '<div class="gf-portrait-strip" style="--part:'+i+';--total:'+count+'">'+
+      (img?'<img src="'+E(img)+'" alt="'+E(label)+'" loading="lazy" onerror="this.remove()">':
+       '<div class="gf-initials">'+E(label.split(' ').map(w=>w[0]).slice(-2).join(''))+'</div>')+
+      '<span>'+E(label)+'</span></div>';
+  }).join('');
+  return '<div class="gf-portrait gf-portrait-multi '+(small?'mini':'')+
+    '" data-ancestors="'+count+'" aria-label="'+count+' original players contributing to this fusion">'+
+    '<div class="gf-portrait-strips">'+tiles+'</div>'+
+    '<span class="gf-image-label">'+(count===2?'DUAL':count===3?'THREE-WAY':count===4?'FOUR-WAY':count+'-WAY')+
+    ' FUSION · '+count+' ORIGINAL PLAYERS</span></div>';
  }
  function profile(p,label){
   return '<div class="gf-parent"><span class="caps">'+label+'</span>'+
