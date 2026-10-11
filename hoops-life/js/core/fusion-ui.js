@@ -256,7 +256,7 @@ HL.FusionUI=(function(){
     (charging?'<div class="gf-reactor-cinematic">'+
       '<div class="gf-reactor-status" data-fusion-stage></div>'+
       '<div class="gf-reactor-ring"><div class="gf-reactor-ring-inner">'+
-      (outcome?.ok?portrait(outcome.node,null,true):portrait(x,y,true))+
+      portrait(x,y,true)+
       '</div></div><div class="gf-reactor-ancestors">'+ancestry.map((person,i)=>
       '<div style="--i:'+i+'"><span>'+E(person.name)+'</span></div>').join('')+'</div>'+
       '<div class="gf-reactor-progress"><i></i></div></div>':'')+
