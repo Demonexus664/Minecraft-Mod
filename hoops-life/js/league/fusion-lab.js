@@ -89,13 +89,20 @@ HL.FusionLab=(function(){
   for(const k of keys){
    const x=a.attrs?.[k]??65,y=b.attrs?.[k]??65,best=Math.max(x,y),worst=Math.min(x,y);
    const overlap=Math.abs(x-y)<=12;
-   const training=overlap?best*.88+worst*.12:best*.71+worst*.29;
+   // Successful fusions retain elite tools; three original legends are worth
+   // more than an average of two parents. Still cap every ability at 99.
+   const branches=lineageOf(a).length+lineageOf(b).length;
+   const shared=worst>=84&&best>=90;
+   const training=overlap?best*.93+worst*.07:best*.91+worst*.09;
+   const inheritance=branches>=3?Math.min(8,3+(branches-3)*1.4):1;
+   const peak=shared?3.5:best>=92?1.5:0;
    const frameCost=height>=82&&PHYSICAL.has(k)?Math.max(0,(height-80)*1.8):0;
    const smallCost=height<=76&&POST.has(k)?Math.max(0,(79-height)*1.4):0;
    const paradox=p.family==='Impossible Gravity'&&
      ((POST.has(k)&&height<=77)||(PERIMETER.has(k)&&height>=83))?2.1:0;
    const fatigue=(a.depth||0)+(b.depth||0);
-   const val=clamp(Math.round(training+rare+paradox-frameCost-smallCost-Math.min(6,fatigue*.7)),25,99);
+   const val=clamp(Math.round(training+rare+paradox+inheritance+peak-
+      frameCost-smallCost-Math.min(3,fatigue*.35)),25,99);
    attrs[k]=val;
    if(val>=88&&best>=90)strengths.push({key:k,value:val});
    if((frameCost+smallCost)>=3&&best-val>=4)tradeoffs.push({key:k,lost:Math.round(best-val),value:val});
@@ -111,6 +118,15 @@ HL.FusionLab=(function(){
    Object.assign(out,{creation:1.45,quickRelease:1.35,clutchChoice:1.3});
   if(p.tags.includes('rimIntimidation')&&p.tags.includes('laneDisruption'))
    Object.assign(out,{rimIntimidation:1.5,rotations:1.4,laneDisruption:1.3});
+  if(p.tags.includes('deepSeal')&&p.tags.includes('contactBalance')){
+   out.deepSeal=Math.max(out.deepSeal||0,1.75);
+   out.contactBalance=Math.max(out.contactBalance||0,1.6);
+  }
+  if(p.tags.includes('secondChance')&&p.tags.includes('rimIntimidation')){
+   out.secondChance=Math.max(out.secondChance||0,1.7);
+   out.rimIntimidation=Math.max(out.rimIntimidation||0,1.7);
+   out.boxPosition=Math.max(out.boxPosition||0,1.6);
+  }
   return out;
  }
  function attempt(a,b,{roll=Math.random,frame='blend',spent=null}={}){
@@ -139,13 +155,19 @@ HL.FusionLab=(function(){
   const attrs=limited.attrs,special=mechanics(p);
   const cost=combined.tradeoffs;
   const lineage=[...lineageOf(a),...lineageOf(b)];
-  const name=(p.rare?'APEX · ':'')+fusionName(lineage);
+  const name=(p.rare?'APEX · ':'')+
+   (lineage.length>=3&&p.tags.includes('deepSeal')&&p.tags.includes('rimIntimidation')?
+    'THE PAINT TRINITY / '+lineage.map(x=>x.name.split(' ').at(-1)).join(' · '):
+    fusionName(lineage));
   const id='fusion:'+(++serial),pos=height>=81?'C':height>=79?'PF':height>=77?'SF':height>=75?'SG':'PG';
   const node={id,name,attrs,height,weight,ovr:HL.computeOvr?.(attrs,pos)||overall({attrs}),
    pos,depth:Math.max(a.depth||0,b.depth||0)+1,
    ancestry:[...new Set(lineage.map(x=>x.pid))],lineage,tags:p.tags,mechanics:special,
    heads:[a.name,b.name],images:[a.photo||a.images?.[0]||'',b.photo||b.images?.[1]||''],
-   tier:p.rare?'apex':p.chance<25?'mythic':'fusion',family:p.family,rarity:p.chance,
+   tier:lineage.length>=3?'mythic':p.rare?'apex':p.chance<25?'mythic':'fusion',
+   family:p.family,rarity:p.chance,ancestorCount:lineage.length,
+   role:lineage.length>=3&&height>=80?'Generational Interior Force':
+     lineage.length>=3?'Generational Hybrid':'Dual Legend',
    parentIds:[a.id,b.id],successChance:p.chance,
    strengths:combined.strengths,tradeoffs:cost,constraints:limited.constraints,
    dna:{mechanics:special,effects:{},links:[],mutations:[p.family]}};
