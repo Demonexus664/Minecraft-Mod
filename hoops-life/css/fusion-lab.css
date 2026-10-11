@@ -407,3 +407,51 @@ html[data-fx-level=off] .gf-collection-card{transition:none!important}
 }
 html[data-fx-level=off] .gf-arena-reactor *,
 html[data-fx-level=off] .gf-arena-reactor *::before{animation:none!important;}
+
+
+/* 82-0 end-of-season GENESIS BROADCAST: proof the hybrid actually played. */
+.genesis-spotlight{position:relative;background:
+ radial-gradient(ellipse 50% 70% at 6% 15%,#6c487e32,transparent),
+ linear-gradient(150deg,#19233c,#0b1221 70%);}
+.genesis-spotlight>header{background:linear-gradient(90deg,#8466af26,transparent)!important;}
+.genesis-spotlight-card{display:grid;grid-template-columns:minmax(160px,.73fr) minmax(0,2fr);
+ gap:clamp(14px,3vw,30px);padding:clamp(14px,2.4vw,26px);border-radius:17px;
+ background:linear-gradient(155deg,#292a4b91,#111a2c 55%,#0c1423);
+ border:1px solid #dab9816c;box-shadow:0 14px 41px #0006,inset 0 1px #ffffff16;
+ animation:gf-hybrid-enter .6s cubic-bezier(.14,1,.25,1) both;}
+.genesis-spotlight-portrait{position:relative;display:flex;flex-direction:column;
+ min-width:0;gap:10px;align-items:stretch;}
+.genesis-spotlight-portrait .gf-portrait-multi.mini{margin:0 auto;aspect-ratio:4/5;
+ max-width:310px;box-shadow:0 20px 38px #0009,0 0 24px #b988ee3c;}
+.genesis-spotlight-portrait .gf-portrait-multi.mini .gf-portrait-strip>span{
+ font-size:clamp(8px,1.1vw,11px);bottom:25px;}
+.genesis-spotlight-tag{font:850 10px var(--body);letter-spacing:.14em;
+ text-align:center;color:#f9dbab;text-transform:uppercase;padding:10px 8px;
+ border-block:1px solid #f2ca9b54;}
+.genesis-spotlight-details{min-width:0;}
+.genesis-spotlight-details>h3{font:900 clamp(29px,4vw,58px)/.93 var(--display);
+ letter-spacing:.005em;text-transform:uppercase;color:#ffe9c2;margin:8px 0 9px;
+ text-shadow:0 5px 23px #edbf7953;overflow-wrap:anywhere;}
+.genesis-spotlight-ancestors{font:700 12px/1.5 var(--body);color:#adbcd2;margin:0 0 18px;}
+.genesis-season-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.genesis-season-stat{min-width:0;text-align:center;padding:15px 5px;
+ border:1px solid #c8b5df2e;border-radius:10px;
+ background:radial-gradient(ellipse at top,#80639b1f,transparent 85%),#111b2e;}
+.genesis-season-stat strong{display:block;font:900 clamp(26px,3.7vw,47px)/1 var(--display);
+ color:#f5f7ff;letter-spacing:-.035em;font-variant-numeric:tabular-nums;
+ text-shadow:0 0 20px #a7bbff24;}
+.genesis-season-stat:nth-child(-n+3) strong{color:#ffdeab;}
+.genesis-season-stat span{display:block;margin-top:10px;font:800 10px var(--body);
+ text-transform:uppercase;letter-spacing:.1em;color:#a7bad5;}
+.genesis-spotlight-powers{border:1px solid #f6d49a43;border-radius:10px;
+ margin:14px 0;padding:13px;background:#9c814018;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.genesis-spotlight-powers b{font:900 12px var(--display);color:#ffe5b3;white-space:nowrap;}
+.genesis-spotlight-powers span{flex:1;font:600 11px/1.6 var(--body);color:#bdd3e8;}
+@media(max-width:650px){.genesis-spotlight-card{grid-template-columns:1fr}
+ .genesis-spotlight-portrait .gf-portrait-multi.mini{max-width:230px;aspect-ratio:5/3}
+ .genesis-season-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .genesis-season-stat{padding:11px 3px}
+ .genesis-season-stat strong{font-size:clamp(22px,6vw,34px)}
+ .genesis-season-stat span{font-size:8px}}
+@media(prefers-reduced-motion:reduce){
+ .genesis-spotlight-card{animation:none!important}}
