@@ -307,8 +307,12 @@ HL.DNA = (function () {
   function analyze(rawEntries,{mode='skill',build:supplied={}}={}){
     const entries=[...new Map(rawEntries.filter(e=>e.pid||e.row?.pid).map(e=>[`${e.pid||e.row.pid}:${e.cat}`,evidence(e)])).values()].sort((a,b)=>`${a.pid}:${a.cat}`.localeCompare(`${b.pid}:${b.cat}`));
     const players=[...new Set(entries.map(e=>e.pid))],cats=[...new Set(entries.map(e=>e.cat))],build=buildContext(entries,supplied),signatures=[],pairs=[],trios=[];
-    for(const pid of players){const s=STARS[pid],es=entries.filter(e=>e.pid===pid),m=selectedMechanics(pid,es.map(e=>e.cat),mode);if(s&&Object.keys(m).length)signatures.push(effect(`sig:${pid}`,s.title,'signature',s.tone,[pid],m,{qualification:`Inherited from ${name(pid)}: ${es.map(e=>e.cat).join(', ')}.`,ingredients:es}));}
-    for(const r of RELATIONS)if(r.p.every(pid=>players.includes(pid))){
+    // Drafted-player team chemistry belongs to 82-0; Skill Draft abilities
+    // belong to the assembled SKILLS, never to merely collecting a celebrity.
+    // Solo signatures and arbitrary named mutations never spawn on an 82-0 roster.
+    // Skill Draft retains its explicit skill-recipes and numeric qualifications.
+    
+    if(mode==='team')for(const r of RELATIONS)if(r.p.every(pid=>players.includes(pid))){
       const m=Object.fromEntries(Object.entries(REL_MECHANICS[r.name]||{}).filter(([k])=>mode==='team'||DOMAINS[k]?.some(c=>cats.includes(c))));
       const relevant=e=>Object.keys(m).some(k=>DOMAINS[k]?.includes(e.cat));
       if(!Object.keys(m).length||mode==='skill'&&!r.p.every(pid=>entries.some(e=>e.pid===pid&&relevant(e))))continue;
@@ -323,7 +327,7 @@ HL.DNA = (function () {
       if(ea&&eb&&!pairs.some(f=>f.players.includes(ea.pid)&&f.players.includes(eb.pid)))pairs.push(effect(`fit:${a}:${b}:${key([ea.pid,eb.pid])}`,n,'duo',tone,[ea.pid,eb.pid],m,{ingredients:[ea,eb],qualification:`${name(ea.pid)} + ${name(eb.pid)}; compatible ${a} and ${b} roles.`}));}
     const generated=derivedChemistry(entries,mode);
     pairs.push(...generated.pairs);trios.push(...generated.trios);
-    const qualified=RECIPES.map(r=>({r,es:qualify(r,entries,build,mode)})).filter(x=>x.es).sort((a,b)=>(b.r.priority||1)-(a.r.priority||1)||a.r.id.localeCompare(b.r.id)),mutations=[],families=new Set();
+    const qualified=mode==='skill'?RECIPES.map(r=>({r,es:qualify(r,entries,build,mode)})).filter(x=>x.es).sort((a,b)=>(b.r.priority||1)-(a.r.priority||1)||a.r.id.localeCompare(b.r.id)):[],mutations=[],families=new Set();
     for(const {r,es}of qualified){if(families.has(r.family)||mutations.length>=2)continue;families.add(r.family);mutations.push(effect(`mutation:${r.id}`,r.name,r.type||'mutation',r.tone,[...new Set(es.map(e=>e.pid))],r.mechanics,{...r,id:`mutation:${r.id}`,type:r.type||'mutation',ingredients:es,qualification:qualificationFor(r,es,build,mode),target:r.target||null}));}
     return {players,cats,mode,build,signatures,pairs,trios,mutations,active:[...signatures,...pairs,...trios,...mutations]};
   }
