@@ -225,7 +225,7 @@ HL.Challenge = (function () {
     HL.DNAFX?.reset();
     st = { mode: cfg.mode, decades: cfg.decades, playSeason: cfg.playSeason, daily: !!cfg.daily, date: cfg.daily ? today() : null,
       round: 0, phase: 'spin', team: null, decade: null, hand: [], lineup: Object.fromEntries(SLOTS.map(s => [s, null])),
-      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[],fusionSlots:{},fusionSpent:{},fusionUsedCards:{},draftView:'roster',pendingFusionId:null,gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
+      skips: { team: 2, era: 2, all: 2 }, usedSkips: 0, used: [], plan: 'balanced', mission:cfg.mission||'perfect', coach:cfg.coach||'steady', timeouts:cfg.timeouts!==false, coachLog:[],fusionSlots:{},fusionSpent:{},fusionUsedCards:{},fusionHistory:[],draftView:'roster',pendingFusionId:null,gauntlet:!!cfg.gauntlet&&!cfg.daily, bosses:[], result: null, pulls: [], special:null, dna:null, dream:null, playoffs:null };
     if (st.daily) { st.playSeason = HL.LATEST_SEASON; st.decades = [1960, 1970, 1980, 1990, 2000, 2010, 2020]; R.setSeed(seedFor('820-' + st.date)); }
   }
   const filled = () => SLOTS.filter(s => st.lineup[s]).length;
@@ -276,21 +276,33 @@ HL.Challenge = (function () {
     }));
   }
   function refreshTeamDna(){st.dna=HL.DNA.analyze(teamDnaEntries(),{mode:'team'});}
-  function assignFusion(slot,node){
-    if(!fusionAllowed()||!SLOTS.includes(slot)||!st.lineup[slot]||!node||!HL.FusionLab?.find(node.id))return false;
-    const ids=node.parentIds||[];
-    const matched=SLOTS.filter(k=>st.lineup[k]&&ids.includes(fusionAt(k)?.id||
-      HL.FusionLab.fromDraftCard(st.lineup[k]).id));
-    if(matched.length!==2||!matched.includes(slot))return false;
-    const removed=matched.find(k=>k!==slot);
-    // Two drafted cards become one actual roster player; the second slot opens.
-    st.fusionSlots[slot]=node.id;
-    delete st.fusionSlots[removed];st.lineup[removed]=null;
-    st.round=Math.max(0,st.round-1);st.phase='spin';
-    st.pendingFusionId=null;st.draftView='roster';
-    refreshTeamDna();return true;
+  // The machine commits the attempt before any success/failure reveal.
+  // Both source cards disappear. Success replaces only the first with a new
+  // hybrid; failure frees both draft slots with no consolation player.
+  function commitFusion(outcome,first,second){
+    if(!st||!outcome||!SLOTS.includes(first)||!SLOTS.includes(second)||
+       first===second||!st.lineup[first]||!st.lineup[second])return false;
+    const parentA=fusionAt(first)||HL.FusionLab.fromDraftCard(st.lineup[first]);
+    const parentB=fusionAt(second)||HL.FusionLab.fromDraftCard(st.lineup[second]);
+    if(outcome.ok&&(!outcome.node||!outcome.node.parentIds.includes(parentA.id)||
+      !outcome.node.parentIds.includes(parentB.id)))return false;
+    // Keep only a lightweight card adapter for History.makePlayer. The real
+    // lineup identity and actual simulated attributes come from fusionAt().
+    const adapter=st.lineup[first];
+    st.lineup[first]=null;st.lineup[second]=null;
+    delete st.fusionSlots[first];delete st.fusionSlots[second];
+    if(outcome.ok){
+      st.lineup[first]={...adapter,fusionId:outcome.node.id};
+      st.fusionSlots[first]=outcome.node.id;
+    }
+    st.fusionHistory.push({ok:!!outcome.ok,hybrid:outcome.node?.name||null,
+      parents:[parentA.name,parentB.name],slots:[first,second],chance:outcome.chance,
+      failureReason:outcome.failureReason||null});
+    st.round=filled();st.hand=[];st.phase=st.round>=SLOTS.length?'ready':'spin';
+    st.draftView='roster';
+    refreshTeamDna();render();
+    return true;
   }
-  function clearFusion(slot){return false;}
   function fusionFit(node,slot) {
     if(!STARTERS.includes(slot))return 0;
     const natural=POSI[node.pos]??2,distance=Math.abs(natural-POSI[slot]);
@@ -298,29 +310,16 @@ HL.Challenge = (function () {
     return Math.round([0,2,6,11,16][distance]+(distance?size:0));
   }
   function genesisPanel(){
-    const drafted=SLOTS.filter(slot=>st.lineup[slot]);
+    const history=st.fusionHistory||[];
     const unlocked=fusionAllowed();
-    const pending=HL.FusionLab?.find(st.pendingFusionId);
-    const nodes=drafted.map(slot=>({slot,node:fusionAt(slot)||
-      HL.FusionLab.fromDraftCard(st.lineup[slot])}));
-    return '<section class="block genesis-820-panel"><header><h3>GENESIS · PLAYER FUSION</h3>'+
-      '<span class="ml-auto t3 sm">'+drafted.length+' drafted</span></header>'+
-      '<div class="body stack"><p class="t2 sm">Select any two players YOU drafted. Each parent gets one fusion attempt in this run, win or lose. Matching positions do not guarantee success. A successful hybrid consumes both cards, then frees one slot for another roll.</p>'+
-      (unlocked?'<button class="btn go big" data-fusion-open>CHOOSE TWO DRAFTED PLAYERS</button>':
-        '<div class="genesis-disabled">Draft two players in Classic to unlock.</div>')+
-      (pending?'<div class="genesis-assignment"><h3>SUCCESS · '+esc(pending.name)+'</h3>'+
-        '<p>Pick the parent slot where the combined player will play. The other becomes a new empty draft slot.</p>'+
-        '<div class="genesis-slot-grid">'+drafted.filter(slot=>pending.parentIds?.includes(fusionAt(slot)?.id||
-          HL.FusionLab.fromDraftCard(st.lineup[slot]).id)).map(slot=>
-          '<button class="genesis-slot-choice" data-fusion-assign="'+slot+'"><b>'+slot+
-          '</b><span>'+esc(fusionAt(slot)?.name||HL.HISTORY.players[st.lineup[slot].row.pid][0])+
-          '</span><small>Keep hybrid here</small></button>').join('')+'</div>'+
-        '<button class="btn small" data-fusion-cancel>Close</button></div>':'')+
-      '<div class="caps">DRAFTED PLAYERS · '+nodes.length+'</div>'+
-      '<div class="genesis-source-grid">'+nodes.map(({slot,node})=>
-        '<div><b>'+slot+'</b><span>'+esc(node.name)+'</span><small>'+node.ovr+
-        ' OVR · '+(st.fusionUsedCards[node.id]?'Attempt used':'Available')+'</small></div>').join('')+'</div>'+
-      '<p class="t3 sm">One genuine roll per parent; no retries, global archive search or reroll farming. Future successful hybrids can be fused if they have not already spent their attempt.</p>'+
+    return '<section class="block genesis-820-panel"><header><h3>GENESIS · RISK YOUR ROSTER</h3></header>'+
+      '<div class="body stack"><p class="t2 sm">Pick two drafted cards. Both are destroyed when you roll. Success produces one stronger hybrid in the first slot. Failure gives you nothing. Empty places must be drafted again.</p>'+
+      '<button class="btn go big" data-fusion-open '+(unlocked?'':'disabled')+
+      '>FUSE TWO OF MY PLAYERS</button>'+
+      (history.length?'<div class="caps">FUSION HISTORY · '+history.length+' ATTEMPTS</div>'+
+       history.slice().reverse().map(h=>'<div class="genesis-result-row '+(h.ok?'success':'failure')+'">'+
+         '<span>'+esc(h.parents.join(' + '))+'</span><strong>'+
+         (h.ok?'STABILIZED · '+esc(h.hybrid):'FAILED · BOTH CARDS LOST')+'</strong></div>').join(''):'')+
       '</div></section>';
   }
 
