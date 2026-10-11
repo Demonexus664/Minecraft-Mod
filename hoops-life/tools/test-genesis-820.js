@@ -1,10 +1,11 @@
 // 82-0 Genesis: lineage, irreversible failure, actual opponent gameplay.
 const test=require('node:test'),assert=require('node:assert/strict');
-const fs=require('node:fs'),path=require('node:path');
-const {load}=require('./load');
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const {load,ctx}=require('./load');
 const HL=load(['js/core/rng.js','data/injuries.js','js/league/ratings.js',
  'js/league/player.js','js/league/gamesim.js','js/league/fusion-lab.js']);
 const F=HL.FusionLab;
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/core/fusion-ui.js'),'utf8'),ctx);
 HL.RNG.setSeed(125); // Repeatable elite source attributes across CI machines.
 const attr={...HL.buildAttributes(96,'C',85,'rimbig'),post:98,close:99,block:97,
  dreb:98,oreb:98,boxout:97,str:96,dunk:98,intD:97,speed:90,vert:96,
@@ -26,6 +27,10 @@ test('Wilt + Robinson + Shaq keeps ALL three original player photos and names',(
  assert.match(triple.node.name,/Chamberlain.*Robinson.*O'Neal/);
  assert.match(triple.node.name,/TRINITY|TRIAD/);
  assert.equal(triple.node.ancestorCount,3);
+ const art=HL.FusionUI.portrait(triple.node,null,true);
+ assert.match(art,/data-ancestors="3"/);
+ for(const file of ['wilt.png','robinson.png','shaq.png'])assert.ok(art.includes(file));
+ assert.match(art,/THREE-WAY FUSION/);
  for(const stat of ['post','block','dreb','oreb','str','close'])
   assert.ok(triple.node.attrs[stat]>=dual.node.attrs[stat]-1,
     stat+' must not disappear in the next generation');
@@ -77,6 +82,11 @@ test('fusion transaction immediately consumes both active team cards, then keeps
   assert.equal(state.lineup.B1,null);
   assert.equal(F.lineageOf(F.find(state.fusionSlots.C)).length,4);
   assert.equal(state.fusionHistory.at(-1).lineage.length,4);
+  assert.match(fourth.node.name,/TITANS|QUAD/);
+  assert.doesNotMatch(fourth.node.name,/TRINITY/);
+  const art=HL.FusionUI.portrait(fourth.node,null,true);
+  assert.match(art,/data-ancestors="4"/);
+  assert.match(art,/FOUR-WAY FUSION/);
  }finally{
   HL.HISTORY=oldHistory;HL.historicalAttributes=oldAttributes;
   HL.historicalSeasonOvr=oldOvr;HL.UI=oldUI;
@@ -129,7 +139,7 @@ function roster(mode,opponent=false){
   center.tend=HL.completeTendencies({...center,tend:{...t,
    usage:elite?99:87,shotHunt:elite?99:82,drive:elite?97:86,
    post:elite?99:90,crash:elite?99:94,drawFoul:elite?97:90,
-   passFirst:elite?12:24,moveBall:elite?31:43,three:16,mid:32,iso:49}});
+   passFirst:elite?44:24,moveBall:elite?62:43,three:16,mid:32,iso:49}});
   center.genesisAncestors=n;
   center.genesisPower={usage:elite?2.35:1.55,paint:elite?1.62:1.24,
    boards:elite?1.65:1.25,rimProtection:elite?1.35:1.13};
@@ -139,7 +149,7 @@ function roster(mode,opponent=false){
  return {id:opponent?89:82,name:opponent?'Opp':'You',strategy,players:ps};
 }
 function sample(mode,games=12){
- const sums={pts:0,reb:0,blk:0,min:0,team:0};
+ const sums={pts:0,reb:0,ast:0,blk:0,min:0,team:0};
  for(let i=0;i<games;i++){
   HL.RNG.setSeed(45210+i);
   const mine=roster(mode),opponent=roster('base',true);
@@ -148,7 +158,7 @@ function sample(mode,games=12){
   const result=HL.simGame(mine,opponent,HL.DEFAULT_RULES(),{});
   const stat=result.home.box[id];
   assert.ok(stat?.gp,mode+' center played');
-  sums.pts+=stat.pts;sums.reb+=stat.orb+stat.drb;
+  sums.pts+=stat.pts;sums.reb+=stat.orb+stat.drb;sums.ast+=stat.ast;
   sums.blk+=stat.blk;sums.min+=stat.min;sums.team+=result.home.score;
  }
  return Object.fromEntries(Object.entries(sums).map(([k,v])=>[k,+(v/games).toFixed(1)]));
