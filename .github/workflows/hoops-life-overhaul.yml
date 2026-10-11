@@ -49,6 +49,7 @@ jobs:
             tools/test-skill-press.js \
             tools/test-presentation-batch3.js \
             tools/test-film-iq.js \
+            tools/test-genesis-820.js \
             tools/test-genesis-game-night.js \
             tools/test-draft-first.js \
             tools/test-power-network.js \
