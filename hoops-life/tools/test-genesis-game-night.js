@@ -43,7 +43,8 @@ test('a successful hybrid has inheritance tradeoffs, and can be a parent again',
  assert.equal(node.depth,1);
  assert.ok(node.strengths.length>0);
  assert.ok(node.ancestry.includes('curryst01')&&node.ancestry.includes('bryanko01'));
- assert.ok(node.attrs.three<99||node.attrs.mid<99,'does not inherit both players perfect');
+ assert.ok(node.attrs.three>=94&&node.attrs.mid>=94,'elite shooters retain their real signature skills');
+ assert.ok(Object.values(node.attrs).some(v=>v<80),'fusion still has basketball weaknesses outside its specialties');
  assert.ok(node.mechanics&&Object.keys(node.mechanics).length>0);
  const next=F.attempt(node,shaq,{roll:()=>0,frame:'right'});
  assert.equal(next.ok,true);
