@@ -414,11 +414,40 @@ HL.Challenge = (function () {
           for(const key of limited)p.attrs[key]=Math.max(25,p.attrs[key]-pen);
         }
         p.ovr=HL.computeOvr(p.attrs,p.pos);
-        p.tend=HL.completeTendencies({...p,tend:HL.defaultTendencies(p)});
+        const ancestors=HL.FusionLab.lineageOf(hybrid).length;
+        const interior=hybrid.pos==='C'||hybrid.pos==='PF';
+        // A fusion is a created basketball identity, not the low-usage default
+        // tendency generated from the roster card we happened to replace.
+        const draftTend=HL.defaultTendencies(p);
+        const elite=ancestors>=3;
+        p.tend=HL.completeTendencies({...p,tend:interior?{
+          ...draftTend,
+          usage:elite?99:87,shotHunt:elite?99:82,
+          drive:elite?97:86,post:elite?99:90,crash:elite?99:94,
+          drawFoul:elite?97:90,passFirst:elite?12:24,moveBall:elite?31:43,
+          three:Math.min(draftTend.three||20,elite?16:28),
+          mid:Math.min(draftTend.mid||35,elite?32:43),
+          iso:Math.min(draftTend.iso||44,49)
+        }:{...draftTend,usage:elite?99:89,shotHunt:elite?99:88}});
+        p.genesisAncestors=ancestors;
+        p.genesisRole=interior?'generational-interior':'generational-perimeter';
+        p.genesisPower={
+          usage:Math.min(3.15,ancestors>=3?2.35+(ancestors-3)*.15:1.55),
+          paint:interior?(elite?1.62:1.24):1,
+          boards:interior?(elite?1.65:1.25):1,
+          rimProtection:interior?(elite?1.35:1.13):1
+        };
+        if(elite){
+          p.attrs.stam=Math.max(p.attrs.stam,97);
+          p.attrs.dur=Math.max(p.attrs.dur,96);
+          if(interior)for(const k of ['post','close','contactFinish','intD','block',
+            'oreb','dreb','str','boxout','screen'])p.attrs[k]=Math.max(p.attrs[k],95);
+        }
         p.genesisId=hybrid.id;p.genesisDepth=hybrid.depth;
         p.genesisMechanics={...hybrid.mechanics};
         p.historicalPid=hybrid.id;
-        p.realMpg=minutes[slot];p.slot=slot;players.push(p);
+        p.realMpg=STARTERS.includes(slot)?(ancestors>=3?42:38):(ancestors>=3?32:27);
+        p.slot=slot;players.push(p);
         continue;
       }
       if (STARTERS.includes(slot)) p.pos = slot;
@@ -448,7 +477,7 @@ HL.Challenge = (function () {
       const player=players[i];
       player.dna={effects:{},mechanics:{...node.mechanics},links:[],
         signature:node.family,mutations:[node.family]};
-      hybrids.push({slot:SLOTS[i],id:node.id,name:node.name,ovr:player.ovr,
+      hybrids.push({slot:SLOTS[i],id:node.id,name:node.name,ovr:player.ovr,ancestors:player.genesisAncestors,minutes:player.realMpg,usage:player.genesisPower.usage,
         family:node.family,depth:node.depth,mechanics:Object.keys(node.mechanics||{})});
     }
     st.genesisSeason=hybrids;
@@ -457,7 +486,14 @@ HL.Challenge = (function () {
     dream.strategy.starters = players.slice(0, 5).map(p => p.id);
     // Game plans alter real possessions: tempo, shot priorities, defensive coverage and glass.
     const tactical=HL.Legacy.gamePlans[st.plan] || HL.Legacy.gamePlans.balanced;
-    Object.assign(dream.strategy,{ focus:tactical.focus, pace:tactical.pace, defense:tactical.defense, crash:tactical.crash });
+    Object.assign(dream.strategy,{focus:tactical.focus,pace:tactical.pace,defense:tactical.defense,crash:tactical.crash});
+    // Target the active hybrid's touches through the same usageLock the
+    // possession engine already uses for player-led offenses.
+    dream.strategy.usageLock=Object.fromEntries(players.filter(p=>p.genesisPower)
+      .map(p=>[p.id,p.genesisPower.usage]));
+    dream.strategy.closers=[...new Set([
+      ...players.filter(p=>p.genesisAncestors>=3).map(p=>p.id),
+      ...players.slice(0,5).map(p=>p.id)])].slice(0,5);
     // Legendary specials are draft-only. Exhibitions never replace league games.
     const opps = L.teams;
     // Fair opponent mix: everyone appears twice before any third matchup; shuffle the dates.
