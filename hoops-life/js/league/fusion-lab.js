@@ -52,6 +52,22 @@ HL.FusionLab=(function(){
    power:Math.round(power),family:paradox?'Impossible Gravity':overlap>=2?'Perfect Synchronization':
     height>=9?'Extremes of the Court':'Hybrid Weapon',tags:t};
  }
+
+ function lineageOf(node){
+  if(Array.isArray(node.lineage)&&node.lineage.length)return node.lineage.map(x=>({...x}));
+  if(node.depth&&Array.isArray(node.ancestry)&&node.ancestry.length)
+   return node.ancestry.map((pid,i)=>({
+     id:String(pid)+':legacy:'+i,pid,
+     name:HL.HISTORY?.players?.[pid]?.[0]||node.heads?.[i%2]||String(pid),
+     photo:node.images?.[i%2]||''
+   }));
+  return [{id:node.id,pid:node.pid||node.id,name:node.name,photo:node.photo||node.images?.[0]||''}];
+ }
+ function fusionName(lineage){
+  const names=lineage.map(x=>String(x.name).split(' ').at(-1)||'Legend');
+  const n=names.length;
+  return (n===2?'DUAL':n===3?'TRIAD':n===4?'QUAD':'LEGACY '+n)+' / '+names.slice(-Math.min(3,n)).join(' · ');
+ }
  const pairKey=(a,b)=>[a.id,b.id].sort().join('|');
  function preview(a,b){
   if(!a||!b)return null;
@@ -122,11 +138,12 @@ HL.FusionLab=(function(){
   const limited=HL.DNA?.reconcileAttributes?HL.DNA.reconcileAttributes(combined.attrs,height):{attrs:combined.attrs,constraints:[]};
   const attrs=limited.attrs,special=mechanics(p);
   const cost=combined.tradeoffs;
-  const name=(p.rare?'APEX · ':'')+a.name.split(' ').at(-1)+' × '+b.name.split(' ').at(-1);
+  const lineage=[...lineageOf(a),...lineageOf(b)];
+  const name=(p.rare?'APEX · ':'')+fusionName(lineage);
   const id='fusion:'+(++serial),pos=height>=81?'C':height>=79?'PF':height>=77?'SF':height>=75?'SG':'PG';
   const node={id,name,attrs,height,weight,ovr:HL.computeOvr?.(attrs,pos)||overall({attrs}),
    pos,depth:Math.max(a.depth||0,b.depth||0)+1,
-   ancestry:[...new Set([...(a.ancestry||[]),...(b.ancestry||[])])],tags:p.tags,mechanics:special,
+   ancestry:[...new Set(lineage.map(x=>x.pid))],lineage,tags:p.tags,mechanics:special,
    heads:[a.name,b.name],images:[a.photo||a.images?.[0]||'',b.photo||b.images?.[1]||''],
    tier:p.rare?'apex':p.chance<25?'mythic':'fusion',family:p.family,rarity:p.chance,
    parentIds:[a.id,b.id],successChance:p.chance,
@@ -199,6 +216,6 @@ HL.FusionLab=(function(){
  const reset=()=>{creations=[];history=[];tries={};serial=0;save();};
  const status=()=>({creations:creations.length,experiments:history.length,persisted:typeof localStorage!=='undefined'});
 
- return {tags,overall,rating,preview,attempt,historical,fromDraftCard,project,search,find,reset,
+ return {tags,overall,rating,preview,attempt,historical,fromDraftCard,project,search,find,lineageOf,fusionName,reset,
   creations:()=>creations,history:()=>history,status,save,restore};
 })();
