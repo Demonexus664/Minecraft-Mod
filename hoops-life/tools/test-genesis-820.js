@@ -43,13 +43,63 @@ test('fusion failure consumes the source attempt and creates no player',()=>{
  assert.throws(()=>F.attempt(left,right,{roll:()=>0,spent}),/already/);
 });
 
-test('actual game action is wired into the roster before cinematic results',()=>{
+test('fusion transaction immediately consumes both active team cards, then keeps every ancestor',()=>{
+ const oldHistory=HL.HISTORY,oldAttributes=HL.historicalAttributes,
+   oldOvr=HL.historicalSeasonOvr,oldUI=HL.UI;
+ try{
+  HL.HISTORY={players:{
+    shaq:[names[2],null,'C',85,325],
+    hakeem:['Hakeem Olajuwon',null,'C',83,255]}};
+  HL.historicalAttributes=row=>row.attrs;
+  HL.historicalSeasonOvr=()=>98;
+  HL.UI={photo:p=>({src:p.name+'.png'})};
+  const shaqCard={row:{pid:'shaq',pos:'C',attrs:{...base[2].attrs}},
+    season:2025,club:'LAL'};
+  const shaqNode=F.fromDraftCard(shaqCard);
+  const inherited=F.attempt(dual.node,shaqNode,{roll:()=>0});
+  assert.equal(inherited.ok,true);
+  const state={lineup:{C:{row:{pid:'wilt'},fusionId:dual.node.id},B1:shaqCard},
+    fusionSlots:{C:dual.node.id},fusionHistory:[]};
+  assert.equal(F.commitRoster(state,inherited,'C','B1'),true);
+  assert.equal(state.lineup.B1,null);
+  assert.equal(state.lineup.C.fusionId,inherited.node.id);
+  assert.equal(state.fusionSlots.C,inherited.node.id);
+  assert.equal(F.lineageOf(F.find(state.fusionSlots.C)).length,3);
+  assert.deepEqual(Array.from(F.lineageOf(F.find(state.fusionSlots.C)),x=>x.name),names);
+  assert.equal(state.fusionHistory.length,1);
+  assert.equal(state.fusionHistory[0].lineage.length,3);
+  const fourthCard={row:{pid:'hakeem',pos:'C',attrs:{...base[1].attrs}},
+    season:2025,club:'HOU'};
+  const fourth=F.attempt(inherited.node,F.fromDraftCard(fourthCard),{roll:()=>0});
+  state.lineup.B1=fourthCard;
+  assert.equal(F.commitRoster(state,fourth,'C','B1'),true);
+  assert.equal(state.lineup.B1,null);
+  assert.equal(F.lineageOf(F.find(state.fusionSlots.C)).length,4);
+  assert.equal(state.fusionHistory.at(-1).lineage.length,4);
+ }finally{
+  HL.HISTORY=oldHistory;HL.historicalAttributes=oldAttributes;
+  HL.historicalSeasonOvr=oldOvr;HL.UI=oldUI;
+ }
+});
+test('failed roster fusion destroys both occupied slots and produces zero substitute',()=>{
+ const state={lineup:{
+  C:{row:{pid:'wilt'},fusionId:dual.node.id},
+  PF:{row:{pid:'robinson'},fusionId:triple.node.id}},
+  fusionSlots:{C:dual.node.id,PF:triple.node.id},fusionHistory:[]};
+ const failure=F.attempt(dual.node,triple.node,{roll:()=>.999999});
+ assert.equal(failure.ok,false);
+ assert.equal(F.commitRoster(state,failure,'C','PF'),true);
+ assert.equal(state.lineup.C,null);assert.equal(state.lineup.PF,null);
+ assert.equal(Object.keys(state.fusionSlots).length,0);
+ assert.equal(state.fusionHistory.length,1);
+ assert.equal(state.fusionHistory[0].ok,false);
+});
+test('animation commits to the same live 82-0 roster before its reveal begins',()=>{
  const ui=fs.readFileSync(path.join(__dirname,'../js/core/fusion-ui.js'),'utf8');
  const mode=fs.readFileSync(path.join(__dirname,'../js/modes/challenge820.js'),'utf8');
  assert.match(ui,/onCommit\?\.\(outcome,cards\[first\]\.slot,cards\[second\]\.slot\)/);
  assert.match(ui,/stage='charge';paint\(\)/);
- assert.match(mode,/st\.lineup\[first\]=null;st\.lineup\[second\]=null/);
- assert.match(mode,/st\.lineup\[first\]=\{\.\.\.adapter,fusionId:outcome\.node\.id\}/);
+ assert.match(mode,/HL\.FusionLab\.commitRoster\(st,outcome,first,second\)/);
  assert.match(mode,/genesisPower/);
  assert.match(mode,/data-fusion-open/);
  assert.doesNotMatch(ui,/Failure preserves both players/);
