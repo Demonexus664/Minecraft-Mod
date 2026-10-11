@@ -242,6 +242,9 @@ HL.DEFAULT_RULES = () => ({
     let three = rules.threePoint ? t.three * .85 * (rules.eraPerimeter ?? 1) : 0;
     let mid = t.mid * HL.clamp(.8+t.pullUp/330,.8,1.11);
     let rim = (t.drive + t.post * 0.6 + (isBig(shooter) ? 5 : 0)) * (rules.eraRim ?? 1);
+    // Genesis is mode-specific: an elite hybrid's distinctive strength must
+    // affect where the possession actually goes, not just its card portrait.
+    if(shooter.genesisPower?.paint)rim*=shooter.genesisPower.paint;
     if (strat.focus === 'inside') { rim *= 1.3; three *= 0.8; }
     if (strat.focus === 'perimeter') { three *= 1.3; rim *= 0.85; }
     if (oppDef === 'zone') { three *= 1.25; rim *= 0.8; }
@@ -730,7 +733,9 @@ HL.DEFAULT_RULES = () => ({
 
       const sl = O.st[shooter.id].line;
       // Block
-      if (R.chance(HL.clamp(blockP, 0, 0.2))) {
+      if(type==='rim'&&helper.genesisPower?.rimProtection)
+        blockP+=(helper.genesisPower.rimProtection-1)*.075;
+      if (R.chance(HL.clamp(blockP, 0, 0.24))) {
         const blocker = type === 'rim' ? helper : sDef;
         D.st[blocker.id].line.blk++;
         sl.fga++; if (value >= 3) sl.tpa++;
@@ -814,13 +819,15 @@ HL.DEFAULT_RULES = () => ({
       if(offPosition>0)recordDNA(O,['reboundPosition']);if(defPosition>0)recordDNA(D,['boxOutPosition']);
       if (D.strat.defense === 'zone') pOff += 0.02;
       if (R.chance(HL.clamp(pOff, 0.1, 0.45))) {
-        const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2+13*HL.eliteImpact(p.attrs.oreb)+8*(positioning(p,O).secondChance||0)) / 50, 1.7) * (0.5 + p.tend.crash / 100));
+        const r = pickBy(O.onCourt, p => Math.pow(Math.max(25, p.attrs.oreb + frameRebound(p)+(p.attrs.boxout-65)*.2+13*HL.eliteImpact(p.attrs.oreb)+8*(positioning(p,O).secondChance||0)) / 50, 1.7) * (0.5 + p.tend.crash / 100) *
+          (p.genesisPower?.boards||1));
         O.st[r.id].line.orb++;
         O.lastOreb = r.id;
         log(`Offensive rebound ${r.name}.`, O);
         return { keep: true, transition: false };
       }
-      const r = pickBy(D.onCourt, p => Math.pow(Math.max(25, p.attrs.dreb + frameRebound(p)+13*HL.eliteImpact(p.attrs.dreb)+8*(positioning(p,D).boxPosition||0)) / 50, 1.85));
+      const r = pickBy(D.onCourt, p => Math.pow(Math.max(25, p.attrs.dreb + frameRebound(p)+13*HL.eliteImpact(p.attrs.dreb)+8*(positioning(p,D).boxPosition||0)) / 50, 1.85) *
+        (p.genesisPower?.boards||1));
       D.st[r.id].line.drb++;
       // Defensive rebounds sometimes lead to a fast break; fast teams run more.
       return { keep: false, transition: R.chance(0.13 + (D.strat.pace - 50) * 0.002) };
