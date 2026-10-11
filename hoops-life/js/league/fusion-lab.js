@@ -228,6 +228,44 @@ HL.FusionLab=(function(){
    fusionReport:{id:node.id,ancestry:node.ancestry,depth:node.depth,tier:node.tier,changes,
      tradeoffs:node.tradeoffs||[],active:Object.keys(node.mechanics||{})}};
  }
+
+ // Atomic 82-0 roster transaction. Never leave parents visible after a roll.
+ // The caller owns draft rounds, presentation and choosing the two roster slots.
+ function commitRoster(state,outcome,slotA,slotB){
+  if(!state?.lineup||!outcome||!slotA||!slotB||slotA===slotB||
+    !state.lineup[slotA]||!state.lineup[slotB])return false;
+  state.fusionSlots ||= {};
+  state.fusionHistory ||= [];
+  const parent=slot=>{
+    const id=state.fusionSlots[slot];
+    return id?find(id):fromDraftCard(state.lineup[slot]);
+  };
+  let x,y;
+  try{x=parent(slotA);y=parent(slotB);}catch{return false;}
+  if(!x||!y||x.id===y.id)return false;
+  // Every success MUST contain precisely the two inputs that were consumed.
+  if(outcome.ok&&(!outcome.node||!outcome.node.parentIds?.includes(x.id)||
+    !outcome.node.parentIds?.includes(y.id)))return false;
+  if(outcome.sourceA!==x.name||outcome.sourceB!==y.name)return false;
+  const adapter=state.lineup[slotA];
+  // State mutation happens synchronously, before the animation is allowed.
+  state.lineup[slotA]=null;
+  state.lineup[slotB]=null;
+  delete state.fusionSlots[slotA];delete state.fusionSlots[slotB];
+  if(outcome.ok){
+   state.lineup[slotA]={...adapter,fusionId:outcome.node.id};
+   state.fusionSlots[slotA]=outcome.node.id;
+  }
+  state.fusionHistory.push({
+   ok:!!outcome.ok,hybrid:outcome.node?.name||null,
+   lineage:outcome.node?lineageOf(outcome.node).map(p=>p.name):
+     [...lineageOf(x),...lineageOf(y)].map(p=>p.name),
+   parents:[x.name,y.name],slots:[slotA,slotB],chance:outcome.chance,
+   failureReason:outcome.failureReason||null
+  });
+  return true;
+ }
+
  function search(q){
   const term=String(q||'').trim().toLowerCase();if(term.length<2)return [];
   return Object.entries(HL.HISTORY?.players||{}).filter(([,p])=>p[0].toLowerCase().includes(term))
@@ -238,6 +276,6 @@ HL.FusionLab=(function(){
  const reset=()=>{creations=[];history=[];tries={};serial=0;save();};
  const status=()=>({creations:creations.length,experiments:history.length,persisted:typeof localStorage!=='undefined'});
 
- return {tags,overall,rating,preview,attempt,historical,fromDraftCard,project,search,find,lineageOf,fusionName,reset,
+ return {tags,overall,rating,preview,attempt,historical,fromDraftCard,project,commitRoster,search,find,lineageOf,fusionName,reset,
   creations:()=>creations,history:()=>history,status,save,restore};
 })();
