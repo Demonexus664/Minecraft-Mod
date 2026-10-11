@@ -153,6 +153,16 @@ HL.FusionLab=(function(){
   const combined=combine(a,b,p,height);
   const limited=HL.DNA?.reconcileAttributes?HL.DNA.reconcileAttributes(combined.attrs,height):{attrs:combined.attrs,constraints:[]};
   const attrs=limited.attrs,special=mechanics(p);
+  const count=lineageOf(a).length+lineageOf(b).length;
+  // A rare multi-generation interior fusion with deep seal and rim denial
+  // should also be able to read double teams rather than only dunking.
+  if(count>=3&&height>=80&&p.tags.includes('deepSeal')&&p.tags.includes('rimIntimidation')){
+    attrs.vision=Math.max(attrs.vision||50,91);
+    attrs.pass=Math.max(attrs.pass||50,87);
+    attrs.passingAccuracy=Math.max(attrs.passingAccuracy||50,88);
+    special.postRead=Math.max(special.postRead||0,1.4);
+    special.postDouble=Math.max(special.postDouble||0,1.35);
+  }
   const cost=combined.tradeoffs;
   const lineage=[...lineageOf(a),...lineageOf(b)];
   const name=(p.rare?'APEX · ':'')+
