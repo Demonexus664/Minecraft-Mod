@@ -22,7 +22,7 @@ function setup(){
  const needle='return { open: () => { st = null; render(); }, LINEAGE,';
  assert.ok(code.includes(needle));
  vm.runInNewContext(code.replace(needle,
-  'return {__draft:{newRun,genesisPanel,assignFusion,fusionAllowed,fusionAt,draftFitChip,'+
+  'render=()=>{}; return {__draft:{newRun,genesisPanel,commitFusion,fusionAllowed,fusionAt,draftFitChip,'+
   'refreshTeamDna,state:()=>st}, open: () => { st = null; render(); }, LINEAGE,'),ctx);
  const make=(id,year,three,post,handle,ovr=94)=>{
   const keys=['three','post','mid','handle','pass','perD','intD','str','speed','vert',
@@ -64,8 +64,12 @@ test('fusion consumes one attempt for each drafted source, with no retries or ch
  assert.ok(s.fusionUsedCards[p.id]&&s.fusionUsedCards[q.id]);
  assert.throws(()=>HL.FusionLab.attempt(p,q,{roll:()=>0,spent:s.fusionSpent}),
    /ONE ATTEMPT/);
- assert.equal(s.lineup.PG,a);
- assert.equal(s.lineup.C,b);
+ assert.equal(api.commitFusion(out,'PG','C'),true);
+ assert.equal(s.lineup.PG,null);
+ assert.equal(s.lineup.C,null);
+ assert.equal(s.round,0);
+ assert.equal(s.phase,'spin');
+ assert.equal(s.fusionHistory[0].ok,false);
 });
 test('success makes a real hybrid, consumes both originals and reopens one roster slot',()=>{
  const {HL,api,make}=setup();
@@ -76,13 +80,13 @@ test('success makes a real hybrid, consumes both originals and reopens one roste
  const p=HL.FusionLab.fromDraftCard(a),q=HL.FusionLab.fromDraftCard(b);
  const res=HL.FusionLab.attempt(p,q,{roll:()=>0,spent:s.fusionSpent});
  assert.equal(res.ok,true);
- assert.equal(api.assignFusion('PG',res.node),true);
+ assert.equal(api.commitFusion(res,'PG','SG'),true);
  assert.equal(api.fusionAt('PG').id,res.node.id);
  assert.equal(s.lineup.SG,null);
  assert.equal(s.round,1);
  assert.equal(s.phase,'spin');
  assert.equal(Object.values(s.lineup).filter(Boolean).length,1);
- assert.equal(api.assignFusion('SG',res.node),false,'cannot clone a fused player');
+ assert.equal(api.commitFusion(res,'PG','SG'),false,'cannot reuse consumed source cards');
 });
 test('daily challenge and HoopIQ cannot access altered fusion rosters',()=>{
  const {api,make}=setup();
@@ -90,7 +94,7 @@ test('daily challenge and HoopIQ cannot access altered fusion rosters',()=>{
  const st=api.state();st.lineup.PG=make('curry',2016,99,40,95);
  st.lineup.C=make('shaq',2000,35,99,52);st.phase='spin';
  assert.equal(api.fusionAllowed(),false);
- assert.doesNotMatch(api.genesisPanel(),/data-fusion-open/);
+ assert.match(api.genesisPanel(),/data-fusion-open[^>]*disabled/);
  api.newRun({mode:'hoopiq',decades:[2000],playSeason:2025});
  const blind=api.state();blind.lineup.PG=st.lineup.PG;blind.lineup.C=st.lineup.C;
  blind.phase='spin';assert.equal(api.fusionAllowed(),false);
