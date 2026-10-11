@@ -465,7 +465,7 @@ HL.Challenge = (function () {
       const player=players[i];
       player.dna={effects:{},mechanics:{...node.mechanics},links:[],
         signature:node.family,mutations:[node.family]};
-      hybrids.push({slot:SLOTS[i],id:node.id,name:node.name,ovr:player.ovr,ancestors:player.genesisAncestors,minutes:player.realMpg,usage:player.genesisPower.usage,
+      hybrids.push({slot:SLOTS[i],id:node.id,name:node.name,playerId:player.id,ovr:player.ovr,ancestors:player.genesisAncestors,minutes:player.realMpg,usage:player.genesisPower.usage,
         family:node.family,depth:node.depth,mechanics:Object.keys(node.mechanics||{})});
     }
     st.genesisSeason=hybrids;
@@ -720,7 +720,7 @@ HL.Challenge = (function () {
   function saveBest() {
     try {
       const all = JSON.parse(localStorage.getItem('hl-820') || '[]');
-      all.push({ w: st.result.w, l: st.result.l, season: st.playSeason, daily: st.date, at: Date.now(), mode: st.mode, five: STARTERS.map(s => `${HL.HISTORY.players[st.lineup[s].row.pid][0]} (${st.lineup[s].season})`) });
+      all.push({ w: st.result.w, l: st.result.l, season: st.playSeason, daily: st.date, at: Date.now(), mode: st.mode, five: STARTERS.map(s => fusionAt(s)?.name || `${HL.HISTORY.players[st.lineup[s].row.pid][0]} (${st.lineup[s].season})`) });
       all.sort((a, b) => b.w / (b.w + b.l) - a.w / (a.w + a.l));
       localStorage.setItem('hl-820', JSON.stringify(all.slice(0, 20)));
     } catch (e) { /* storage unavailable */ }
@@ -954,6 +954,29 @@ HL.Challenge = (function () {
     const r = st.result;
     const [tier, line] = verdict(r.w, r.games);
     const posterTeam = { abbr: 'YOU', city: 'The', name: 'Five', color: '#c9a227', color2: '#111111', espn: null };
+    const genesisSpotlight=(r.genesis||[]).length?'<section class="block genesis-spotlight">'+
+      '<header><h3>GENESIS · FUSION SEASON SPOTLIGHT</h3><span class="ml-auto t3 sm">Actual simulations · Real inherited ancestry</span></header>'+
+      '<div class="body stack">'+r.genesis.map(h=>{
+        const l=r.lines[h.playerId]||{},g=Math.max(1,l.gp||0),node=HL.FusionLab.find(h.id);
+        const stat=(key,value)=>'<div class="genesis-season-stat"><strong>'+value+'</strong><span>'+key+'</span></div>';
+        const ts=(l.fga||0)+.44*(l.fta||0);
+        const percentage=ts?((l.pts||0)/(2*ts)*100).toFixed(1)+'%':'—';
+        const ancestry=HL.FusionLab.lineageOf(node||{name:h.name,ancestry:[],depth:0});
+        return '<article class="genesis-spotlight-card">'+
+          '<div class="genesis-spotlight-portrait">'+(node?HL.FusionUI?.portrait(node,null,true)||'':'')+
+          '<div class="genesis-spotlight-tag">'+h.ancestors+'-PLAYER FUSION · GENERATION '+h.depth+'</div></div>'+
+          '<div class="genesis-spotlight-details"><div class="caps">A NEW BASKETBALL IDENTITY</div>'+
+          '<h3>'+esc(h.name)+'</h3><p class="genesis-spotlight-ancestors">'+ancestry.map(v=>esc(v.name)).join(' × ')+'</p>'+
+          '<div class="genesis-season-stats">'+stat('POINTS / GAME',((l.pts||0)/g).toFixed(1))+
+          stat('REBOUNDS / GAME',(((l.orb||0)+(l.drb||0))/g).toFixed(1))+
+          stat('BLOCKS / GAME',((l.blk||0)/g).toFixed(1))+
+          stat('ASSISTS / GAME',((l.ast||0)/g).toFixed(1))+
+          stat('MINUTES / GAME',((l.min||0)/g).toFixed(1))+
+          stat('TRUE SHOOTING',percentage)+'</div>'+
+          '<div class="genesis-spotlight-powers"><b>REAL ON-COURT POWERS</b><span>'+
+          h.mechanics.map(x=>esc(x.replace(/([A-Z])/g,' $1'))).join(' · ')+
+          '</span></div><p class="t3 sm">True shooting measures scoring efficiency; it is not an overall rating. '+h.ovr+' OVR is the hybrid’s on-court rating after positional fit.</p></div></article>';
+      }).join('')+'</div></section>':'';
     const rows = r.players.slice(0, SLOTS.length).map(p => { const l = r.lines[p.id]; const g = Math.max(1, l.gp); return `<tr><td class="l"><b>${esc(p.name)}</b> <span class="t3 xs">${p.slot.startsWith('B') ? 'Bench' : p.slot}</span></td><td>${(l.min / g).toFixed(1)}</td><td class="hi">${(l.pts / g).toFixed(1)}</td><td>${((l.orb + l.drb) / g).toFixed(1)}</td><td>${(l.ast / g).toFixed(1)}</td><td>${(l.stl/g).toFixed(1)}</td><td>${(l.blk/g).toFixed(1)}</td><td>${(l.tpa/g).toFixed(1)}</td><td>${l.fga+.44*l.fta ? (100*l.pts/(2*(l.fga+.44*l.fta))).toFixed(1) : '-'}</td></tr>`; }).join('');
     const k = Math.round(r.w / r.games * 10);
     const mission='<section class="block"><header><h3>SEASON MISSION</h3></header><div class="body stack">'+
@@ -972,7 +995,7 @@ HL.Challenge = (function () {
         '<div class="kv"><span>Game '+e.g+' · '+esc(e.opp)+'</span><b>'+
         esc(HL.Legacy.gamePlans[e.plan]?.title||e.plan)+'</b></div>').join(''):'')+
       '</div></section>';
-    const share = `${r.games}-0 Challenge${st.daily ? ` · Daily ${st.date}` : ''} · ${yrLabel(st.playSeason)}\n${r.w}-${r.l} · ${tier}\n${'🟩'.repeat(k)}${'🟥'.repeat(10 - k)}\n${STARTERS.map(s => `${s} ${HL.HISTORY.players[st.lineup[s].row.pid][0]}`).join(' · ')}`;
+    const share = `${r.games}-0 Challenge${st.daily ? ` · Daily ${st.date}` : ''} · ${yrLabel(st.playSeason)}\n${r.w}-${r.l} · ${tier}\n${'🟩'.repeat(k)}${'🟥'.repeat(10 - k)}\n${STARTERS.map(s => `${s} ${fusionAt(s)?.name||HL.HISTORY.players[st.lineup[s].row.pid][0]}`).join(' · ')}`;
     return `<div class="stack" style="gap:14px">${HL.GFX.championPoster(posterTeam, r.players.slice(0, 5), '', { wide: true, kicker: `${r.games}-0 Challenge · ${yrLabel(st.playSeason)} · ${r.w}-${r.l}`, sub: tier })}
       <section class="block"><div class="body row wrap" style="gap:24px">
         <div><div class="caps">Final record</div><div class="num" style="font-size:64px;line-height:1">${r.w}-${r.l}</div></div>
@@ -986,6 +1009,7 @@ HL.Challenge = (function () {
       ${HL.AbilityReplay?.render(r.abilityCounts,'SUPERTEAM ABILITY REPLAY')||''}
       ${identityReport(r)}
        ${mission}${gauntlet}${rivals}
+       ${genesisSpotlight}
        ${filmReel(r.gameLog)}
         ${HL.FilmIQ?.render(r.gameLog,r.schemeRecords)||''}
        ${HL.FanFeed?HL.FanFeed.render(HL.FanFeed.season82(r)):''}
